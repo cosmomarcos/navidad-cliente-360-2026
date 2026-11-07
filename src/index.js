@@ -239,8 +239,7 @@ async function handleApi(request, env, url) {
     if (request.method === "GET" && url.pathname === "/api/admin/participants") {
       const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition) return json({ participants: [] });
-      await env.DB.prepare("DELETE FROM edition_members WHERE edition_id=? AND status<>'confirmed'").bind(edition.id).run();
-      const result = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), u.display_name) AS display_name, u.email, u.avatar_url, em.status, em.joined_at FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY em.joined_at ASC").bind(edition.id).all();
+      const result = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), u.display_name) AS display_name, u.email, u.avatar_url, em.status, em.joined_at FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status IN ('confirmed','inactive') ORDER BY CASE em.status WHEN 'confirmed' THEN 0 ELSE 1 END, em.joined_at ASC").bind(edition.id).all();
       return json({ participants: result.results || [] });
     }
     if (request.method === "PATCH" && url.pathname.startsWith("/api/admin/participants/")) {
@@ -248,9 +247,7 @@ async function handleApi(request, env, url) {
       const body = await request.json();
       const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition || typeof body.active !== "boolean") return json({ error: "Solicitud inválida." }, 400);
-      const result = body.active
-        ? await env.DB.prepare("UPDATE edition_members SET status='confirmed' WHERE edition_id=? AND user_id=?").bind(edition.id, userId).run()
-        : await env.DB.prepare("DELETE FROM edition_members WHERE edition_id=? AND user_id=?").bind(edition.id, userId).run();
+      const result = await env.DB.prepare("UPDATE edition_members SET status=? WHERE edition_id=? AND user_id=? AND status IN ('confirmed','inactive')").bind(body.active ? "confirmed" : "inactive", edition.id, userId).run();
       if (!result.meta.changes) return json({ error: "Participante no encontrado." }, 404);
       return json({ ok: true });
     }
