@@ -1,12 +1,13 @@
 const $ = selector => document.querySelector(selector);
+const setClass = (selector, className, enabled) => { const el=$(selector); if(el) el.classList.toggle(className, !!enabled); return el; };
 const params = new URLSearchParams(location.search);
 const token = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
 let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null;
 const api=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||"Ocurrió un error.");return d;};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function setLoginView(){
-  $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");
-  $("#join-card").classList.remove("hidden");
+  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
+  const card=$("#join-card");if(!card)return;card.classList.remove("hidden");
   $("#join-card").innerHTML=`<div class="login-brand"><span>🎄</span><p class="kicker">CLIENTE 360 · NAVIDAD 2026</p><h1>Navidad Cliente 360</h1><p>Una Navidad, muchas sorpresas.</p></div><div id="login-context" class="login-context">${token?"Inicia sesión con Google para validar tu invitación y unirte a la celebración.":"Inicia sesión con tu cuenta de Google para continuar."}</div><div id="google-button" class="google-button"></div><div id="login-feedback" class="status hidden" role="status"></div><div class="privacy-note">🔒 Tu participación y tu asignación secreta estarán protegidas.</div>`;
 }
 function showFeedback(message,error=false){const el=$("#login-feedback");if(!el)return;el.textContent=message;el.classList.remove("hidden","error");if(error)el.classList.add("error");}
@@ -16,7 +17,7 @@ function showProfileForm(profile=null){
  $("#participant-profile-form").addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget));const fb=$("#profile-feedback");try{await api("/api/profile/participant",{method:"POST",body:JSON.stringify(values)});currentUser=await api("/api/me");renderMemberApp();}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});
 }
 function renderMemberApp(){
- $("#join-card").classList.add("hidden");$("#admin-panel").classList.add("hidden");
+ setClass("#join-card","hidden",true);setClass("#admin-panel","hidden",true);
  let app=$("#member-app");app.classList.remove("hidden");
  const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";
  const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><article class="member-feature"><span>🎁</span><div><b>Mi amigo secreto</b><p>Tu asignación estará disponible cuando el organizador realice el sorteo.</p></div><small>Próximamente</small></article><div class="member-shortcuts"><article><span>💝</span><b>Lista de deseos</b><small>Próximamente</small></article><article><span>💌</span><b>Mensajes y pistas</b><small>Próximamente</small></article></div>`;
@@ -56,7 +57,7 @@ function renderRejoinView(){
 }
 async function logout(){try{await api("/api/auth/logout",{method:"POST"});}finally{location.href=location.pathname+(token?"?invite="+encodeURIComponent(token):"");}}
 async function renderAdmin(){
- const panel=$("#admin-panel");
+ const panel=$("#admin-panel");if(!panel)return;
  if(!currentUser?.isPrimaryAdmin){panel.classList.add("hidden");return;}
  if(!panel.parentElement?.matches("#admin-tools-slot")){panel.classList.add("hidden");return;}
  panel.classList.remove("hidden");
@@ -71,10 +72,10 @@ async function renderAdmin(){
  }catch(e){panel.innerHTML=`<p class="admin-error">${esc(e.message)}</p>`;}
 }
 async function checkSession(){
- $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");
+ setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
  currentUser=await api("/api/me");signedIn=!!currentUser.authenticated;
  if(!signedIn){setLoginView();await initGoogle();return;}
- $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");$("#google-area").classList.add("hidden");
+ setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);setClass("#google-area","hidden",true);
  if(token&&!currentUser.membership){$("#join-card").classList.remove("hidden");$("#join-card").innerHTML=`<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">INVITACIÓN</p><h2>${esc(inviteEdition?.title||"Navidad Cliente 360")}</h2></div></div><p class="muted">${inviteValid?"Tu invitación está lista. Confirma tu participación para continuar.":"La invitación no es válida o venció."}</p><button id="confirm-join" class="primary-button" ${inviteValid?"":"disabled"}>Confirmar mi participación →</button><div id="join-feedback" class="status hidden"></div>`;
  $("#confirm-join").addEventListener("click",async()=>{try{await api("/api/invitations/join",{method:"POST",body:JSON.stringify({token})});currentUser=await api("/api/me");showProfileForm();}catch(e){const fb=$("#join-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
  }else if(currentUser.membership?.status==="confirmed"&&!currentUser.participantProfile){$("#join-card").classList.add("hidden");showProfileForm();}
@@ -82,7 +83,7 @@ async function checkSession(){
  else {$("#join-card").classList.remove("hidden");$("#join-card").innerHTML="<h2>Tu cuenta está activa</h2><p>Solicita una invitación válida al organizador para participar.</p>";}
  await renderAdmin();
 }
-window.handleGoogleCredential=async response=>{try{await api("/api/auth/google",{method:"POST",body:JSON.stringify({credential:response.credential})});await loadInvite();await checkSession();}catch(e){showFeedback(e.message,true);}};
+window.handleGoogleCredential=async response=>{try{if(!response?.credential)throw new Error("Google no devolvió una credencial válida. Intenta nuevamente.");await api("/api/auth/google",{method:"POST",body:JSON.stringify({credential:response.credential})});await loadInvite();await checkSession();}catch(e){console.error("Error al completar el inicio de sesión:",e);showFeedback("No se pudo completar el inicio de sesión. Recarga la página e inténtalo nuevamente.",true);}};
 async function initGoogle(){const c=await fetch("/api/config").then(r=>r.json());if(!c.googleClientId)return;const deadline=Date.now()+10000;while(!window.google?.accounts?.id&&Date.now()<deadline)await new Promise(r=>setTimeout(r,150));if(!window.google?.accounts?.id){showFeedback("No se pudo cargar Google. Intenta nuevamente.",true);return;}window.google.accounts.id.initialize({client_id:c.googleClientId,callback:window.handleGoogleCredential});window.google.accounts.id.renderButton($("#google-button"),{theme:"outline",size:"large",shape:"pill",text:"continue_with",width:280});}
 await loadInvite();await checkSession();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
