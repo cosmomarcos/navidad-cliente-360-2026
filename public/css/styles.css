@@ -75,3 +75,14 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 /* Separación clara entre el nombre de marca y el identificador de versión */
 .brand-title{gap:16px}
 .app-version-inline{margin-left:4px;padding:4px 8px;border-radius:12px;font-size:8px;letter-spacing:.8px}
+
+.draw-admin-card{margin:24px 0;padding:20px;background:#f0e8d8;border:1px solid #e2d7c2;border-radius:16px;color:#19372d}
+.draw-admin-card h3{font-family:'Playfair Display',serif;font-size:19px;margin:0 0 6px}.draw-admin-card>p{font-size:12px;color:#64766b;line-height:1.5;margin:0 0 14px}
+.draw-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.draw-stats span{padding:11px;background:#fffaf0;border:1px solid #e3dac8;border-radius:10px;font-size:10px;color:#64766b}.draw-stats b{display:block;font-size:20px;color:#19372d;font-family:'Playfair Display',serif}
+.draw-state-label{font-weight:700;font-size:12px;color:#19372d;margin:12px 0}
+#draw-admin-actions{display:grid;gap:9px}#draw-admin-actions small{font-size:10px;color:#64766b;line-height:1.5}
+.draw-success,.draw-ready{padding:12px;background:#e1eadb;border-radius:10px;color:#28543d;font-size:12px;line-height:1.5;margin:8px 0}
+.danger-action{background:#8f3832!important}.admin-action:disabled{opacity:.45;cursor:not-allowed}
+.secret-reveal,.secret-waiting{max-width:620px;margin:20px auto;padding:28px 22px;background:#f7f0df;color:#19372d;border-radius:18px;text-align:center;box-shadow:0 15px 35px #0002}
+.secret-reveal>span,.secret-waiting>span{font-size:34px}.secret-reveal h2{font-family:'Playfair Display',serif;font-size:30px;color:#174536;margin:8px 0 12px}.secret-reveal p,.secret-waiting p{font-size:13px;color:#64766b;line-height:1.6}.secret-reveal small{font-size:11px;color:#8a7549}.secret-waiting h3{font-family:'Playfair Display',serif;margin:8px 0}
+@media(max-width:520px){.draw-admin-card{padding:15px}.draw-stats{grid-template-columns:1fr 1fr}.draw-stats span:first-child{grid-column:1/-1}}
