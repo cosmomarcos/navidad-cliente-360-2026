@@ -209,5 +209,21 @@ window.handleGoogleCredential=async response=>{try{if(!response?.credential)thro
   if (loader) loader.remove();
 }}catch(error){console.error("No se pudo inicializar la sesión:",error);setLoginView();try{await initGoogle();}catch(loginError){showFeedback("No se pudo conectar con el servicio. Recarga la página e inténtalo nuevamente.",true);}}finally{document.body.classList.remove("app-booting");const loader=$("#app-loader");if(loader)loader.remove();}}catch(e){console.error("Error al completar el inicio de sesión:",e);showFeedback("No se pudo completar el inicio de sesión. Recarga la página e inténtalo nuevamente.",true);}};
 async function initGoogle(){const c=await fetch("/api/config").then(r=>r.json());if(!c.googleClientId)return;const deadline=Date.now()+10000;while(!window.google?.accounts?.id&&Date.now()<deadline)await new Promise(r=>setTimeout(r,150));if(!window.google?.accounts?.id){showFeedback("No se pudo cargar Google. Intenta nuevamente.",true);return;}window.google.accounts.id.initialize({client_id:c.googleClientId,callback:window.handleGoogleCredential});window.google.accounts.id.renderButton($("#google-button"),{theme:"outline",size:"large",shape:"pill",text:"continue_with",width:280});}
-await loadInvite();await checkSession();
+try {
+  await loadInvite();
+  await checkSession();
+} catch (error) {
+  console.error("No se pudo inicializar la sesión:", error);
+  try {
+    setLoginView();
+    await initGoogle();
+  } catch (loginError) {
+    console.error("No se pudo inicializar Google:", loginError);
+    showFeedback("No se pudo conectar con el servicio. Recarga la página e inténtalo nuevamente.", true);
+  }
+} finally {
+  document.body.classList.remove("app-booting");
+  const loader = $("#app-loader");
+  if (loader) loader.remove();
+}
 if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
