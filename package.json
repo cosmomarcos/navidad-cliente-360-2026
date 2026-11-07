@@ -8,7 +8,7 @@
     "deploy": "wrangler deploy",
     "db:local": "wrangler d1 migrations apply navidad-cliente-360-db --local",
     "db:remote": "wrangler d1 migrations apply navidad-cliente-360-db --remote",
-    "test": "node --check src/index.js && node --check public/js/app.js && node --check public/js/participants.js && node -e \"JSON.parse(require('fs').readFileSync('public/manifest.webmanifest','utf8'))\""
+    "test": "node --check src/index.js && node --check public/js/app.js && node --check public/js/participants.js && node --check public/sw.js && node -e \"JSON.parse(require('fs').readFileSync('public/manifest.webmanifest','utf8'))\""
   },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0"
