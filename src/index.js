@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.8.2" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.8.3" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -248,7 +248,7 @@ async function handleApi(request, env, url) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
     if (request.method === "GET" && url.pathname === "/api/community") {
-      const messages = await env.DB.prepare("SELECT m.id, m.message, m.created_at, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS sender_name, m.user_id=? AS is_mine FROM community_messages m JOIN users u ON u.id=m.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE m.edition_id=? ORDER BY m.created_at DESC LIMIT 80").bind(user.id, member.edition_id).all();
+      const messages = await env.DB.prepare("SELECT m.id, m.message, m.created_at, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS sender_name, m.user_id=? AS is_mine FROM community_messages m JOIN users u ON u.id=m.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE m.edition_id=? ORDER BY m.created_at DESC LIMIT 100").bind(user.id, member.edition_id).all();
       return json({ messages: (messages.results || []).reverse() });
     }
     if (request.method === "POST" && url.pathname === "/api/community") {
@@ -424,6 +424,23 @@ export default {
         return json({ error: "Error interno del servidor al procesar " + url.pathname + ": " + (error?.message || "Error desconocido"), code: "WORKER_EXCEPTION" }, 500);
       }
       return new Response("Error interno. Intenta nuevamente.", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+    }
+  },
+  async scheduled(controller, env, ctx) {
+    try {
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS community_messages (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_community_messages_created_at ON community_messages(created_at)").run();
+      let deleted = 0;
+      for (let batch = 0; batch < 20; batch++) {
+        const result = await env.DB.prepare("DELETE FROM community_messages WHERE id IN (SELECT id FROM community_messages WHERE created_at < datetime('now', '-30 days') ORDER BY created_at ASC LIMIT 500)").run();
+        const changes = result.meta?.changes || 0;
+        deleted += changes;
+        if (changes < 500) break;
+      }
+      console.log("Community chat retention cleanup completed", { deleted, retentionDays: 30, batches: Math.ceil(deleted / 500) });
+    } catch (error) {
+      console.error("Community chat retention cleanup failed", { message: error?.message || String(error) });
+      throw error;
     }
   }
 };
