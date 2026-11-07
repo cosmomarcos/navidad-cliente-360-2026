@@ -263,7 +263,7 @@ async function handleApi(request, env, url) {
       const note = String(body.note || "").trim();
       const link = String(body.url || "").trim();
       const imageData = String(body.imageData || "");
-      if (imageData && (!/^data:image\\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData) || imageData.length > 280000)) return json({ error: "La imagen no es válida o supera el tamaño permitido." }, 400);
+      if (imageData && (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData) || imageData.length > 280000)) return json({ error: "La imagen no es válida o supera el tamaño permitido." }, 400);
       if (title.length < 2 || title.length > 100) return json({ error: "El deseo debe tener entre 2 y 100 caracteres." }, 400);
       if (note.length > 300) return json({ error: "La descripción no puede superar los 300 caracteres." }, 400);
       if (link && (link.length > 500 || !/^https?:\/\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
@@ -281,7 +281,7 @@ async function handleApi(request, env, url) {
       const note = String(body.note || "").trim();
       const link = String(body.url || "").trim();
       const imageData = String(body.imageData || "");
-      if (imageData && (!/^data:image\\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData) || imageData.length > 280000)) return json({ error: "La imagen no es válida o supera el tamaño permitido." }, 400);
+      if (imageData && (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData) || imageData.length > 280000)) return json({ error: "La imagen no es válida o supera el tamaño permitido." }, 400);
       if (title.length < 2 || title.length > 100) return json({ error: "El deseo debe tener entre 2 y 100 caracteres." }, 400);
       if (note.length > 300) return json({ error: "La descripción no puede superar los 300 caracteres." }, 400);
       if (link && (link.length > 500 || !/^https?:\/\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
