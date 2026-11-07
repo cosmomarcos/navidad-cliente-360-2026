@@ -207,3 +207,18 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .clue-compose-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px}.clue-compose-footer small{color:#788477;font-size:10px;line-height:1.4}
 .clue-compose-footer .primary-button{margin:0;padding:10px 14px;font-size:11px}
 @media(max-width:560px){.community-chat,.community-clues{padding:16px;margin:14px auto}.community-section-heading h3{font-size:19px}.community-chat-feed{max-height:360px;padding:10px}.community-message{max-width:94%}.clue-compose-footer{align-items:stretch;flex-direction:column}.clue-compose-footer .primary-button{width:100%}}
+
+
+/* v0.8.4: evitar el destello del login mientras se valida la sesión */
+.app-booting #app-loader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#0b251f;background-image:radial-gradient(ellipse at 50% 0%,#1b5142 0,transparent 60%);color:#f7f0df}
+.app-booting .shell{visibility:hidden}
+#app-loader{display:none}
+.loader-mark{display:grid;place-items:center;width:54px;height:54px;border:1px solid #d7b66c;border-radius:50%;color:#d7b66c;font-size:30px}
+.loader-title{font-size:12px;letter-spacing:3px;font-weight:700}
+.loader-subtitle{font-size:11px;color:#b8c8bd}
+.loader-spinner{width:20px;height:20px;border:2px solid #557263;border-top-color:#d7b66c;border-radius:50%;animation:loader-spin .8s linear infinite;margin-top:8px}
+@keyframes loader-spin{to{transform:rotate(360deg)}}
+.home-team-photo-wrap{position:relative;margin:18px 0 28px;padding:7px;border-radius:22px;background:linear-gradient(135deg,rgba(215,182,108,.75),rgba(85,114,99,.35));box-shadow:0 18px 42px rgba(0,0,0,.28)}
+.home-team-photo{height:clamp(230px,48vw,460px);max-height:none;object-fit:cover;object-position:center 48%;border-radius:16px}
+.home-team-photo-wrap:after{content:"";position:absolute;inset:7px;border-radius:16px;pointer-events:none;background:linear-gradient(180deg,rgba(5,25,20,.02) 55%,rgba(5,25,20,.24))}
+@media(max-width:600px){.home-team-photo-wrap{margin:14px 0 22px;padding:5px;border-radius:17px}.home-team-photo-wrap:after{inset:5px;border-radius:12px}.home-team-photo{height:250px;border-radius:12px}}
