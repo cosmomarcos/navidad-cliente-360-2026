@@ -59,8 +59,8 @@ async function loadHomeParticipants(){
   const participants=data.participants||[];
   count.textContent="("+participants.length+")";
   list.innerHTML=participants.length?participants.map((p,index)=>{
-   const initials=String(p.display_name||"Participante").trim().split(/\\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase();
-   const avatar=p.avatar_url&&/^https:\\/\\//i.test(p.avatar_url)?'<img src="'+esc(p.avatar_url)+'" alt="">':esc(initials||"🎄");
+   const initials=String(p.display_name||"Participante").trim().split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase();
+   const avatar=p.avatar_url&&/^https:\/\//i.test(p.avatar_url)?'<img src="'+esc(p.avatar_url)+'" alt="">':esc(initials||"🎄");
    return '<article class="home-participant-row"><span class="home-participant-avatar">'+avatar+'</span><span class="home-participant-name">'+esc(p.display_name||"Participante")+'</span><span class="home-participant-number">'+String(index+1).padStart(2,"0")+'</span></article>';
   }).join(""):'<p class="participants-empty">Todavía no hay participantes inscritos.</p>';
  }catch(error){
