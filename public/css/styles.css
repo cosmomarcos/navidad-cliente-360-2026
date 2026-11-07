@@ -265,3 +265,39 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
  .member-welcome:after{right:12px;top:4px;font-size:64px}
 }
 @media(max-width:380px){.exchange-budget-card{flex-wrap:wrap}.exchange-budget-amount{margin-left:52px;margin-top:-5px}}
+
+/* Notificaciones de pistas */
+.nav-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#b83c35;color:#fff;font-size:10px;font-weight:800;line-height:1}
+.nav-unread-badge[hidden]{display:none}
+.push-settings{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin:16px 0;padding:16px;border:1px solid rgba(23,69,54,.14);border-radius:16px;background:#f8f5eb}
+.push-settings b{display:block;color:#19372d;font-size:14px}.push-settings p{margin:4px 0 0;color:#64766b;font-size:12px}
+.push-settings .status{grid-column:1/-1;margin:0}.push-settings .secondary-action{white-space:nowrap}.push-enabled{opacity:.8}
+@media(max-width:480px){.push-settings{grid-template-columns:1fr}.push-settings .secondary-action{width:100%}}
+
+
+/* Información logística y lista pública de participantes en Inicio */
+.exchange-budget-card{display:flex;flex-wrap:wrap;align-items:center;gap:14px;position:relative;overflow:hidden;margin:14px 0;padding:20px;border:1px solid rgba(177,145,82,.25);border-radius:20px;background:linear-gradient(145deg,#fffaf0,#f1e8d4);color:#19372d;box-shadow:0 12px 28px rgba(0,0,0,.14)}
+.exchange-location{position:relative;z-index:1;flex:1 0 100%;display:grid;gap:12px;padding-top:16px;border-top:1px solid rgba(25,55,45,.12)}
+.exchange-detail-row{display:flex;align-items:flex-start;gap:11px}
+.exchange-detail-icon{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:11px;background:#e8dfc9;font-size:17px}
+.exchange-detail-row b{display:block;color:#19372d;font-size:13px}
+.exchange-detail-row p{margin:3px 0;color:#314e40;font-size:12px;line-height:1.5}
+.exchange-detail-row small{color:#8b7448;font-size:10px;font-weight:700}
+.exchange-breakfast{margin:0;padding:12px 14px;border-radius:12px;background:#e9dfc8;color:#694d21;font-size:12px;font-weight:700;line-height:1.5}
+.exchange-map-link{color:#176347;font-size:12px;font-weight:800;text-decoration:none}
+.exchange-map-preview{overflow:hidden;height:190px;border:1px solid rgba(25,55,45,.15);border-radius:14px;background:#e6e0d2}
+.exchange-map-preview iframe{display:block;width:100%;height:100%;border:0}
+.home-participants-card{margin:14px 0 20px;padding:20px;border:1px solid rgba(215,182,108,.28);border-radius:20px;background:#f7f0df;color:#19372d;box-shadow:0 12px 28px rgba(0,0,0,.13)}
+.home-participants-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.home-participants-heading h2{margin:4px 0 0;font-family:'Playfair Display',serif;font-size:20px;line-height:1.25}
+.home-participants-heading h2 span{color:#9a7c42;font-family:inherit;font-size:16px}
+.home-participants-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:#e9dfc8;font-size:21px}
+.home-participants-list{display:grid;gap:8px}
+.home-participant-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(25,55,45,.08);border-radius:12px;background:#fffdf7}
+.home-participant-avatar{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;overflow:hidden;border-radius:50%;background:#e9dfc8;color:#315444;font-size:11px;font-weight:800}
+.home-participant-avatar img{width:100%;height:100%;object-fit:cover}
+.home-participant-name{flex:1;color:#19372d;font-size:12px;font-weight:700}
+.home-participant-number{color:#a18b61;font-size:10px;font-weight:800;letter-spacing:1px}
+.home-participant-row.is-inactive{opacity:.68}.home-participant-name small{display:block;margin-top:3px;color:#987d45;font-size:10px}.home-participant-toggle{border:1px solid #d6c8a8;border-radius:8px;background:#f4ead3;color:#315444;padding:7px 9px;font-size:10px;font-weight:800;cursor:pointer}.home-participant-toggle:disabled{opacity:.5}
+.participants-loading,.participants-empty{margin:0;padding:12px;color:#718073;font-size:12px}
+@media(max-width:600px){.exchange-map-preview{height:165px}.home-participants-card{padding:16px}.home-participants-heading h2{font-size:18px}}

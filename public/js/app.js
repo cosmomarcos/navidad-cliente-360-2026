@@ -39,11 +39,48 @@ function renderMemberApp(){
  const budgetAmount=currentUser.membership?.budget_amount;
  const budgetCurrency=currentUser.membership?.currency||"PEN";
  const budgetLabel=budgetAmount==null?"Por definir":new Intl.NumberFormat("es-PE",{style:"currency",currency:budgetCurrency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(budgetAmount));
- const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Monto acordado para el intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><p>Presupuesto acordado por participante</p></div><div class="exchange-budget-amount">${esc(budgetLabel)}</div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
- app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto</button><button data-tab="community"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos</button><button data-tab="profile"><span>👤</span>Perfil</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
+ const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><p>Presupuesto acordado por participante</p></div><div class="exchange-budget-amount">${esc(budgetLabel)}</div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div></div></section><section class="home-participants-card" aria-labelledby="home-participants-title"><div class="home-participants-heading"><div><span class="exchange-budget-kicker">EL EQUIPO QUE CELEBRA</span><h2 id="home-participants-title">Lista de Participantes <span id="home-participants-count">(—)</span></h2></div><span class="home-participants-icon">🎄</span></div><div id="home-participants-list" class="home-participants-list" aria-live="polite"><p class="participants-loading">Cargando participantes…</p></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
+ app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto</button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes <span class="nav-unread-badge" id="community-unread-badge" hidden></span></button><button data-tab="wishes"><span>💝</span>Deseos</button><button data-tab="profile"><span>👤</span>Perfil</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
  updateMemberCountdown(currentUser.membership?.event_date);
+ loadHomeParticipants();
  prefetchMemberTabs();
+ if(communityPollTimer)clearInterval(communityPollTimer);
+ updateCommunityUnreadBadge();
+ communityPollTimer=setInterval(updateCommunityUnreadBadge,45000);
  app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileSettings();return;}if(btn.dataset.tab==="admin-settings"){showAdminSettings();return;}if(btn.dataset.tab==="secret"){renderSecretTab();return;}if(btn.dataset.tab==="wishes"){renderWishesTab();return;}if(btn.dataset.tab==="community"){renderCommunityTab();return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Mensajes",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>${labels[btn.dataset.tab]}</h2></div><article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
+ const requestedTab=new URLSearchParams(location.search).get("tab");
+ if(requestedTab==="community")app.querySelector('[data-tab="community"]')?.click();
+}
+async function loadHomeParticipants(){
+ const list=$("#home-participants-list"),count=$("#home-participants-count");
+ if(!list||!count)return;
+ try{
+  const data=await api(currentUser?.isPrimaryAdmin?"/api/admin/participants":"/api/participants",{noMemoryCache:true});
+  const participants=data.participants||[];
+  const active=participants.filter(p=>p.status==="confirmed"||!p.status);
+  count.textContent="("+active.length+")";
+  list.innerHTML=participants.length?participants.map((p,index)=>{
+   const initials=String(p.display_name||"Participante").trim().split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase();
+   const avatar=p.avatar_url&&/^https:\/\//i.test(p.avatar_url)?'<img src="'+esc(p.avatar_url)+'" alt="">':esc(initials||"🎄");
+   const inactive=p.status&&p.status!=="confirmed";
+   const action=currentUser?.isPrimaryAdmin?'<button class="home-participant-toggle" data-home-user="'+esc(p.user_id)+'" data-home-active="'+(inactive?"0":"1")+'">'+(inactive?"Reactivar":"Desactivar")+'</button>':"";
+   return '<article class="home-participant-row'+(inactive?" is-inactive":"")+'"><span class="home-participant-avatar">'+avatar+'</span><span class="home-participant-name">'+esc(p.display_name||"Participante")+(inactive?'<small>Inscripción pausada</small>':"")+'</span><span class="home-participant-number">'+(inactive?"PAUSADO":String(index+1).padStart(2,"0"))+'</span>'+action+'</article>';
+  }).join(""):'<p class="participants-empty">Todavía no hay participantes inscritos.</p>';
+  if(currentUser?.isPrimaryAdmin&&!list.dataset.adminActions){
+   list.dataset.adminActions="1";
+   list.addEventListener("click",async event=>{
+    const button=event.target.closest("[data-home-user]");if(!button)return;
+    button.disabled=true;
+    try{
+     await api("/api/admin/participants/"+encodeURIComponent(button.dataset.homeUser),{method:"PATCH",body:JSON.stringify({active:button.dataset.homeActive!=="1"})});
+     await loadHomeParticipants();
+    }catch(error){button.disabled=false;button.textContent=error.message;}
+   });
+  }
+ }catch(error){
+  count.textContent="(—)";
+  list.innerHTML='<p class="participants-empty">No se pudo cargar la lista. Vuelve a intentarlo más tarde.</p>';
+ }
 }
 async function showAdminSettings(){
  const home=$("#member-app .member-home"); if(!currentUser?.isPrimaryAdmin||!home)return;
@@ -84,6 +121,35 @@ async function compressWishImage(file){
  const scale=Math.min(1,800/Math.max(image.width,image.height));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));canvas.getContext("2d").drawImage(image,0,0,canvas.width,canvas.height);
  const data=canvas.toDataURL("image/jpeg",.72);if(data.length>280000)throw new Error("La imagen sigue siendo muy pesada. Prueba con otra imagen más pequeña.");return data;
 }
+
+async function updateCommunityUnreadBadge(){
+ const badge=$("#community-unread-badge");if(!badge||!currentUser?.authenticated)return;
+ try{const data=await api("/api/community/unread",{noMemoryCache:true});const count=Number(data.unread||0);badge.textContent=count>9?"9+":String(count);badge.hidden=count===0;badge.setAttribute("aria-label",count+" mensajes sin leer");}
+ catch{badge.hidden=true;}
+}
+function urlBase64ToUint8Array(value){
+ const padding="=".repeat((4-value.length%4)%4),base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
+ const raw=atob(base64);return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function enablePushNotifications(button){
+ const original=button.textContent;button.disabled=true;button.textContent="Activando…";
+ try{
+  if(!("serviceWorker"in navigator)||!("PushManager"in window)||!("Notification"in window))throw new Error("Este navegador no admite notificaciones push.");
+  const config=await api("/api/push/public-key");
+  if(!config.publicKey)throw new Error("El servidor aún no tiene configuradas las claves de notificaciones.");
+  const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
+  if(permission!=="granted")throw new Error("No se concedió permiso para mostrar notificaciones.");
+  const registration=await navigator.serviceWorker.ready;
+  let subscription=await registration.pushManager.getSubscription();
+  if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(config.publicKey)});
+  await api("/api/push/subscribe",{method:"POST",body:JSON.stringify(subscription)});
+  button.textContent="Notificaciones activadas ✓";button.classList.add("push-enabled");
+ }catch(error){
+  button.disabled=false;button.textContent=original;
+  const feedback=$("#push-feedback");if(feedback){feedback.textContent=error.message;feedback.classList.remove("hidden");feedback.classList.add("error");}
+ }
+}
+
 async function renderCommunityTab(){
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Buzón secreto ✉️</h2><p>Deja un mensaje anónimo para tu amigo secreto y revisa las sorpresas que te envíe.</p></div><div class="tab-skeleton" aria-label="Preparando buzón"><span></span><span></span><span></span></div>';
@@ -93,7 +159,9 @@ async function renderCommunityTab(){
   if(clues.state==="not_assigned")messageMarkup='<div class="clue-locked"><span>🎁</span><div><b>Tu buzón estará listo pronto</b><p>Cuando el organizador te asigne un amigo secreto, podrás enviarle mensajes anónimos.</p></div></div>';
   else if(clues.state!=="drawn")messageMarkup='<div class="clue-locked"><span>🔐</span><div><b>El buzón se abrirá después del sorteo</b><p>Una vez realizado el sorteo, podrás dejar mensajes anónimos a tu amigo secreto y recibir los suyos.</p></div></div>';
   else messageMarkup='<div class="clue-recieved-list">'+(clues.clues||[]).map(c=>'<article class="clue-received"><span>💌</span><div><b>Un mensaje para ti</b><p>'+esc(c.message)+'</p><time>'+formatCommunityTime(c.created_at)+'</time></div></article>').join('')+'</div>' + (!(clues.clues||[]).length?'<div class="community-empty clue-empty"><span>💌</span><b>Tu buzón está esperando</b><p>Aún no recibes mensajes. ¡Tu amigo secreto podría sorprenderte pronto!</p></div>':'')+'<div class="clue-compose"><div class="clue-compose-heading"><div><span class="wish-kicker">UN DETALLE EN SECRETO</span><h3>Dejar un mensaje</h3></div><span class="wish-count">'+clues.sentCount+' / '+clues.limit+'</span></div><form id="clue-form"><label for="clue-message">Escribe algo para tu amigo secreto</label><textarea id="clue-message" name="message" maxlength="240" rows="3" placeholder="Ej. ¡Espero que tengas una Navidad increíble! 🎄" required '+(clues.sentCount>=clues.limit?'disabled':'')+'></textarea><div class="clue-compose-footer"><small>Tu identidad permanecerá en secreto. Puedes enviar hasta 5 mensajes.</small><button class="primary-button" type="submit" '+(clues.sentCount>=clues.limit?'disabled':'')+'>Enviar mensaje →</button></div><div id="clue-feedback" class="status hidden"></div></form></div>';
-  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Buzón secreto ✉️</h2><p>Un espacio privado para dejarle mensajes anónimos a tu amigo secreto y recibir los suyos.</p></div><section class="community-clues">'+messageMarkup+'</section>';
+  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Buzón secreto ✉️</h2><p>Un espacio privado para dejarle mensajes anónimos a tu amigo secreto y recibir los suyos.</p></div><div class="push-settings"><div><b>Entérate al instante</b><p>Recibe un aviso cuando tu amigo secreto te deje una pista.</p></div><button type="button" id="enable-push-notifications" class="secondary-action">🔔 Activar notificaciones</button><div id="push-feedback" class="status hidden" role="status"></div></div><section class="community-clues">'+messageMarkup+'</section>';
+  const pushButton=$("#enable-push-notifications");if(pushButton)pushButton.addEventListener("click",()=>enablePushNotifications(pushButton));
+  updateCommunityUnreadBadge();
   const clueForm=$("#clue-form");if(clueForm)clueForm.addEventListener("submit",async ev=>{ev.preventDefault();const form=ev.currentTarget;const fb=$("#clue-feedback");const send=form.querySelector('button[type="submit"]');send.disabled=true;try{await api("/api/community/clues",{method:"POST",body:JSON.stringify({message:form.elements.message.value})});await renderCommunityTab();}catch(e){fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");send.disabled=false;}});
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Buzón secreto</h2></div><p class="status error">'+esc(e.message)+'</p>';}
 }
@@ -162,7 +230,7 @@ function renderRejoinView(){
  $("#rejoin-button").addEventListener("click",async()=>{try{await api("/api/participation/rejoin",{method:"POST"});currentUser=await api("/api/me");if(!currentUser.participantProfile)showProfileForm();else renderMemberApp();}catch(e){const fb=$("#rejoin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
  $("#logout-button").addEventListener("click",logout);
 }
-async function logout(){try{await api("/api/auth/logout",{method:"POST"});}finally{location.href=location.pathname+(token?"?invite="+encodeURIComponent(token):"");}}
+async function logout(){if(communityPollTimer)clearInterval(communityPollTimer);try{await api("/api/auth/logout",{method:"POST"});}finally{location.href=location.pathname+(token?"?invite="+encodeURIComponent(token):"");}}
 async function renderAdmin(){
  const panel=$("#admin-panel");if(!panel)return;
  if(!currentUser?.isPrimaryAdmin){panel.classList.add("hidden");return;}
