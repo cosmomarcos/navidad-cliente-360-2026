@@ -15,7 +15,7 @@ const api=async(path,options={})=>{
  return d;
 };
 function prefetchMemberTabs(){
- const paths=["/api/secret/me","/api/community","/api/community/clues","/api/wishes"];
+ const paths=["/api/secret/me","/api/community/clues","/api/wishes"];
  if(currentUser?.isPrimaryAdmin)paths.push("/api/admin/status","/api/admin/draw/status");
  const warm=()=>Promise.allSettled(paths.map(path=>api(path)));
  if("requestIdleCallback"in window)window.requestIdleCallback(warm,{timeout:1200});else setTimeout(warm,250);
