@@ -28,7 +28,7 @@ async function currentUser(request, env) {
 }
 async function isPrimaryAdmin(user, env) { return !!user && !!env.ADMIN_EMAIL && user.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase(); }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.3.2" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.4.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -47,7 +47,11 @@ async function handleApi(request, env, url) {
   if (request.method === "POST" && url.pathname === "/api/auth/logout") return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
   if (request.method === "GET" && url.pathname === "/api/me") {
     const user = await currentUser(request, env);
-    return user ? json({ authenticated: true, user, isPrimaryAdmin: await isPrimaryAdmin(user, env) }) : json({ authenticated: false });
+    if (!user) return json({ authenticated: false });
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profiles (user_id TEXT PRIMARY KEY REFERENCES users(id), first_name TEXT NOT NULL, last_name TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))" ).run();
+    const membership = await env.DB.prepare("SELECT em.id, em.edition_id, em.status, e.title, e.year FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(user.id).first();
+    const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
+    return json({ authenticated: true, user, isPrimaryAdmin: await isPrimaryAdmin(user, env), membership: membership || null, participantProfile: profile || null });
   }
   if (url.pathname.startsWith("/api/admin/")) {
     const user = await currentUser(request, env);
@@ -128,6 +132,19 @@ async function handleApi(request, env, url) {
       return json({ ok: true, invitationUrl: `${url.origin}/?invite=${token}` });
     }
     return json({ error: "Ruta administrativa no encontrada." }, 404);
+  }
+  if (request.method === "POST" && url.pathname === "/api/profile/participant") {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profiles (user_id TEXT PRIMARY KEY REFERENCES users(id), first_name TEXT NOT NULL, last_name TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))" ).run();
+    const member = await env.DB.prepare("SELECT id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    if (!member) return json({ error: "Primero confirma tu participación." }, 403);
+    const body = await request.json();
+    const firstName = String(body.firstName || "").trim().replace(/\\s+/g," ");
+    const lastName = String(body.lastName || "").trim().replace(/\\s+/g," ");
+    if (firstName.length < 2 || lastName.length < 2 || firstName.length > 80 || lastName.length > 100) return json({ error: "Ingresa nombres y apellidos válidos." }, 400);
+    await env.DB.prepare("INSERT INTO participant_profiles (user_id, first_name, last_name, updated_at) VALUES (?, ?, ?, datetime('now')) ON CONFLICT(user_id) DO UPDATE SET first_name=excluded.first_name, last_name=excluded.last_name, updated_at=datetime('now')").bind(user.id, firstName, lastName).run();
+    return json({ ok: true, profile: { firstName, lastName } });
   }
   const inviteMatch = url.pathname.match(/^\/api\/invitations\/([A-Za-z0-9_-]+)$/);
   if (request.method === "GET" && inviteMatch) {
