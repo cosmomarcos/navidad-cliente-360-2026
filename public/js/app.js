@@ -161,6 +161,22 @@ function urlBase64ToUint8Array(value){
  const padding="=".repeat((4-value.length%4)%4),base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
  const raw=atob(base64);return Uint8Array.from(raw,c=>c.charCodeAt(0));
 }
+async function refreshPushButtonState(button){
+ try{
+  if(!("serviceWorker"in navigator)||!("PushManager"in window)||!("Notification"in window))return;
+  if(Notification.permission!=="granted")return;
+  const registration=await navigator.serviceWorker.ready;
+  const subscription=await registration.pushManager.getSubscription();
+  if(!subscription)return;
+  await api("/api/push/subscribe",{method:"POST",body:JSON.stringify(subscription)});
+  button.textContent="Notificaciones activadas ✓";
+  button.disabled=true;
+  button.classList.add("push-enabled");
+  const feedback=$("#push-feedback");
+  if(feedback){feedback.textContent="Este dispositivo ya está registrado para recibir tus notificaciones.";feedback.classList.remove("hidden","error");}
+ }catch(error){console.warn("No se pudo verificar la suscripción push",error);}
+}
+
 async function enablePushNotifications(button){
  const original=button.textContent;button.disabled=true;button.textContent="Activando…";
  try{
@@ -196,7 +212,11 @@ async function renderCommunityTab(){
   else if(clues.state!=="drawn")messageMarkup='<div class="clue-locked"><span>🔐</span><div><b>El buzón se abrirá después del sorteo</b><p>Una vez realizado el sorteo, podrás dejar mensajes anónimos a tu amigo secreto y recibir los suyos.</p></div></div>';
   else messageMarkup='<div class="clue-recieved-list">'+(clues.clues||[]).map(c=>'<article class="clue-received"><span>💌</span><div><b>Un mensaje para ti</b><p>'+esc(c.message)+'</p><time>'+formatCommunityTime(c.created_at)+'</time></div></article>').join('')+'</div>' + (!(clues.clues||[]).length?'<div class="community-empty clue-empty"><span>💌</span><b>Tu buzón está esperando</b><p>Aún no recibes mensajes. ¡Tu amigo secreto podría sorprenderte pronto!</p></div>':'')+'<div class="clue-compose"><div class="clue-compose-heading"><div><span class="wish-kicker">UN DETALLE EN SECRETO</span><h3>Dejar un mensaje</h3></div><span class="wish-count">'+clues.sentCount+' enviados</span></div><form id="clue-form"><label for="clue-message">Escribe algo para tu amigo secreto</label><textarea id="clue-message" name="message" maxlength="240" rows="3" placeholder="Ej. ¡Espero que tengas una Navidad increíble! 🎄" required></textarea><div class="clue-compose-footer"><small>Tu identidad permanecerá en secreto. Puedes enviar todos los mensajes que quieras.</small><button class="primary-button" type="submit">Enviar mensaje →</button></div><div id="clue-feedback" class="status hidden"></div></form></div>';
   section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Buzón secreto ✉️</h2><p>Un espacio privado para dejarle mensajes anónimos a tu amigo secreto y recibir los suyos.</p></div><div class="push-settings"><div><b>Entérate al instante</b><p>Recibe un aviso cuando tu amigo secreto te deje una pista.</p></div><button type="button" id="enable-push-notifications" class="secondary-action">🔔 Activar notificaciones</button><div id="push-feedback" class="status hidden" role="status"></div></div><section class="community-clues">'+messageMarkup+'</section>';
-  const pushButton=$("#enable-push-notifications");if(pushButton)pushButton.addEventListener("click",()=>enablePushNotifications(pushButton));
+  const pushButton=$("#enable-push-notifications");
+  if(pushButton){
+   pushButton.addEventListener("click",()=>enablePushNotifications(pushButton));
+   refreshPushButtonState(pushButton);
+  }
   updateCommunityUnreadBadge();
   const clueForm=$("#clue-form");if(clueForm)clueForm.addEventListener("submit",async ev=>{ev.preventDefault();const form=ev.currentTarget;const fb=$("#clue-feedback");const send=form.querySelector('button[type="submit"]');send.disabled=true;try{await api("/api/community/clues",{method:"POST",body:JSON.stringify({message:form.elements.message.value})});await renderCommunityTab();}catch(e){fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");send.disabled=false;}});
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Buzón secreto</h2></div><p class="status error">'+esc(e.message)+'</p>';}
