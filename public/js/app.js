@@ -78,7 +78,7 @@ async function checkSession() {
     currentUser = await api("/api/me");
     signedIn = Boolean(currentUser?.authenticated);
     window.__NC360_DIAGNOSTICS = {
-      version: "0.2.2",
+      version: "0.3.0",
       authenticated: signedIn,
       isPrimaryAdmin: Boolean(currentUser?.isPrimaryAdmin),
       sessionChecked: true
@@ -99,7 +99,7 @@ async function checkSession() {
       panel.classList.add("hidden");
     }
   } catch (error) {
-    window.__NC360_DIAGNOSTICS = { version: "0.2.2", sessionChecked: false, error: error.message };
+    window.__NC360_DIAGNOSTICS = { version: "0.3.0", sessionChecked: false, error: error.message };
     panel.classList.remove("hidden");
     panel.innerHTML = `<h2>No se pudo cargar tu sesión</h2><p>${escapeHtml(error.message)}</p><button class="admin-action" id="retry-admin">Reintentar</button>`;
     $("#retry-admin").addEventListener("click", checkSession);
