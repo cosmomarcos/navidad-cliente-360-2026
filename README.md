@@ -89,3 +89,16 @@ El flujo de validación de GitHub Actions ejecuta:
 - El chat general y su tarea programada de retención ya no forman parte del Worker.
 
 **Importante:** el dry-run y las pruebas estáticas no sustituyen las pruebas funcionales en el dominio de producción ni la verificación de secretos y permisos en Cloudflare.
+
+
+## Notificaciones de pistas · v1.1.0
+
+Los participantes pueden activar notificaciones push desde **Mensajes → Buzón secreto → Activar notificaciones**. Cuando su amigo secreto envía una pista, el destinatario recibe un aviso genérico que conserva el anonimato; al tocarlo, la aplicación abre el buzón. La pestaña Mensajes también muestra un contador de pistas sin leer.
+
+### Configuración adicional en Cloudflare
+
+- Variable pública `VAPID_PUBLIC_KEY`: ya incluida en `wrangler.toml`.
+- Secreto `VAPID_PRIVATE_KEY`: configurar una sola vez en el Worker mediante `npx wrangler secret put VAPID_PRIVATE_KEY`. Nunca guardar este valor en el repositorio.
+- Las tablas `push_subscriptions` y `anonymous_clue_reads` se crean automáticamente al usar las funciones correspondientes.
+
+La suscripción se registra por dispositivo/navegador. Cada participante debe activar las notificaciones en cada dispositivo donde quiera recibirlas. En iPhone/iPad, instalar la PWA en la pantalla de inicio antes de activar las notificaciones.
