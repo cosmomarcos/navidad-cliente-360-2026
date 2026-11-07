@@ -54,3 +54,11 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .participant-admin{margin-top:20px;padding-top:18px;border-top:1px solid #ded5c4}.participant-admin h3{font-size:17px}.participant-help{margin:4px 0 10px;font-size:11px}
 .exclusion-box{margin-top:16px;padding:14px}.admin-result{display:grid;gap:6px}.admin-result a{overflow-wrap:anywhere;color:#174536}
 @media(max-width:600px){.admin-settings-view{padding:18px 15px}.edition-settings-form{grid-template-columns:1fr}.edition-settings-form label:first-child,.edition-settings-form button{grid-column:auto}.invite-management .admin-form{display:grid;grid-template-columns:1fr}.invite-management .admin-form label{max-width:none}.invite-management .admin-action{justify-self:start}}
+
+/* El saludo y la cuenta regresiva pertenecen únicamente a Inicio */
+.member-welcome{margin-bottom:16px}
+.member-section-heading{background:#f7f0df;color:#19372d;border-radius:16px;padding:20px;margin-bottom:14px}
+.member-section-heading h2{font-family:'Playfair Display',serif;font-size:24px;margin:5px 0 0}
+.app-version{max-width:820px;margin:14px auto 82px;text-align:center;color:#9ab2a5;font-size:9px;letter-spacing:1px;padding:8px 4px}
+.app-version b{color:#d8bd7d;font-weight:700}
+@media(max-width:600px){.app-version{margin-bottom:82px;font-size:8px}}
