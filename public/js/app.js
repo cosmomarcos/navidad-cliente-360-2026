@@ -24,7 +24,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 let snowFrame=0,snowflakes=[],snowCanvas=null,snowCtx=null,snowEnabled=false,snowWidth=0,snowHeight=0,snowLast=0;
 function setSnowfall(enabled){
  snowCanvas ||= document.getElementById("seasonal-snow");
- if(!snowCanvas||window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+ if(!snowCanvas)return;
  snowEnabled=!!enabled;snowCanvas.classList.toggle("is-active",snowEnabled);
  if(snowEnabled&&!snowFrame){snowCtx=snowCanvas.getContext("2d",{alpha:true});resizeSnow();snowFrame=requestAnimationFrame(drawSnow);}
  if(!snowEnabled&&snowFrame){cancelAnimationFrame(snowFrame);snowFrame=0;if(snowCtx)snowCtx.clearRect(0,0,snowWidth,snowHeight);}
@@ -33,13 +33,13 @@ function resizeSnow(){
  if(!snowCanvas||!snowCtx)return;
  const dpr=Math.min(window.devicePixelRatio||1,1.5);snowWidth=window.innerWidth;snowHeight=window.innerHeight;
  snowCanvas.width=Math.round(snowWidth*dpr);snowCanvas.height=Math.round(snowHeight*dpr);snowCtx.setTransform(dpr,0,0,dpr,0,0);
- const count=Math.min(78,Math.max(28,Math.round(snowWidth*snowHeight/14500)));
- snowflakes=Array.from({length:count},()=>({x:Math.random()*snowWidth,y:Math.random()*snowHeight,r:1+Math.random()*2.2,v:.45+Math.random()*1.05,drift:-.35+Math.random()*.7,phase:Math.random()*Math.PI*2,alpha:.32+Math.random()*.48}));
+ const count=Math.min(115,Math.max(55,Math.round(snowWidth*snowHeight/8500)));
+ snowflakes=Array.from({length:count},()=>({x:Math.random()*snowWidth,y:Math.random()*snowHeight,r:1.6+Math.random()*3,v:.75+Math.random()*1.4,drift:-.35+Math.random()*.7,phase:Math.random()*Math.PI*2,alpha:.62+Math.random()*.35}));
 }
 function drawSnow(time){
  if(!snowEnabled||!snowCtx)return;snowFrame=requestAnimationFrame(drawSnow);
  if(time-snowLast<28)return;snowLast=time;snowCtx.clearRect(0,0,snowWidth,snowHeight);
- for(const f of snowflakes){f.y+=f.v;f.x+=f.drift+Math.sin(time*.0007+f.phase)*.28;if(f.y>snowHeight+5){f.y=-5;f.x=Math.random()*snowWidth;}if(f.x<-5)f.x=snowWidth+5;if(f.x>snowWidth+5)f.x=-5;snowCtx.beginPath();snowCtx.arc(f.x,f.y,f.r,0,Math.PI*2);snowCtx.fillStyle="rgba(255,250,235,"+f.alpha+")";snowCtx.fill();}
+ for(const f of snowflakes){f.y+=f.v;f.x+=f.drift+Math.sin(time*.0007+f.phase)*.28;if(f.y>snowHeight+5){f.y=-5;f.x=Math.random()*snowWidth;}if(f.x<-5)f.x=snowWidth+5;if(f.x>snowWidth+5)f.x=-5;snowCtx.beginPath();snowCtx.arc(f.x,f.y,f.r,0,Math.PI*2);snowCtx.fillStyle="rgba(255,255,255,"+f.alpha+")";snowCtx.fill();}
 }
 window.addEventListener("resize",()=>{if(snowEnabled)resizeSnow()},{passive:true});
 
