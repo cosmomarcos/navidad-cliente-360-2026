@@ -74,7 +74,12 @@ function renderMemberApp(){
  communityPollTimer=setInterval(updateCommunityUnreadBadge,45000);
  app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{setSnowfall(btn.dataset.tab==="home");app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileSettings();return;}if(btn.dataset.tab==="admin-settings"){showAdminSettings();return;}if(btn.dataset.tab==="secret"){renderSecretTab();return;}if(btn.dataset.tab==="wishes"){renderWishesTab();return;}if(btn.dataset.tab==="community"){renderCommunityTab();return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Mensajes",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>${labels[btn.dataset.tab]}</h2></div><article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
  const requestedTab=new URLSearchParams(location.search).get("tab");
- if(requestedTab==="community")app.querySelector('[data-tab="community"]')?.click();
+ if(requestedTab==="community"){
+  const cleanUrl=new URL(location.href);
+  cleanUrl.searchParams.delete("tab");
+  history.replaceState({}, "", cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);
+  app.querySelector('[data-tab="community"]')?.click();
+ }
 }
 async function loadProfileParticipants(){
  const list=$("#profile-participants-list"),count=$("#profile-participants-count");
