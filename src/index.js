@@ -160,18 +160,7 @@ async function handleApi(request, env, url) {
         return json({ ok: true, state: "registration", message: "Asignaciones anteriores eliminadas. Los demás datos e historiales se conservaron." });
       }
     }
-    if (request.method === "GET" && url.pathname === "/api/secret/me") {
-      const participant = await currentUser(request, env);
-      if (!participant) return json({ error: "Inicia sesión primero." }, 401);
-      await ensureDrawSchema(env);
-      const membership = await env.DB.prepare("SELECT em.status, em.edition_id, e.status AS edition_status, e.title FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(participant.id).first();
-      if (!membership || membership.status !== "confirmed") return json({ state: "not_participating" });
-      const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
-      if (!state || state.state !== "drawn") return json({ state: state?.state || "registration", title: membership.title });
-      const assignment = await env.DB.prepare("SELECT u.id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM draw_assignments a JOIN users u ON u.id=a.recipient_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? AND a.giver_user_id=?").bind(membership.edition_id, participant.id).first();
-      if (!assignment) return json({ state: "not_assigned", title: membership.title });
-      return json({ state: "drawn", title: membership.title, recipient: { displayName: assignment.display_name } });
-    }
+
     if (request.method === "GET" && url.pathname === "/api/admin/status") {
       const workspace = await env.DB.prepare("SELECT id, name FROM workspace LIMIT 1").first();
       const edition = workspace ? await env.DB.prepare("SELECT id, title, year, budget_amount, event_date, status FROM editions WHERE workspace_id = ? ORDER BY year DESC LIMIT 1").bind(workspace.id).first() : null;
@@ -247,6 +236,18 @@ async function handleApi(request, env, url) {
       return json({ ok: true, invitationUrl: `${url.origin}/?invite=${token}` });
     }
     return json({ error: "Ruta administrativa no encontrada." }, 404);
+  }
+  if (request.method === "GET" && url.pathname === "/api/secret/me") {
+    const participant = await currentUser(request, env);
+    if (!participant) return json({ error: "Inicia sesión primero." }, 401);
+    await ensureDrawSchema(env);
+    const membership = await env.DB.prepare("SELECT em.status, em.edition_id, e.status AS edition_status, e.title FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(participant.id).first();
+    if (!membership || membership.status !== "confirmed") return json({ state: "not_participating" });
+    const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
+    if (!state || state.state !== "drawn") return json({ state: state?.state || "registration", title: membership.title });
+    const assignment = await env.DB.prepare("SELECT u.id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM draw_assignments a JOIN users u ON u.id=a.recipient_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? AND a.giver_user_id=?").bind(membership.edition_id, participant.id).first();
+    if (!assignment) return json({ state: "not_assigned", title: membership.title });
+    return json({ state: "drawn", title: membership.title, recipient: { displayName: assignment.display_name } });
   }
   if (request.method === "POST" && url.pathname === "/api/participation/withdraw") {
     const user = await currentUser(request, env);
