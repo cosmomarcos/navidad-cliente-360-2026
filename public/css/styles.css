@@ -311,5 +311,5 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 @media(max-width:600px){.profile-participants-card{margin:15px 0;padding:16px}.profile-actions{gap:10px}}
 
 
-/* v1.1.4 · Nieve ambiental solo en login e Inicio */
-.seasonal-snow{position:fixed;inset:0;width:100%;height:100%;z-index:20;pointer-events:none;opacity:0;transition:opacity .45s ease}.seasonal-snow.is-active{opacity:.82}@media(prefers-reduced-motion:reduce){.seasonal-snow{display:none!important}}
+/* v1.1.5 · Nieve ambiental solo en login e Inicio */
+.seasonal-snow{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:9999;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .35s ease}.seasonal-snow.is-active{opacity:1;visibility:visible}
