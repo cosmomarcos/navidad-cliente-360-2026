@@ -307,7 +307,7 @@ async function handleApi(request, env, url) {
     if (request.method === "GET" && url.pathname === "/api/community/unread") {
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
       if (draw?.state !== "drawn") return json({ unread: 0 });
-      const assignment = await env.DB.prepare("SELECT run_number FROM draw_assignments WHERE edition_id=? AND recipient_user_id=?").bind(member.edition_id,user.id).first();
+      const assignment = await env.DB.prepare("SELECT run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(member.edition_id,user.id).first();
       if (!assignment) return json({ unread: 0 });
       const read = await env.DB.prepare("SELECT last_seen_at FROM anonymous_clue_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND recipient_user_id=? AND run_number=? AND created_at > ?").bind(member.edition_id,user.id,assignment.run_number,read?.last_seen_at || "1970-01-01 00:00:00").first();
