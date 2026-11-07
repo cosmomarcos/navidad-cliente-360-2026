@@ -227,8 +227,8 @@ function showProfileSettings(){
  $("#withdraw-participation").addEventListener("click",async()=>{if(!confirm("¿Seguro que deseas dejar de participar? Podrás volver a confirmar mientras la inscripción siga abierta."))return;try{await api("/api/participation/withdraw",{method:"POST"});currentUser=await api("/api/me");renderRejoinView();}catch(e){const fb=$("#profile-action-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
 }
 function renderRejoinView(){
- const app=$("#member-app");app.classList.remove("hidden");app.innerHTML=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>Tu participación está pausada</h1><p>Puedes volver a confirmar mientras las inscripciones sigan abiertas.</p></section><section class="member-home"><button id="rejoin-button" class="primary-button">Volver a confirmar mi participación →</button><button id="logout-button" class="secondary-action">Cerrar sesión</button><div id="rejoin-feedback" class="status hidden"></div></section>`;
- $("#rejoin-button").addEventListener("click",async()=>{try{await api("/api/participation/rejoin",{method:"POST"});currentUser=await api("/api/me");if(!currentUser.participantProfile)showProfileForm();else renderMemberApp();}catch(e){const fb=$("#rejoin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+ const app=$("#member-app");app.classList.remove("hidden");
+ app.innerHTML=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>Tu participación ha sido retirada</h1><p>Ya no formas parte de esta edición. Si deseas regresar más adelante, solicita una nueva invitación al organizador.</p></section><section class="member-home"><button id="logout-button" class="secondary-action">Cerrar sesión</button></section>`;
  $("#logout-button").addEventListener("click",logout);
 }
 async function logout(){if(communityPollTimer)clearInterval(communityPollTimer);try{await api("/api/auth/logout",{method:"POST"});}finally{location.href=location.pathname+(token?"?invite="+encodeURIComponent(token):"");}}
