@@ -87,7 +87,7 @@ async function sendPushToUser(env, userId, payload, subject) {
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.1.12" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.1.13" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -466,12 +466,16 @@ async function handleApi(request, env, url) {
     const hash = await sha256(body.token);
     const invite = await env.DB.prepare("SELECT id, edition_id, expires_at, max_uses, uses, revoked_at FROM invitations WHERE token_hash=?").bind(hash).first();
     if (!invite || invite.revoked_at || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ error: "La invitación no es válida o ya venció." }, 404);
-    const existing = await env.DB.prepare("SELECT id FROM edition_members WHERE edition_id=? AND user_id=?").bind(invite.edition_id, user.id).first();
-    if (!existing) {
+    const existing = await env.DB.prepare("SELECT id, status FROM edition_members WHERE edition_id=? AND user_id=?").bind(invite.edition_id, user.id).first();
+    if (existing) {
+      if (existing.status !== "confirmed") {
+        await env.DB.prepare("UPDATE edition_members SET status='confirmed', joined_at=datetime('now') WHERE id=?").bind(existing.id).run();
+      }
+    } else {
       const memberId = crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
+      await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id, status) VALUES (?, ?, ?, 'confirmed')").bind(memberId, invite.edition_id, user.id).run();
     }
-    return json({ ok: true, message: "Ya formas parte de la edición." });
+    return json({ ok: true, message: "Tu participación ha sido confirmada." });
   }
   return json({ error: "Ruta no encontrada." }, 404);
 }
