@@ -405,7 +405,7 @@ async function handleApi(request, env, url) {
     if (!invite || invite.revoked_at || invite.uses >= invite.max_uses || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ error: "La invitación no es válida o ya venció." }, 404);
     const existing = await env.DB.prepare("SELECT id FROM edition_members WHERE edition_id=? AND user_id=?").bind(invite.edition_id, user.id).first();
     if (!existing) {
-      const reservation = await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > datetime('now'))").bind(invite.id).run();
+      const reservation = await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses AND revoked_at IS NULL AND (expires_at IS NULL OR julianday(expires_at) > julianday('now'))").bind(invite.id).run();
       if (!reservation.meta.changes) return json({ error: "La invitación ya no está disponible." }, 409);
       try {
         const memberId = crypto.randomUUID();
