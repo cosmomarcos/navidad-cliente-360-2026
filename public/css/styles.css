@@ -93,3 +93,42 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .wish-editor,.wish-list,.recipient-wishes{max-width:720px;margin:18px auto;padding:20px;background:#f7f0df;color:#19372d;border:1px solid #e2d7c2;border-radius:16px}
 .wish-editor form{display:grid;gap:12px}.wish-editor label{display:grid;gap:6px;font-size:12px;font-weight:700}.wish-editor input,.wish-editor textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #d8cfbb;border-radius:9px;background:#fffdf7;color:#19372d;font:inherit}.wish-editor small,.wish-empty{font-size:11px;color:#64766b}.wish-list h3,.recipient-wishes h3{font-family:'Playfair Display',serif;margin:0 0 12px}.wish-item{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid #e2d7c2}.wish-item:last-child{border-bottom:0}.wish-item b{font-size:13px}.wish-item p,.recipient-wishes>p{font-size:12px;line-height:1.5;color:#64766b;margin:5px 0}.wish-item a{font-size:11px;color:#28624e}.wish-delete{border:0;background:#f2e1d9;color:#8f3832;border-radius:8px;padding:7px 10px;cursor:pointer}.wish-privacy{max-width:720px;margin:12px auto;padding:12px;background:#e1eadb;color:#28543d;border-radius:10px;font-size:12px}.recipient-wishes{border-color:#cbb77e}.wish-editor button:disabled{opacity:.5}
 @media(max-width:520px){.wish-editor,.wish-list,.recipient-wishes{padding:15px}}
+
+/* Lista de deseos: tarjetas limpias, jerarquía tipográfica y acciones discretas */
+.wish-editor,.wish-list,.recipient-wishes{max-width:760px;margin:20px auto;padding:24px;background:#f7f0df;color:#19372d;border:1px solid #e2d7c2;border-radius:18px;box-shadow:0 8px 22px rgba(14,45,35,.08)}
+.wish-section-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+.wish-section-heading h3{font-family:'Playfair Display',serif;font-size:21px;line-height:1.2;margin:4px 0 0;color:#173d32}
+.wish-kicker{font-size:9px;font-weight:800;letter-spacing:1.5px;color:#9b8050}
+.wish-heading-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#eee5cf;font-size:19px;flex:0 0 auto}
+.wish-editor form{display:grid;gap:13px}
+.wish-editor label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#294b3e}
+.wish-editor label span{display:inline;color:#899287;font-weight:400}
+.wish-editor input,.wish-editor textarea{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ded4c0;border-radius:10px;background:#fffdf7;color:#19372d;font:inherit;font-size:13px;transition:border-color .2s,box-shadow .2s}
+.wish-editor input:focus,.wish-editor textarea:focus{outline:none;border-color:#9c8654;box-shadow:0 0 0 3px rgba(185,157,99,.14)}
+.wish-editor textarea{resize:vertical;min-height:66px}
+.wish-form-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:3px}
+.wish-form-footer small{font-size:11px;color:#7b8579}
+.wish-form-footer .primary-button{margin:0;padding:11px 17px}
+.wish-form-footer button:disabled{opacity:.45;cursor:not-allowed}
+.wish-count{padding:6px 10px;border-radius:20px;background:#e9e3d2;color:#6c654e;font-size:10px;font-weight:800;white-space:nowrap}
+.wish-card-list{display:grid;gap:10px}
+.wish-card{display:flex;align-items:center;gap:14px;min-width:0;padding:15px;background:#fffaf0;border:1px solid #e9dfcc;border-radius:14px;transition:transform .18s,border-color .18s,box-shadow .18s}
+.wish-card:hover{transform:translateY(-1px);border-color:#d7c7a7;box-shadow:0 6px 15px rgba(38,56,42,.06)}
+.wish-card-icon{display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border-radius:12px;background:#f0e8d6;font-size:21px}
+.wish-card-content{flex:1;min-width:0}
+.wish-number{display:block;margin-bottom:4px;color:#a18a5b;font-size:8px;font-weight:800;letter-spacing:1.4px}
+.wish-card h4{margin:0;color:#19372d;font-size:14px;font-weight:750;line-height:1.35;overflow-wrap:anywhere}
+.wish-card-content p{margin:5px 0 0;color:#738074;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.wish-link{display:inline-flex;align-items:center;gap:5px;margin-top:8px;color:#28624e;text-decoration:none;font-size:10px;font-weight:700}
+.wish-link:hover{text-decoration:underline}.wish-link span{font-size:12px}
+.wish-delete{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border:1px solid #eadbd1;border-radius:10px;background:#fbefea;color:#a34e43;font-size:19px;line-height:1;cursor:pointer;transition:background .2s,color .2s}
+.wish-delete:hover{background:#a34e43;color:#fff}
+.wish-empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;padding:27px 16px;border:1px dashed #d9cdb7;border-radius:14px;background:#fffaf0}
+.wish-empty-state>span{display:grid;place-items:center;width:48px;height:48px;margin-bottom:10px;border-radius:15px;background:#f0e8d6;font-size:23px}
+.wish-empty-state b{font-family:'Playfair Display',serif;font-size:16px;color:#19372d}
+.wish-empty-state p,.wish-empty{margin:6px 0 0;color:#788477;font-size:11px;line-height:1.5}
+.wish-privacy{display:flex;align-items:center;gap:11px;max-width:760px;margin:14px auto;padding:14px 16px;background:#e6eddc;border:1px solid #d7e2ce;border-radius:13px;color:#28543d}
+.wish-privacy>span{font-size:18px}.wish-privacy p{display:grid;gap:3px;margin:0}.wish-privacy b{font-size:11px}.wish-privacy small{font-size:10px;line-height:1.4;color:#5f7865}
+.recipient-wishes{border-color:#d9c99f;background:linear-gradient(145deg,#f8f1df,#f3ead5)}
+.wish-section-description{margin:-8px 0 16px;color:#738074;font-size:11px;line-height:1.5}
+@media(max-width:520px){.wish-editor,.wish-list,.recipient-wishes{padding:17px;margin:14px auto}.wish-section-heading h3{font-size:19px}.wish-card{gap:10px;padding:12px}.wish-card-icon{width:38px;height:38px;flex-basis:38px}.wish-form-footer{align-items:flex-start;flex-direction:column}.wish-form-footer .primary-button{width:100%}}
