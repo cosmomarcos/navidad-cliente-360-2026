@@ -174,3 +174,36 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 @keyframes wishModalFade{from{opacity:0}to{opacity:1}}
 @keyframes wishModalRise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:520px){.wish-image-modal{padding:10px}.wish-image-modal-panel{max-height:92vh;border-radius:16px}.wish-image-modal-header{padding:14px 15px}.wish-image-modal-header h3{font-size:16px}.wish-image-modal-stage{padding:9px}.wish-image-modal-stage img{max-height:calc(92vh - 145px)}}
+
+/* Comunidad: chat grupal y pistas secretas */
+.community-chat,.community-clues{max-width:820px;margin:18px auto;padding:22px;background:#f7f0df;color:#19372d;border:1px solid #e2d7c2;border-radius:18px;box-shadow:0 8px 22px rgba(14,45,35,.07)}
+.community-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}
+.community-section-heading h3{margin:4px 0 0;color:#19372d;font-family:'Playfair Display',serif;font-size:21px}
+.community-section-heading p{margin:5px 0 0;color:#718073;font-size:11px;line-height:1.5}
+.community-refresh{padding:8px 12px;border:1px solid #d9cfbc;border-radius:20px;background:#fffaf0;color:#315744;font-size:10px;font-weight:700;cursor:pointer}
+.community-chat-feed{display:flex;flex-direction:column;gap:10px;max-height:420px;min-height:160px;overflow-y:auto;padding:14px;border:1px solid #e8dfce;border-radius:14px;background:#f0eadc}
+.community-message{align-self:flex-start;max-width:85%;padding:10px 13px;border:1px solid #e4d9c5;border-radius:4px 14px 14px 14px;background:#fffaf0}
+.community-message.mine{align-self:flex-end;border-color:#cbd9c9;border-radius:14px 4px 14px 14px;background:#e4eddf}
+.community-message-meta{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+.community-message-meta b{color:#315744;font-size:10px}.community-message-meta time,.clue-received time{color:#92958a;font-size:9px}
+.community-message p{margin:0;color:#334a3c;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.community-compose{display:grid;gap:7px;margin-top:13px}.community-compose>label,.clue-compose label{color:#315744;font-size:11px;font-weight:750}
+.community-compose-row{display:flex;gap:8px}
+.community-compose-row input{flex:1;min-width:0;padding:12px 14px;border:1px solid #ded4c0;border-radius:12px;background:#fffdf7;color:#19372d;font:inherit;font-size:12px}
+.community-compose-row button{width:44px;border:0;border-radius:12px;background:#194b3b;color:#fff;font-size:18px;cursor:pointer}
+.community-compose-row button:disabled,.clue-compose button:disabled{opacity:.5;cursor:not-allowed}
+.community-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:130px;text-align:center;padding:18px;color:#718073}
+.community-empty>span{font-size:25px;margin-bottom:7px}.community-empty b{font-family:'Playfair Display',serif;font-size:15px;color:#315744}.community-empty p{max-width:320px;margin:5px 0 0;font-size:10px;line-height:1.5}
+.community-clues{border-color:#d8c99f;background:linear-gradient(145deg,#f8f1df,#f3ead5)}
+.clue-locked{display:flex;align-items:flex-start;gap:13px;padding:16px;border:1px solid #e4d8bd;border-radius:13px;background:rgba(255,250,240,.75)}
+.clue-locked>span{font-size:23px}.clue-locked b{font-size:12px;color:#315744}.clue-locked p{margin:5px 0 0;color:#718073;font-size:11px;line-height:1.5}
+.clue-recieved-list{display:grid;gap:9px;margin-bottom:15px}
+.clue-received{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid #e2d4b6;border-radius:13px;background:#fffaf0}
+.clue-received>span{font-size:20px}.clue-received b{color:#9a7b3e;font-size:10px;letter-spacing:.4px}.clue-received p{margin:5px 0;color:#334a3c;font-size:12px;line-height:1.5;white-space:pre-wrap}
+.clue-empty{min-height:100px;border:1px dashed #d9cba9;border-radius:13px;background:rgba(255,250,240,.5);margin-bottom:15px}
+.clue-compose{padding:16px;border:1px solid #e3d7bf;border-radius:14px;background:rgba(255,250,240,.75)}
+.clue-compose-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.clue-compose-heading h3{margin:4px 0 0;font-family:'Playfair Display',serif;font-size:17px;color:#19372d}
+.clue-compose textarea{display:block;width:100%;box-sizing:border-box;margin-top:7px;padding:12px;border:1px solid #ded4c0;border-radius:10px;background:#fffdf7;color:#19372d;font:inherit;font-size:12px;resize:vertical}
+.clue-compose-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px}.clue-compose-footer small{color:#788477;font-size:10px;line-height:1.4}
+.clue-compose-footer .primary-button{margin:0;padding:10px 14px;font-size:11px}
+@media(max-width:560px){.community-chat,.community-clues{padding:16px;margin:14px auto}.community-section-heading h3{font-size:19px}.community-chat-feed{max-height:360px;padding:10px}.community-message{max-width:94%}.clue-compose-footer{align-items:stretch;flex-direction:column}.clue-compose-footer .primary-button{width:100%}}
