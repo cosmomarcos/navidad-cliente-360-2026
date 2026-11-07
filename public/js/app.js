@@ -79,7 +79,7 @@ async function checkSession() {
     currentUser = await api("/api/me");
     signedIn = Boolean(currentUser?.authenticated);
     window.__NC360_DIAGNOSTICS = {
-      version: "0.3.0",
+      version: "0.3.2",
       authenticated: signedIn,
       isPrimaryAdmin: Boolean(currentUser?.isPrimaryAdmin),
       sessionChecked: true
@@ -96,11 +96,12 @@ async function checkSession() {
       panel.classList.remove("hidden");
       panel.innerHTML = "<h2>Panel del administrador principal</h2><p>Cargando configuración de la edición…</p>";
       await renderAdmin();
+      if (window.mountParticipantAdmin) await window.mountParticipantAdmin();
     } else {
       panel.classList.add("hidden");
     }
   } catch (error) {
-    window.__NC360_DIAGNOSTICS = { version: "0.3.0", sessionChecked: false, error: error.message };
+    window.__NC360_DIAGNOSTICS = { version: "0.3.2", sessionChecked: false, error: error.message };
     panel.classList.remove("hidden");
     panel.innerHTML = `<h2>No se pudo cargar tu sesión</h2><p>${escapeHtml(error.message)}</p><button class="admin-action" id="retry-admin">Reintentar</button>`;
     $("#retry-admin").addEventListener("click", checkSession);
