@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.4" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.5" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -117,7 +117,6 @@ async function handleApi(request, env, url) {
         const exclusions = await env.DB.prepare("SELECT user_a_id, user_b_id FROM edition_exclusions WHERE edition_id=?").bind(edition.id).all();
         if (!buildSecretAssignments(list, exclusions.results || [])) return json({ error: "Las exclusiones actuales no permiten crear un sorteo válido. Revisa las exclusiones mutuas." }, 409);
         await env.DB.prepare("INSERT INTO edition_draw_state (edition_id, state, ready_at, drawn_at, updated_at) VALUES (?, 'ready', datetime('now'), NULL, datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET state='ready', ready_at=datetime('now'), drawn_at=NULL, updated_at=datetime('now')").bind(edition.id).run();
-        await env.DB.prepare("UPDATE editions SET status='ready' WHERE id=? AND status='registration'").bind(edition.id).run();
         return json({ ok: true, state: "ready", participants: list.length });
       }
       if (request.method === "POST" && url.pathname === "/api/admin/draw/execute") {
@@ -314,7 +313,7 @@ export default {
     } catch (error) {
       console.error("Unhandled Worker error", { path: url.pathname, method: request.method, message: error?.message || String(error) });
       if (url.pathname.startsWith("/api/")) {
-        return json({ error: "Error interno del servidor al procesar " + url.pathname, code: "WORKER_EXCEPTION" }, 500);
+        return json({ error: "Error interno del servidor al procesar " + url.pathname + ": " + (error?.message || "Error desconocido"), code: "WORKER_EXCEPTION" }, 500);
       }
       return new Response("Error interno. Intenta nuevamente.", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
     }
