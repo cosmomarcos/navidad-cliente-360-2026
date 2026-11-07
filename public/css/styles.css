@@ -148,3 +148,13 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .wish-edit-actions .primary-button{border:0}
 .wish-edit-actions button:disabled{opacity:.55;cursor:wait}
 @media(max-width:520px){.wish-card-actions{gap:5px}.wish-edit,.wish-delete{width:30px;height:30px;flex-basis:30px}}
+
+.wish-image-link{display:block;width:68px;height:68px;flex:0 0 68px;overflow:hidden;border-radius:12px;background:#f0e8d6}
+.wish-image{display:block;width:100%;height:100%;object-fit:cover}
+.wish-image-preview{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px;border:1px solid #e5dbc8;border-radius:12px;background:#fffaf0}
+.wish-image-preview img{width:88px;height:88px;object-fit:cover;border-radius:9px}
+.wish-image-preview button{border:1px solid #eadbd1;border-radius:8px;background:#fbefea;color:#98483e;padding:8px 11px;font-size:11px;cursor:pointer}
+.wish-image-help{font-size:10px;color:#7b8579}
+.wish-remove-image-label{display:flex!important;align-items:center;gap:7px;font-size:10px!important;font-weight:500!important}
+.wish-remove-image-label input{width:auto!important}
+@media(max-width:520px){.wish-image-link{width:58px;height:58px;flex-basis:58px}.wish-image-preview img{width:76px;height:76px}}
