@@ -265,3 +265,11 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
  .member-welcome:after{right:12px;top:4px;font-size:64px}
 }
 @media(max-width:380px){.exchange-budget-card{flex-wrap:wrap}.exchange-budget-amount{margin-left:52px;margin-top:-5px}}
+
+/* Notificaciones de pistas */
+.nav-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#b83c35;color:#fff;font-size:10px;font-weight:800;line-height:1}
+.nav-unread-badge[hidden]{display:none}
+.push-settings{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin:16px 0;padding:16px;border:1px solid rgba(23,69,54,.14);border-radius:16px;background:#f8f5eb}
+.push-settings b{display:block;color:#19372d;font-size:14px}.push-settings p{margin:4px 0 0;color:#64766b;font-size:12px}
+.push-settings .status{grid-column:1/-1;margin:0}.push-settings .secondary-action{white-space:nowrap}.push-enabled{opacity:.8}
+@media(max-width:480px){.push-settings{grid-template-columns:1fr}.push-settings .secondary-action{width:100%}}
