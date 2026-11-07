@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.7.3" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.8.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -150,7 +150,9 @@ async function handleApi(request, env, url) {
       if (request.method === "POST" && url.pathname === "/api/admin/draw/reset") {
         const body = await request.json();
         if (body.confirmation !== "VOLVER A SORTEAR") return json({ error: "Escribe VOLVER A SORTEAR para confirmar." }, 400);
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
         await env.DB.batch([
+          env.DB.prepare("DELETE FROM anonymous_clues WHERE edition_id=?").bind(edition.id),
           env.DB.prepare("DELETE FROM draw_assignments WHERE edition_id=?").bind(edition.id),
           env.DB.prepare("UPDATE draw_runs SET status='superseded' WHERE edition_id=? AND status='completed'").bind(edition.id),
           env.DB.prepare("INSERT INTO edition_draw_state (edition_id, state, ready_at, drawn_at, updated_at) VALUES (?, 'registration', NULL, NULL, datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET state='registration', ready_at=NULL, drawn_at=NULL, updated_at=datetime('now')").bind(edition.id),
@@ -235,6 +237,50 @@ async function handleApi(request, env, url) {
       return json({ ok: true, invitationUrl: `${url.origin}/?invite=${token}` });
     }
     return json({ error: "Ruta administrativa no encontrada." }, 404);
+  }
+  if (url.pathname.startsWith("/api/community")) {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    const member = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    if (!member) return json({ error: "Necesitas una participación activa para entrar a la comunidad." }, 403);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS community_messages (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_community_messages_edition ON community_messages(edition_id, created_at)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
+    if (request.method === "GET" && url.pathname === "/api/community") {
+      const messages = await env.DB.prepare("SELECT m.id, m.message, m.created_at, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS sender_name, m.user_id=? AS is_mine FROM community_messages m JOIN users u ON u.id=m.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE m.edition_id=? ORDER BY m.created_at DESC LIMIT 80").bind(user.id, member.edition_id).all();
+      return json({ messages: (messages.results || []).reverse() });
+    }
+    if (request.method === "POST" && url.pathname === "/api/community") {
+      const body = await request.json(); const message = String(body.message || "").trim();
+      if (message.length < 1 || message.length > 500) return json({ error: "El mensaje debe tener entre 1 y 500 caracteres." }, 400);
+      const recent = await env.DB.prepare("SELECT created_at FROM community_messages WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 1").bind(member.edition_id, user.id).first();
+      if (recent && (Date.now() - new Date(recent.created_at.replace(" ", "T") + "Z").getTime()) < 2000) return json({ error: "Espera un momento antes de enviar otro mensaje." }, 429);
+      await env.DB.prepare("INSERT INTO community_messages (id, edition_id, user_id, message) VALUES (?, ?, ?, ?)").bind(crypto.randomUUID(), member.edition_id, user.id, message).run();
+      return json({ ok: true });
+    }
+    if (request.method === "GET" && url.pathname === "/api/community/clues") {
+      const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
+      if (draw?.state !== "drawn") return json({ state: draw?.state || "registration", clues: [], sentCount: 0, limit: 5 });
+      const assignment = await env.DB.prepare("SELECT recipient_user_id, run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(member.edition_id, user.id).first();
+      if (!assignment) return json({ state: "not_assigned", clues: [], sentCount: 0, limit: 5 });
+      const clues = await env.DB.prepare("SELECT id, message, created_at FROM anonymous_clues WHERE edition_id=? AND recipient_user_id=? AND run_number=? ORDER BY created_at DESC LIMIT 30").bind(member.edition_id, user.id, assignment.run_number).all();
+      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
+      return json({ state: "drawn", clues: clues.results || [], sentCount: count.total || 0, limit: 5 });
+    }
+    if (request.method === "POST" && url.pathname === "/api/community/clues") {
+      const body = await request.json(); const message = String(body.message || "").trim();
+      if (message.length < 2 || message.length > 240) return json({ error: "La pista debe tener entre 2 y 240 caracteres." }, 400);
+      const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
+      if (draw?.state !== "drawn") return json({ error: "Las pistas anónimas estarán disponibles después del sorteo." }, 409);
+      const assignment = await env.DB.prepare("SELECT recipient_user_id, run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(member.edition_id, user.id).first();
+      if (!assignment) return json({ error: "Todavía no tienes una asignación. El administrador debe incluirte en el sorteo." }, 409);
+      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
+      if (count.total >= 5) return json({ error: "Ya enviaste las 5 pistas permitidas para este sorteo." }, 409);
+      await env.DB.prepare("INSERT INTO anonymous_clues (id, edition_id, giver_user_id, recipient_user_id, run_number, message) VALUES (?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), member.edition_id, user.id, assignment.recipient_user_id, assignment.run_number, message).run();
+      return json({ ok: true, sentCount: count.total + 1 });
+    }
+    return json({ error: "Ruta de comunidad no encontrada." }, 404);
   }
   if (url.pathname.startsWith("/api/wishes")) {
     const user = await currentUser(request, env);
