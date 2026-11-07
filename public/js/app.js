@@ -55,6 +55,7 @@ async function renderAdmin() {
         try { const result = await api("/api/admin/bootstrap", { method: "POST", body: JSON.stringify(values) });
           $("#admin-result").innerHTML = `<div class="admin-result"><b>Edición creada.</b><br>Invitación inicial: <a href="${escapeAttr(result.invitationUrl)}">${escapeHtml(result.invitationUrl)}</a></div>`;
           await renderAdmin();
+      if (window.mountParticipantAdmin) await window.mountParticipantAdmin();
         } catch (error) { $("#admin-result").textContent = error.message; }
       });
     } else {
@@ -119,6 +120,7 @@ window.handleGoogleCredential = async (response) => {
     currentUser = await api("/api/me");
     if (inviteValid) joinButton.classList.remove("hidden");
     await renderAdmin();
+    if (window.mountParticipantAdmin) await window.mountParticipantAdmin();
   } catch (error) { showStatus(error.message, true); }
 };
 async function initGoogle() {
