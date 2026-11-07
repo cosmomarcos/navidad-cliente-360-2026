@@ -61,20 +61,43 @@ async function renderAdmin() {
         } catch (error) { $("#admin-result").textContent = error.message; }
       });
     }
-  } catch (error) { panel.innerHTML = `<h2>Panel de administración</h2><p>${escapeHtml(error.message)}</p>`; }
+  } catch (error) { panel.classList.remove("hidden"); panel.innerHTML = `<h2>Error al cargar el panel</h2><p>${escapeHtml(error.message)}</p><button class="admin-action" id="retry-admin">Reintentar</button>`; $("#retry-admin").addEventListener("click", renderAdmin); console.error("Navidad Cliente 360: error al cargar panel", error); }
 }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function escapeAttr(value) { return escapeHtml(value); }
 async function checkSession() {
+  const panel = $("#admin-panel");
   try {
-    currentUser = await api("/api/me"); signedIn = currentUser.authenticated;
-    if (signedIn) {
-      $("#google-area").classList.add("hidden");
-      if (inviteValid) joinButton.classList.remove("hidden");
-      showStatus(`Sesión iniciada: ${currentUser.user.display_name || currentUser.user.email}`);
-      await renderAdmin();
+    currentUser = await api("/api/me");
+    signedIn = Boolean(currentUser?.authenticated);
+    window.__NC360_DIAGNOSTICS = {
+      version: "0.2.2",
+      authenticated: signedIn,
+      isPrimaryAdmin: Boolean(currentUser?.isPrimaryAdmin),
+      sessionChecked: true
+    };
+    if (!signedIn) {
+      $("#google-area").classList.remove("hidden");
+      panel.classList.add("hidden");
+      return;
     }
-  } catch {}
+    $("#google-area").classList.add("hidden");
+    if (inviteValid) joinButton.classList.remove("hidden");
+    showStatus(`Sesión iniciada: ${currentUser.user?.display_name || currentUser.user?.email || "usuario"}`);
+    if (currentUser.isPrimaryAdmin) {
+      panel.classList.remove("hidden");
+      panel.innerHTML = "<h2>Panel del administrador principal</h2><p>Cargando configuración de la edición…</p>";
+      await renderAdmin();
+    } else {
+      panel.classList.add("hidden");
+    }
+  } catch (error) {
+    window.__NC360_DIAGNOSTICS = { version: "0.2.2", sessionChecked: false, error: error.message };
+    panel.classList.remove("hidden");
+    panel.innerHTML = `<h2>No se pudo cargar tu sesión</h2><p>${escapeHtml(error.message)}</p><button class="admin-action" id="retry-admin">Reintentar</button>`;
+    $("#retry-admin").addEventListener("click", checkSession);
+    console.error("Navidad Cliente 360: error al comprobar sesión", error);
+  }
 }
 joinButton.addEventListener("click", async () => {
   try { await api("/api/invitations/join", { method: "POST", body: JSON.stringify({ token }) }); showStatus("¡Listo! Ya formas parte de Navidad Cliente 360 2026. 🎄"); joinButton.classList.add("hidden"); }
