@@ -346,7 +346,7 @@ async function handleApi(request, env, url) {
       if (count.total >= 5) return json({ error: "Ya enviaste las 5 pistas permitidas para este sorteo." }, 409);
       const clueId = crypto.randomUUID();
       await env.DB.prepare("INSERT INTO anonymous_clues (id, edition_id, giver_user_id, recipient_user_id, run_number, message) VALUES (?, ?, ?, ?, ?, ?)").bind(clueId,member.edition_id,user.id,assignment.recipient_user_id,assignment.run_number,message).run();
-      await sendPushToUser(env,assignment.recipient_user_id,{title:"¡Tienes una nueva pista! 🎁",body:"Tu amigo secreto te ha dejado un mensaje. Entra a descubrirlo.",url:"/?tab=community",tag:"clue-"+clueId},url.origin);
+      await sendPushToUser(env,assignment.recipient_user_id,{title:"¡Tienes un mensaje! 🎁",body:"Tu amigo secreto te envio un mensaje",url:"/?tab=community",tag:"clue-"+clueId},url.origin);
       return json({ ok: true, sentCount: count.total + 1 });
     }
     return json({ error: "Ruta de comunidad no encontrada." }, 404);
