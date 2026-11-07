@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.7.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.7.2" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -270,6 +270,18 @@ async function handleApi(request, env, url) {
       return json({ ok: true });
     }
     const match = url.pathname.match(/^\/api\/wishes\/([A-Za-z0-9-]+)$/);
+    if (request.method === "PUT" && match) {
+      const body = await request.json();
+      const title = String(body.title || "").trim();
+      const note = String(body.note || "").trim();
+      const link = String(body.url || "").trim();
+      if (title.length < 2 || title.length > 100) return json({ error: "El deseo debe tener entre 2 y 100 caracteres." }, 400);
+      if (note.length > 300) return json({ error: "La descripción no puede superar los 300 caracteres." }, 400);
+      if (link && (link.length > 500 || !/^https?:\\/\\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
+      const result = await env.DB.prepare("UPDATE participant_wishes SET title=?, note=?, url=?, updated_at=datetime('now') WHERE id=? AND edition_id=? AND user_id=?").bind(title, note || null, link || null, match[1], membership.edition_id, user.id).run();
+      if (!result.meta.changes) return json({ error: "No encontramos ese deseo." }, 404);
+      return json({ ok: true });
+    }
     if (request.method === "DELETE" && match) {
       const result = await env.DB.prepare("DELETE FROM participant_wishes WHERE id=? AND edition_id=? AND user_id=?").bind(match[1], membership.edition_id, user.id).run();
       if (!result.meta.changes) return json({ error: "No encontramos ese deseo." }, 404);
