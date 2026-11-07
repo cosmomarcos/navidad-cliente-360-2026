@@ -55,14 +55,28 @@ async function loadHomeParticipants(){
  const list=$("#home-participants-list"),count=$("#home-participants-count");
  if(!list||!count)return;
  try{
-  const data=await api("/api/participants",{noMemoryCache:true});
+  const data=await api(currentUser?.isPrimaryAdmin?"/api/admin/participants":"/api/participants",{noMemoryCache:true});
   const participants=data.participants||[];
-  count.textContent="("+participants.length+")";
+  const active=participants.filter(p=>p.status==="confirmed"||!p.status);
+  count.textContent="("+active.length+")";
   list.innerHTML=participants.length?participants.map((p,index)=>{
    const initials=String(p.display_name||"Participante").trim().split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase();
    const avatar=p.avatar_url&&/^https:\/\//i.test(p.avatar_url)?'<img src="'+esc(p.avatar_url)+'" alt="">':esc(initials||"🎄");
-   return '<article class="home-participant-row"><span class="home-participant-avatar">'+avatar+'</span><span class="home-participant-name">'+esc(p.display_name||"Participante")+'</span><span class="home-participant-number">'+String(index+1).padStart(2,"0")+'</span></article>';
+   const inactive=p.status&&p.status!=="confirmed";
+   const action=currentUser?.isPrimaryAdmin?'<button class="home-participant-toggle" data-home-user="'+esc(p.user_id)+'" data-home-active="'+(inactive?"0":"1")+'">'+(inactive?"Reactivar":"Desactivar")+'</button>':"";
+   return '<article class="home-participant-row'+(inactive?" is-inactive":"")+'"><span class="home-participant-avatar">'+avatar+'</span><span class="home-participant-name">'+esc(p.display_name||"Participante")+(inactive?'<small>Inscripción pausada</small>':"")+'</span><span class="home-participant-number">'+(inactive?"PAUSADO":String(index+1).padStart(2,"0"))+'</span>'+action+'</article>';
   }).join(""):'<p class="participants-empty">Todavía no hay participantes inscritos.</p>';
+  if(currentUser?.isPrimaryAdmin&&!list.dataset.adminActions){
+   list.dataset.adminActions="1";
+   list.addEventListener("click",async event=>{
+    const button=event.target.closest("[data-home-user]");if(!button)return;
+    button.disabled=true;
+    try{
+     await api("/api/admin/participants/"+encodeURIComponent(button.dataset.homeUser),{method:"PATCH",body:JSON.stringify({active:button.dataset.homeActive!=="1"})});
+     await loadHomeParticipants();
+    }catch(error){button.disabled=false;button.textContent=error.message;}
+   });
+  }
  }catch(error){
   count.textContent="(—)";
   list.innerHTML='<p class="participants-empty">No se pudo cargar la lista. Vuelve a intentarlo más tarde.</p>';
