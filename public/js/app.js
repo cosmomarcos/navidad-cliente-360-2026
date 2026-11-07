@@ -3,7 +3,23 @@ const setClass = (selector, className, enabled) => { const el=$(selector); if(el
 const params = new URLSearchParams(location.search);
 const token = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
 let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null;
-const api=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const raw=await r.text();let d;try{d=JSON.parse(raw);}catch{const html=raw.trimStart().startsWith("<!DOCTYPE")||raw.trimStart().startsWith("<html");throw new Error(html?"El servidor devolvió la página web en lugar de la API. Cloudflare aún no ha publicado la versión del servidor o la ruta no está disponible.":"El servidor devolvió una respuesta no válida.");}if(!r.ok)throw new Error(d.error||"Ocurrió un error.");return d;};
+const apiMemoryCache=new Map();
+const api=async(path,options={})=>{
+ const method=(options.method||"GET").toUpperCase(),cacheable=method==="GET"&&!options.noMemoryCache;
+ if(method!=="GET")apiMemoryCache.clear();
+ if(cacheable){const cached=apiMemoryCache.get(path);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:8000))return cached.data;}
+ const r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,headers:{"content-type":"application/json",...(options.headers||{})}});
+ const raw=await r.text();let d;try{d=JSON.parse(raw);}catch{const html=raw.trimStart().startsWith("<!DOCTYPE")||raw.trimStart().startsWith("<html");throw new Error(html?"El servidor devolvió la página web en lugar de la API. Cloudflare aún no ha publicado la versión del servidor o la ruta no está disponible.":"El servidor devolvió una respuesta no válida.");}
+ if(!r.ok)throw new Error(d.error||"Ocurrió un error.");
+ if(cacheable)apiMemoryCache.set(path,{data:d,time:Date.now()});
+ return d;
+};
+function prefetchMemberTabs(){
+ const paths=["/api/secret/me","/api/community","/api/community/clues","/api/wishes"];
+ if(currentUser?.isPrimaryAdmin)paths.push("/api/admin/status","/api/admin/draw/status");
+ const warm=()=>Promise.allSettled(paths.map(path=>api(path)));
+ if("requestIdleCallback"in window)window.requestIdleCallback(warm,{timeout:1200});else setTimeout(warm,250);
+}
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function setLoginView(){
   setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
@@ -23,6 +39,7 @@ function renderMemberApp(){
  const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
  app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto</button><button data-tab="community"><span>💬</span>Comunidad</button><button data-tab="wishes"><span>💝</span>Deseos</button><button data-tab="profile"><span>👤</span>Perfil</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
  updateMemberCountdown(currentUser.membership?.event_date);
+ prefetchMemberTabs();
  app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileSettings();return;}if(btn.dataset.tab==="admin-settings"){showAdminSettings();return;}if(btn.dataset.tab==="secret"){renderSecretTab();return;}if(btn.dataset.tab==="wishes"){renderWishesTab();return;}if(btn.dataset.tab==="community"){renderCommunityTab();return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Comunidad",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>${labels[btn.dataset.tab]}</h2></div><article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
 }
 async function showAdminSettings(){
