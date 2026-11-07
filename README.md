@@ -4,11 +4,12 @@ Aplicación PWA para organizar el intercambio navideño del equipo Cliente 360. 
 
 ## Versión
 
-**1.0.0 — Release candidate para producción.**
+**1.1.1 — Mejoras de inicio, logística del intercambio y lista pública de participantes.**
 
 ## Funcionalidades
 
-- Inicio navideño responsive e instalable como PWA.
+- Inicio navideño responsive e instalable como PWA, con ubicación, horario y vista previa del mapa del intercambio.
+- Lista pública de participantes con contador dinámico en la pantalla de inicio.
 - Inicio de sesión con Google y sesiones mediante cookie HttpOnly, Secure y SameSite=Lax.
 - Invitaciones privadas para incorporarse a la edición.
 - Perfil de participante y administración de integrantes.
