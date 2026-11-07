@@ -83,7 +83,7 @@ async function compressWishImage(file){
 }
 async function renderCommunityTab(){
  const section=$("#member-app .member-home");if(!section)return;
- section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Comunidad 💬</h2><p>Comparte el espíritu navideño con todo el equipo y envía pistas secretas a tu amigo.</p></div><div class="community-loading">Cargando comunidad…</div>';
+ section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Comunidad 💬</h2><p>Comparte el espíritu navideño con todo el equipo y envía pistas secretas a tu amigo.</p></div><div class="tab-skeleton" aria-label="Preparando comunidad"><span></span><span></span><span></span></div>';
  try{
   const [chat,clues]=await Promise.all([api("/api/community"),api("/api/community/clues")]);
   const messages=chat.messages||[];
@@ -117,7 +117,7 @@ async function refreshCommunityMessages(forceBottom=false){
 function formatCommunityTime(value){const date=new Date(String(value).replace(" ","T")+"Z");return Number.isNaN(date.getTime())?"":date.toLocaleString("es-PE",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});}
 async function renderWishesTab(){
  const section=$("#member-app .member-home");if(!section)return;
- section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Lista de deseos 💝</h2><p>Pequeñas ideas para inspirar el regalo perfecto.</p></div><div class="wishes-loading">Preparando tu lista…</div>';
+ section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Lista de deseos 💝</h2><p>Pequeñas ideas para inspirar el regalo perfecto.</p></div><div class="tab-skeleton" aria-label="Preparando deseos"><span></span><span></span><span></span></div>';
  try{
   const data=await api("/api/wishes");
   const mine=data.wishes||[];
@@ -151,7 +151,7 @@ async function renderWishesTab(){
 }
 async function renderSecretTab(){
  const section=$("#member-app .member-home");if(!section)return;
- section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Mi amigo secreto</h2></div><div class="secret-loading">Consultando el estado del sorteo…</div>';
+ section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Mi amigo secreto</h2></div><div class="tab-skeleton tab-skeleton-compact" aria-label="Consultando tu asignación"><span></span><span></span></div>';
  try{
   const data=await api("/api/secret/me");
   if(data.state==="drawn")section.innerHTML='<div class="member-section-heading"><p class="kicker">TU ASIGNACIÓN SECRETA</p><h2>Tu amigo secreto 🎁</h2></div><article class="secret-reveal"><span>🎄</span><p>Este año te toca regalarle a</p><h2>'+esc(data.recipient.displayName)+'</h2><small>Recuerda mantenerlo en secreto 🤫</small></article>';
