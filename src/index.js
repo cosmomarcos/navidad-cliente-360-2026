@@ -28,7 +28,7 @@ async function currentUser(request, env) {
 }
 async function isPrimaryAdmin(user, env) { return !!user && !!env.ADMIN_EMAIL && user.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase(); }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.4.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.4.1" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -132,6 +132,25 @@ async function handleApi(request, env, url) {
       return json({ ok: true, invitationUrl: `${url.origin}/?invite=${token}` });
     }
     return json({ error: "Ruta administrativa no encontrada." }, 404);
+  }
+  if (request.method === "POST" && url.pathname === "/api/participation/withdraw") {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
+    if (!edition) return json({ error: "No hay una edición activa." }, 404);
+    if (edition.status === "drawn" || edition.status === "completed") return json({ error: "El sorteo ya se realizó o la edición terminó. Contacta al organizador." }, 409);
+    const result = await env.DB.prepare("UPDATE edition_members SET status='withdrawn' WHERE edition_id=? AND user_id=? AND status='confirmed'").bind(edition.id, user.id).run();
+    if (!result.meta.changes) return json({ error: "No tienes una participación activa." }, 409);
+    return json({ ok: true });
+  }
+  if (request.method === "POST" && url.pathname === "/api/participation/rejoin") {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
+    if (!edition || edition.status !== "registration") return json({ error: "La inscripción ya no está disponible." }, 409);
+    const result = await env.DB.prepare("UPDATE edition_members SET status='confirmed', joined_at=datetime('now') WHERE edition_id=? AND user_id=? AND status='withdrawn'").bind(edition.id, user.id).run();
+    if (!result.meta.changes) return json({ error: "No encontramos una inscripción anterior para reactivar." }, 404);
+    return json({ ok: true });
   }
   if (request.method === "POST" && url.pathname === "/api/profile/participant") {
     const user = await currentUser(request, env);
