@@ -74,6 +74,10 @@ async function handleApi(request, env, url) {
       if (!result.meta.changes) return json({ error: "Participante no encontrado." }, 404);
       return json({ ok: true });
     }
+    if (url.pathname.startsWith("/api/admin/exclusions")) {
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS edition_exclusions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_a_id TEXT NOT NULL REFERENCES users(id), user_b_id TEXT NOT NULL REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')), CHECK(user_a_id <> user_b_id), UNIQUE(edition_id, user_a_id, user_b_id))").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_exclusions_edition ON edition_exclusions(edition_id)").run();
+    }
     if (request.method === "GET" && url.pathname === "/api/admin/exclusions") {
       const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition) return json({ exclusions: [] });
