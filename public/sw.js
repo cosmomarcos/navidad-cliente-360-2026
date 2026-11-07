@@ -1,5 +1,5 @@
 const CACHE = "cliente360-shell-v1.1.12";
-const SHELL = ["/", "/css/styles.css", "/js/app.js", "/js/participants.js", "/manifest.webmanifest", "/icons/icon.svg", "/icons/apple-touch-icon.png", "/icons/icon-192.png", "/icons/icon-512.png"];
+const SHELL = ["/", "/css/styles.css", "/js/app.js", "/js/participants.js", "/manifest.webmanifest", "/icons/icon.svg"];
 self.addEventListener("install", event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
   await cache.addAll(SHELL);
