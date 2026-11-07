@@ -436,13 +436,7 @@ async function handleApi(request, env, url) {
     return json({ ok: true, removed: true });
   }
   if (request.method === "POST" && url.pathname === "/api/participation/rejoin") {
-    const user = await currentUser(request, env);
-    if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
-    if (!edition || edition.status !== "registration") return json({ error: "La inscripción ya no está disponible." }, 409);
-    const result = await env.DB.prepare("UPDATE edition_members SET status='confirmed', joined_at=datetime('now') WHERE edition_id=? AND user_id=? AND status='withdrawn'").bind(edition.id, user.id).run();
-    if (!result.meta.changes) return json({ error: "No encontramos una inscripción anterior para reactivar." }, 404);
-    return json({ ok: true });
+    return json({ error: "Para volver a participar necesitas una nueva invitación del organizador." }, 409);
   }
   if (request.method === "POST" && url.pathname === "/api/profile/participant") {
     const user = await currentUser(request, env);
