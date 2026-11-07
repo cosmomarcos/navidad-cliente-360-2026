@@ -15,5 +15,5 @@ migrations_dir = "migrations"
 
 [vars]
 APP_NAME = "Navidad Cliente 360 2026"
-VAPID_PUBLIC_KEY = "BEzsG7t86DreRtJof0SNdObWD4k1o53eTjF_YjETolq3D3DKGDuKCwIs78HkfVvSwfpFLHtZQpBpmQu1XEHc_N8"
+VAPID_PUBLIC_KEY = "BK82-ax3h3ZJxS9D6Xe-dy-AV2prRTFNIdqFDoOJstbLnFm5Rr-NkhqpsP1EwMi6fKkYCkcueZgUxM6RDJpfUOs"
 EDITION_YEAR = "2026"
