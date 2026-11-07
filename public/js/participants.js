@@ -1,4 +1,4 @@
-// Fase 0.4: administración de participantes y exclusiones.
+// Administración de exclusiones del sorteo. La lista de participantes se consulta desde Inicio.
 const participantApi = async (path, options = {}) => {
   const response = await fetch(path, { credentials: "same-origin", ...options, headers: { "content-type": "application/json", ...(options.headers || {}) } });
   const data = await response.json();
@@ -18,9 +18,8 @@ window.mountParticipantAdmin = async function () {
     root.id = "participant-admin";
     root.className = "participant-admin";
     root.innerHTML = `
-      <h3>Administración de participantes</h3>
-      <p class="participant-help">La lista pública está disponible para todos en Inicio. Desde aquí puedes administrar inscripciones y exclusiones del sorteo.</p>
-      <div id="participant-list" aria-live="polite">Cargando participantes…</div>
+      <h3>Exclusiones del sorteo</h3>
+      <p class="participant-help">La lista de participantes está disponible para todos en Inicio. Configura aquí las parejas que no deben asignarse entre sí.</p>
       <div class="exclusion-box">
         <h4>Agregar exclusión mutua</h4>
         <p>Las dos personas seleccionadas no podrán regalarse entre sí.</p>
@@ -34,24 +33,18 @@ window.mountParticipantAdmin = async function () {
       <div id="participant-feedback" role="status" aria-live="polite"></div>`;
     panel.append(root);
   }
-  if (!panel.dataset.participantHandlers) {
-    panel.dataset.participantHandlers = "1";
-    panel.addEventListener("click", async event => {
-      const toggle = event.target.closest("[data-user]");
+  if (!root.dataset.handlers) {
+    root.dataset.handlers = "1";
+    root.addEventListener("click", async event => {
       const remove = event.target.closest("[data-exclusion]");
+      if (!remove) return;
       try {
-        if (toggle) {
-          await participantApi("/api/admin/participants/" + encodeURIComponent(toggle.dataset.user), { method: "PATCH", body: JSON.stringify({ active: toggle.dataset.active !== "1" }) });
-          document.querySelector("#participant-feedback").textContent = "Estado del participante actualizado.";
-          await window.mountParticipantAdmin();
-        } else if (remove) {
-          await participantApi("/api/admin/exclusions/" + encodeURIComponent(remove.dataset.exclusion), { method: "DELETE" });
-          document.querySelector("#participant-feedback").textContent = "Exclusión eliminada.";
-          await window.mountParticipantAdmin();
-        }
+        await participantApi("/api/admin/exclusions/" + encodeURIComponent(remove.dataset.exclusion), { method: "DELETE" });
+        document.querySelector("#participant-feedback").textContent = "Exclusión eliminada.";
+        await window.mountParticipantAdmin();
       } catch (error) { document.querySelector("#participant-feedback").textContent = error.message; }
     });
-    panel.addEventListener("submit", async event => {
+    root.addEventListener("submit", async event => {
       if (event.target.id !== "exclusion-form") return;
       event.preventDefault();
       const values = Object.fromEntries(new FormData(event.target));
@@ -67,22 +60,18 @@ window.mountParticipantAdmin = async function () {
   }
   try {
     const data = await participantApi("/api/admin/participants");
-    const list = document.querySelector("#participant-list");
     const active = data.participants.filter(p => p.status === "confirmed");
-    list.innerHTML = data.participants.length ? data.participants.map(p => `
-      <article class="participant-row">
-        <div class="participant-avatar">${p.avatar_url ? `<img src="${participantEscape(p.avatar_url)}" alt="">` : "🎄"}</div>
-        <div class="participant-info"><b>${participantEscape(p.display_name)}</b><small>${participantEscape(p.email)}</small></div>
-        <span class="participant-state ${p.status === "confirmed" ? "is-active" : "is-inactive"}">${p.status === "confirmed" ? "Activo" : "Inactivo"}</span>
-        <button class="participant-toggle" data-user="${participantEscape(p.user_id)}" data-active="${p.status === "confirmed" ? "1" : "0"}">${p.status === "confirmed" ? "Desactivar" : "Reactivar"}</button>
-      </article>`).join("") : "<p>Aún no hay participantes registrados.</p>";
     const options = active.map(p => `<option value="${participantEscape(p.user_id)}">${participantEscape(p.display_name)}</option>`).join("");
-    document.querySelectorAll("#exclusion-form select").forEach(select => { const previous = select.value; select.innerHTML = options; if ([...select.options].some(o => o.value === previous)) select.value = previous; });
+    root.querySelectorAll("#exclusion-form select").forEach(select => {
+      const previous = select.value;
+      select.innerHTML = options;
+      if ([...select.options].some(o => o.value === previous)) select.value = previous;
+    });
     const exclusions = await participantApi("/api/admin/exclusions");
-    document.querySelector("#exclusion-list").innerHTML = exclusions.exclusions.length
+    root.querySelector("#exclusion-list").innerHTML = exclusions.exclusions.length
       ? exclusions.exclusions.map(x => `<div class="exclusion-row"><span>${participantEscape(x.user_a_name)} ↔ ${participantEscape(x.user_b_name)}</span><button class="participant-toggle danger" data-exclusion="${participantEscape(x.id)}">Eliminar</button></div>`).join("")
       : "<p>No hay exclusiones configuradas.</p>";
   } catch (error) {
-    document.querySelector("#participant-list").textContent = "No se pudo cargar la administración: " + error.message;
+    root.querySelector("#exclusion-list").textContent = "No se pudo cargar la configuración: " + error.message;
   }
 };
