@@ -4,7 +4,7 @@ Aplicación PWA para organizar el intercambio navideño del equipo Cliente 360. 
 
 ## Versión
 
-**1.1.1 — Mejoras de inicio, logística del intercambio y lista pública de participantes.**
+**1.1.6 — Notificaciones push para nuevos mensajes del amigo secreto.**
 
 ## Funcionalidades
 
@@ -94,7 +94,7 @@ El flujo de validación de GitHub Actions ejecuta:
 
 ## Notificaciones de pistas · v1.1.0
 
-Los participantes pueden activar notificaciones push desde **Mensajes → Buzón secreto → Activar notificaciones**. Cuando su amigo secreto envía una pista, el destinatario recibe un aviso genérico que conserva el anonimato; al tocarlo, la aplicación abre el buzón. La pestaña Mensajes también muestra un contador de pistas sin leer.
+Los participantes pueden activar notificaciones push desde **Mensajes → Buzón secreto → Activar notificaciones**. Cuando su amigo secreto envía un mensaje, el destinatario recibe una notificación push incluso si la aplicación no está abierta; el aviso dice “Tu amigo secreto te envio un mensaje” y, al tocarlo, abre el buzón. La pestaña Mensajes también muestra un contador de pistas sin leer.
 
 ### Configuración adicional en Cloudflare
 
