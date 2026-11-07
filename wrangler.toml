@@ -26,4 +26,5 @@ EDITION_YEAR = "2026"
 
 [[previews.d1_databases]]
 binding = "DB"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_name = "navidad-cliente-360-preview"
+database_id = "9377aecc-706c-4632-b679-39a88db40e1f"
