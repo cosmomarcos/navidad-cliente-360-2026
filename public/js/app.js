@@ -1,6 +1,6 @@
 const $ = selector => document.querySelector(selector);
 const params = new URLSearchParams(location.search);
-const token = params.get("invite") || location.pathname.match(/\\/unirse\\/([^/]+)/)?.[1] || "";
+const token = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
 let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null;
 const api=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||"Ocurrió un error.");return d;};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
