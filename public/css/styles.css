@@ -158,3 +158,19 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .wish-remove-image-label{display:flex!important;align-items:center;gap:7px;font-size:10px!important;font-weight:500!important}
 .wish-remove-image-label input{width:auto!important}
 @media(max-width:520px){.wish-image-link{width:58px;height:58px;flex-basis:58px}.wish-image-preview img{width:76px;height:76px}}
+
+.wish-view-image{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:6px 11px;border:1px solid #d8c9a9;border-radius:20px;background:#f4eddd;color:#315744;font-size:10px;font-weight:750;cursor:pointer;transition:background .2s,border-color .2s,transform .2s}
+.wish-view-image:hover{background:#e9dfc8;border-color:#bda77a;transform:translateY(-1px)}
+.wish-image-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(5,22,17,.82);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);animation:wishModalFade .18s ease-out}
+.wish-image-modal-panel{display:flex;flex-direction:column;width:min(760px,100%);max-height:min(88vh,900px);overflow:hidden;border:1px solid rgba(218,199,157,.65);border-radius:20px;background:#f7f0df;box-shadow:0 24px 80px rgba(0,0,0,.35);animation:wishModalRise .2s ease-out}
+.wish-image-modal-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 20px;border-bottom:1px solid #e4d9c4}
+.wish-image-modal-header span{font-size:8px;font-weight:800;letter-spacing:1.6px;color:#9b8050}
+.wish-image-modal-header h3{margin:4px 0 0;color:#19372d;font-family:'Playfair Display',serif;font-size:19px;overflow-wrap:anywhere}
+.wish-image-modal-close{display:grid;place-items:center;width:36px;height:36px;flex:0 0 36px;border:1px solid #e4d7c4;border-radius:50%;background:#fffaf0;color:#315744;font-size:24px;line-height:1;cursor:pointer}
+.wish-image-modal-close:hover{background:#e9dfc8}
+.wish-image-modal-stage{display:flex;align-items:center;justify-content:center;min-height:180px;overflow:auto;padding:16px;background:radial-gradient(ellipse at center,#e9e1d0 0%,#ded5c2 100%)}
+.wish-image-modal-stage img{display:block;max-width:100%;max-height:calc(88vh - 160px);width:auto;height:auto;object-fit:contain;border-radius:10px;box-shadow:0 8px 28px rgba(26,39,30,.16)}
+.wish-image-modal-caption{margin:0;padding:11px 18px;text-align:center;color:#7b8579;font-size:10px}
+@keyframes wishModalFade{from{opacity:0}to{opacity:1}}
+@keyframes wishModalRise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:520px){.wish-image-modal{padding:10px}.wish-image-modal-panel{max-height:92vh;border-radius:16px}.wish-image-modal-header{padding:14px 15px}.wish-image-modal-header h3{font-size:16px}.wish-image-modal-stage{padding:9px}.wish-image-modal-stage img{max-height:calc(92vh - 145px)}}
