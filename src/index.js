@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.2" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.3" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -305,4 +305,18 @@ async function handleApi(request, env, url) {
   }
   return json({ error: "Ruta no encontrada." }, 404);
 }
-export default { async fetch(request, env) { const url = new URL(request.url); if (url.pathname.startsWith("/api/")) return handleApi(request, env, url); return env.ASSETS.fetch(request); } };
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    try {
+      if (url.pathname.startsWith("/api/")) return await handleApi(request, env, url);
+      return await env.ASSETS.fetch(request);
+    } catch (error) {
+      console.error("Unhandled Worker error", { path: url.pathname, method: request.method, message: error?.message || String(error) });
+      if (url.pathname.startsWith("/api/")) {
+        return json({ error: "Error interno del servidor al procesar " + url.pathname, code: "WORKER_EXCEPTION" }, 500);
+      }
+      return new Response("Error interno. Intenta nuevamente.", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+    }
+  }
+};
