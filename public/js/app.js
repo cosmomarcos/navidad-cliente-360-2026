@@ -25,7 +25,7 @@ function renderMemberApp(){
 }
 async function showAdminSettings(){
  const home=$("#member-app .member-home"); if(!currentUser?.isPrimaryAdmin||!home)return;
- home.innerHTML='<div class="admin-settings-view"><h2>⚙️ Ajustes del intercambio</h2><p>Configura los datos principales de Navidad Cliente 360. Estos cambios se reflejarán para todos los participantes.</p><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p><div class="admin-tools-section"><h2>Administración</h2><p>Participantes, invitaciones y exclusiones del intercambio.</p><div id="admin-tools-slot"></div></div></div>';
+ home.innerHTML='<div class="admin-settings-view"><div class="settings-header"><span>⚙️</span><div><h2>Ajustes del intercambio</h2><p>Configuración general de la edición.</p></div></div><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p><div class="admin-tools-section"><div id="admin-tools-slot"></div></div></div>';
  const adminPanel=$("#admin-panel");$("#admin-tools-slot").append(adminPanel);adminPanel.classList.remove("hidden");await renderAdmin();
  try{
   const data=await api("/api/admin/status");const e=data.edition||{};const form=$("#edition-settings-form");
@@ -55,11 +55,19 @@ function renderRejoinView(){
 }
 async function logout(){try{await api("/api/auth/logout",{method:"POST"});}finally{location.href=location.pathname+(token?"?invite="+encodeURIComponent(token):"");}}
 async function renderAdmin(){
- const panel=$("#admin-panel");if(!currentUser?.isPrimaryAdmin){panel.classList.add("hidden");return;}if(!panel.parentElement?.matches("#admin-tools-slot")){panel.classList.add("hidden");return;}panel.classList.remove("hidden");
- try{const s=await api("/api/admin/status");panel.innerHTML=`<div class="admin-heading"><h2>Panel del administrador principal</h2><button id="admin-logout" class="secondary-action">Cerrar sesión</button></div><p>Sesión administrativa: ${esc(s.email)}</p><div class="admin-result"><b>${esc(s.edition?.title||"Edición sin configurar")}</b> · ${s.edition?.year||""}<br>Presupuesto: ${s.edition?.budget_amount==null?"No definido":"S/ "+s.edition.budget_amount}<br>Evento: ${esc(s.edition?.event_date||"Por definir")}<br>Participantes inscritos: ${s.participants||0}</div><form id="invite-form" class="admin-form"><label>Usos del nuevo enlace<input name="maxUses" type="number" min="1" max="500" value="1"></label></form><button class="admin-action" id="new-invite">Generar invitación</button><div id="admin-result" aria-live="polite"></div>`;
- $("#admin-logout").addEventListener("click",logout); $("#new-invite").addEventListener("click",async()=>{try{const v=Object.fromEntries(new FormData($("#invite-form")));const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify(v)});$("#admin-result").innerHTML=`<div class="admin-result">Enlace generado: <a href="${esc(r.invitationUrl)}">${esc(r.invitationUrl)}</a></div>`;}catch(e){$("#admin-result").textContent=e.message;}});
- if(window.mountParticipantAdmin)await window.mountParticipantAdmin();
- }catch(e){panel.innerHTML=`<h2>Error al cargar el panel</h2><p>${esc(e.message)}</p>`;}
+ const panel=$("#admin-panel");
+ if(!currentUser?.isPrimaryAdmin){panel.classList.add("hidden");return;}
+ if(!panel.parentElement?.matches("#admin-tools-slot")){panel.classList.add("hidden");return;}
+ panel.classList.remove("hidden");
+ try{
+  panel.innerHTML=`<section class="invite-management">
+   <div class="management-heading"><div><h3>Invitaciones</h3><p>Genera enlaces para incorporar participantes al intercambio.</p></div><span class="management-icon">✉️</span></div>
+   <form id="invite-form" class="admin-form"><label>Usos permitidos del enlace<input name="maxUses" type="number" min="1" max="500" value="1"></label><button class="admin-action" id="new-invite" type="submit">Generar invitación</button></form>
+   <div id="admin-result" aria-live="polite"></div>
+  </section>`;
+  $("#invite-form").addEventListener("submit",async ev=>{ev.preventDefault();try{const v=Object.fromEntries(new FormData(ev.currentTarget));const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify(v)});$("#admin-result").innerHTML=`<div class="admin-result"><b>Invitación creada</b><a href="${esc(r.invitationUrl)}">${esc(r.invitationUrl)}</a></div>`;}catch(e){$("#admin-result").textContent=e.message;}});
+  if(window.mountParticipantAdmin)await window.mountParticipantAdmin();
+ }catch(e){panel.innerHTML=`<p class="admin-error">${esc(e.message)}</p>`;}
 }
 async function checkSession(){
  $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");
