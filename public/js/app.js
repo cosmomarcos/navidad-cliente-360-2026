@@ -238,11 +238,23 @@ async function renderAdmin(){
  panel.classList.remove("hidden");
  try{
   panel.innerHTML=`<section class="invite-management">
-   <div class="management-heading"><div><h3>Invitaciones</h3><p>Genera enlaces para incorporar participantes al intercambio.</p></div><span class="management-icon">✉️</span></div>
-   <form id="invite-form" class="admin-form"><label>Usos permitidos del enlace<input name="maxUses" type="number" min="1" max="500" value="1"></label><button class="admin-action" id="new-invite" type="submit">Generar invitación</button></form>
+   <div class="management-heading"><div><h3>Invitación para participantes</h3><p>Un enlace único, válido durante 24 horas. Al generar otro, el anterior se desactiva.</p></div><span class="management-icon">✉️</span></div>
+   <form id="invite-form" class="admin-form"><button class="admin-action" id="new-invite" type="submit">＋ Generar invitación</button></form>
    <div id="admin-result" aria-live="polite"></div>
   </section>`;
-  $("#invite-form").addEventListener("submit",async ev=>{ev.preventDefault();try{const v=Object.fromEntries(new FormData(ev.currentTarget));const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify(v)});$("#admin-result").innerHTML=`<div class="admin-result"><b>Invitación creada</b><a href="${esc(r.invitationUrl)}">${esc(r.invitationUrl)}</a></div>`;}catch(e){$("#admin-result").textContent=e.message;}});
+  $("#invite-form").addEventListener("submit",async ev=>{
+   ev.preventDefault();
+   const button=$("#new-invite"),result=$("#admin-result");
+   button.disabled=true;button.textContent="Generando…";
+   try{
+    const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify({})});
+    const shareText="¡Estás invitado a Navidad Cliente 360! Únete desde este enlace: "+r.invitationUrl;
+    const whatsappUrl="https://wa.me/?text="+encodeURIComponent(shareText);
+    const expiry=new Date(r.expiresAt).toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short"});
+    result.innerHTML=`<div class="admin-result invite-created"><div class="invite-created-heading"><span>✓</span><div><b>Invitación generada</b><small>Válida hasta ${esc(expiry)}</small></div></div><a class="invite-url" href="${esc(r.invitationUrl)}" target="_blank" rel="noopener noreferrer">${esc(r.invitationUrl)}</a><a class="invite-whatsapp" href="${esc(whatsappUrl)}" target="_blank" rel="noopener noreferrer"><span>◉</span> Compartir por WhatsApp</a><p class="invite-note">Este enlace puede ser utilizado por todos los participantes durante su vigencia. Si generas otro, este quedará invalidado.</p></div>`;
+   }catch(e){result.innerHTML=`<p class="admin-invite-error">${esc(e.message)}</p>`;}
+   finally{button.disabled=false;button.textContent="＋ Generar invitación";}
+  });
   if(window.mountParticipantAdmin)await window.mountParticipantAdmin();
  }catch(e){panel.innerHTML=`<p class="admin-error">${esc(e.message)}</p>`;}
 }
