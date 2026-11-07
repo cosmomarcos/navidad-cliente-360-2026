@@ -56,7 +56,7 @@ async function handleApi(request, env, url) {
     if (request.method === "GET" && url.pathname === "/api/admin/status") {
       const workspace = await env.DB.prepare("SELECT id, name FROM workspace LIMIT 1").first();
       const edition = workspace ? await env.DB.prepare("SELECT id, title, year, budget_amount, event_date, status FROM editions WHERE workspace_id = ? ORDER BY year DESC LIMIT 1").bind(workspace.id).first() : null;
-      const members = edition ? await env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id = ?").bind(edition.id).first() : { total: 0 };
+      const members = edition ? await env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id = ? AND status = 'confirmed'").bind(edition.id).first() : { total: 0 };
       return json({ isPrimaryAdmin: true, email: user.email, initialized: !!edition, edition, participants: members.total || 0 });
     }
     if (request.method === "GET" && url.pathname === "/api/admin/participants") {
