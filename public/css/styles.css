@@ -301,3 +301,11 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .home-participant-row.is-inactive{opacity:.68}.home-participant-name small{display:block;margin-top:3px;color:#987d45;font-size:10px}.home-participant-toggle{border:1px solid #d6c8a8;border-radius:8px;background:#f4ead3;color:#315444;padding:7px 9px;font-size:10px;font-weight:800;cursor:pointer}.home-participant-toggle:disabled{opacity:.5}
 .participants-loading,.participants-empty{margin:0;padding:12px;color:#718073;font-size:12px}
 @media(max-width:600px){.exchange-map-preview{height:165px}.home-participants-card{padding:16px}.home-participants-heading h2{font-size:18px}}
+
+
+/* v1.1.2: lista de participantes dentro de Mi equipo */
+.profile-participants-card{margin:18px auto 20px;max-width:820px}
+.profile-participants-card .home-participants-heading{margin-bottom:15px}
+.profile-participants-card .home-participant-row{min-height:48px}
+.profile-actions{margin-top:20px}
+@media(max-width:600px){.profile-participants-card{margin:15px 0;padding:16px}.profile-actions{gap:10px}}
