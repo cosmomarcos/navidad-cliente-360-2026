@@ -27,8 +27,32 @@ async function currentUser(request, env) {
   return env.DB.prepare("SELECT id, email, display_name, avatar_url FROM users WHERE id = ?").bind(session.sub).first();
 }
 async function isPrimaryAdmin(user, env) { return !!user && !!env.ADMIN_EMAIL && user.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase(); }
+async function ensureDrawSchema(env) {
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS edition_draw_state (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, state TEXT NOT NULL DEFAULT 'registration', ready_at TEXT, drawn_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_assignments (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id, giver_user_id))").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_runs (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, run_number INTEGER NOT NULL, status TEXT NOT NULL, participant_count INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_draw_assignments_edition ON draw_assignments(edition_id)").run();
+}
+function buildSecretAssignments(members, exclusions) {
+  const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
+  const recipients = [...members].sort(() => Math.random() - 0.5);
+  const assigned = new Map(), used = new Set(); let steps = 0;
+  function solve(index) {
+    if (index === members.length) return true;
+    if (++steps > 250000) return false;
+    const giver = members[index];
+    const candidates = recipients.filter(r => r.user_id !== giver.user_id && !used.has(r.user_id) && !blocked.has(giver.user_id + ":" + r.user_id)).sort(() => Math.random() - 0.5);
+    for (const recipient of candidates) {
+      assigned.set(giver.user_id, recipient.user_id); used.add(recipient.user_id);
+      if (solve(index + 1)) return true;
+      used.delete(recipient.user_id); assigned.delete(giver.user_id);
+    }
+    return false;
+  }
+  return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
+}
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.5.6" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -70,6 +94,82 @@ async function handleApi(request, env, url) {
       if (budget !== null && (!Number.isFinite(budget) || budget < 0 || budget > 1000000)) return json({ error: "El presupuesto debe ser un monto válido." }, 400);
       await env.DB.prepare("UPDATE editions SET title=?, event_date=?, budget_amount=? WHERE id=?").bind(title, eventDate, budget, edition.id).run();
       return json({ ok: true });
+    }
+    if (url.pathname.startsWith("/api/admin/draw/")) {
+      await ensureDrawSchema(env);
+      const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
+      if (!edition) return json({ error: "No hay una edición configurada." }, 404);
+      if (request.method === "GET" && url.pathname === "/api/admin/draw/status") {
+        const state = await env.DB.prepare("SELECT state, ready_at, drawn_at FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
+        const members = await env.DB.prepare("SELECT em.user_id, p.first_name, p.last_name FROM edition_members em LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed'").bind(edition.id).all();
+        const exclusions = await env.DB.prepare("SELECT user_a_id, user_b_id FROM edition_exclusions WHERE edition_id=?").bind(edition.id).all();
+        const missing = (members.results || []).filter(m => !m.first_name || !m.last_name);
+        return json({ state: state?.state || "registration", readyAt: state?.ready_at || null, drawnAt: state?.drawn_at || null, participants: (members.results || []).length, missingProfiles: missing.length, exclusions: (exclusions.results || []).length, editionStatus: edition.status });
+      }
+      if (request.method === "POST" && url.pathname === "/api/admin/draw/ready") {
+        if (edition.status === "drawn" || edition.status === "completed") return json({ error: "El sorteo ya se realizó. Usa Volver a sortear para reiniciar el proceso." }, 409);
+        const members = await env.DB.prepare("SELECT em.user_id, p.first_name, p.last_name FROM edition_members em LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed'").bind(edition.id).all();
+        const list = members.results || [];
+        if (list.length < 2) return json({ error: "Se necesitan al menos dos participantes activos." }, 400);
+        const missing = list.filter(m => !m.first_name || !m.last_name);
+        if (missing.length) return json({ error: "Hay " + missing.length + " participante(s) sin nombres y apellidos completos. Completa sus perfiles antes de continuar." }, 400);
+        const exclusions = await env.DB.prepare("SELECT user_a_id, user_b_id FROM edition_exclusions WHERE edition_id=?").bind(edition.id).all();
+        if (!buildSecretAssignments(list, exclusions.results || [])) return json({ error: "Las exclusiones actuales no permiten crear un sorteo válido. Revisa las exclusiones mutuas." }, 409);
+        await env.DB.prepare("INSERT INTO edition_draw_state (edition_id, state, ready_at, drawn_at, updated_at) VALUES (?, 'ready', datetime('now'), NULL, datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET state='ready', ready_at=datetime('now'), drawn_at=NULL, updated_at=datetime('now')").bind(edition.id).run();
+        await env.DB.prepare("UPDATE editions SET status='ready' WHERE id=? AND status='registration'").bind(edition.id).run();
+        return json({ ok: true, state: "ready", participants: list.length });
+      }
+      if (request.method === "POST" && url.pathname === "/api/admin/draw/execute") {
+        const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
+        if (!state || state.state !== "ready" || edition.status !== "ready") return json({ error: "Primero confirma que todos están listos en Ajustes." }, 409);
+        const membersResult = await env.DB.prepare("SELECT em.user_id, p.first_name, p.last_name FROM edition_members em JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed'").bind(edition.id).all();
+        const members = membersResult.results || [];
+        if (members.length < 2 || members.some(m => !m.first_name || !m.last_name)) return json({ error: "La lista de participantes cambió o hay perfiles incompletos. Vuelve a validar la preparación." }, 409);
+        const exclusions = await env.DB.prepare("SELECT user_a_id, user_b_id FROM edition_exclusions WHERE edition_id=?").bind(edition.id).all();
+        const assignments = buildSecretAssignments(members, exclusions.results || []);
+        if (!assignments) return json({ error: "No existe una combinación válida con las exclusiones actuales." }, 409);
+        const lock = await env.DB.prepare("UPDATE editions SET status='drawing' WHERE id=? AND status='ready'").bind(edition.id).run();
+        if (!lock.meta.changes) return json({ error: "El sorteo ya está siendo ejecutado o el estado cambió. Actualiza la pantalla." }, 409);
+        try {
+          const prior = await env.DB.prepare("SELECT COALESCE(MAX(run_number),0) AS n FROM draw_runs WHERE edition_id=?").bind(edition.id).first();
+          const runNumber = (prior?.n || 0) + 1, runId = crypto.randomUUID();
+          const statements = [
+            env.DB.prepare("DELETE FROM draw_assignments WHERE edition_id=?").bind(edition.id),
+            env.DB.prepare("INSERT INTO draw_runs (id, edition_id, run_number, status, participant_count) VALUES (?, ?, ?, 'completed', ?)").bind(runId, edition.id, runNumber, assignments.length)
+          ];
+          for (const a of assignments) statements.push(env.DB.prepare("INSERT INTO draw_assignments (id, edition_id, giver_user_id, recipient_user_id, run_number) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), edition.id, a.giver_user_id, a.recipient_user_id, runNumber));
+          statements.push(env.DB.prepare("UPDATE edition_draw_state SET state='drawn', drawn_at=datetime('now'), updated_at=datetime('now') WHERE edition_id=?").bind(edition.id));
+          statements.push(env.DB.prepare("UPDATE editions SET status='drawn' WHERE id=?").bind(edition.id));
+          await env.DB.batch(statements);
+          return json({ ok: true, state: "drawn", participants: assignments.length, runNumber });
+        } catch (error) {
+          await env.DB.prepare("UPDATE editions SET status='ready' WHERE id=? AND status='drawing'").bind(edition.id).run();
+          throw error;
+        }
+      }
+      if (request.method === "POST" && url.pathname === "/api/admin/draw/reset") {
+        const body = await request.json();
+        if (body.confirmation !== "VOLVER A SORTEAR") return json({ error: "Escribe VOLVER A SORTEAR para confirmar." }, 400);
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM draw_assignments WHERE edition_id=?").bind(edition.id),
+          env.DB.prepare("UPDATE draw_runs SET status='superseded' WHERE edition_id=? AND status='completed'").bind(edition.id),
+          env.DB.prepare("INSERT INTO edition_draw_state (edition_id, state, ready_at, drawn_at, updated_at) VALUES (?, 'registration', NULL, NULL, datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET state='registration', ready_at=NULL, drawn_at=NULL, updated_at=datetime('now')").bind(edition.id),
+          env.DB.prepare("UPDATE editions SET status='registration' WHERE id=?").bind(edition.id)
+        ]);
+        return json({ ok: true, state: "registration", message: "Asignaciones anteriores eliminadas. Los demás datos e historiales se conservaron." });
+      }
+    }
+    if (request.method === "GET" && url.pathname === "/api/secret/me") {
+      const participant = await currentUser(request, env);
+      if (!participant) return json({ error: "Inicia sesión primero." }, 401);
+      await ensureDrawSchema(env);
+      const membership = await env.DB.prepare("SELECT em.status, em.edition_id, e.status AS edition_status, e.title FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(participant.id).first();
+      if (!membership || membership.status !== "confirmed") return json({ state: "not_participating" });
+      const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
+      if (!state || state.state !== "drawn") return json({ state: state?.state || "registration", title: membership.title });
+      const assignment = await env.DB.prepare("SELECT u.id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM draw_assignments a JOIN users u ON u.id=a.recipient_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? AND a.giver_user_id=?").bind(membership.edition_id, participant.id).first();
+      if (!assignment) return json({ state: "not_assigned", title: membership.title });
+      return json({ state: "drawn", title: membership.title, recipient: { displayName: assignment.display_name } });
     }
     if (request.method === "GET" && url.pathname === "/api/admin/status") {
       const workspace = await env.DB.prepare("SELECT id, name FROM workspace LIMIT 1").first();
