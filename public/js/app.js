@@ -43,6 +43,7 @@ async function renderAdmin(){
  }catch(e){panel.innerHTML=`<h2>Error al cargar el panel</h2><p>${esc(e.message)}</p>`;}
 }
 async function checkSession(){
+ $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");
  currentUser=await api("/api/me");signedIn=!!currentUser.authenticated;
  if(!signedIn){setLoginView();await initGoogle();return;}
  $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");$("#google-area").classList.add("hidden");
