@@ -38,9 +38,16 @@ async function renderAdmin() {
         <label>Nombre de la edición<input name="title" value="Navidad Cliente 360 2026" maxlength="100" required></label>
         <label>Año<input name="year" type="number" min="2026" value="2026" required></label>
         <label>Presupuesto por persona (S/)<input name="budgetAmount" type="number" min="0" step="0.01" value="80"></label>
-        <label>Fecha del evento<input name="eventDate" type="date" value="2026-12-18"></label>
+        <label>Fecha del evento<div class="date-control"><input id="event-date" name="eventDate" type="date" value="2026-12-18" min="2026-01-01" max="2027-12-31" required><button type="button" class="date-picker-button" id="open-event-calendar" aria-label="Abrir calendario">📅 Elegir fecha</button></div><small class="date-help">Selecciona el día del evento en el calendario o escribe la fecha.</small></label>
         <label>Usos de la invitación inicial<input name="maxUses" type="number" min="1" max="500" value="100"></label>
       </form><button class="admin-action" id="create-edition">Crear edición y generar invitación</button><div id="admin-result" aria-live="polite"></div>`;
+      $("#open-event-calendar").addEventListener("click", () => {
+        const dateInput = $("#event-date");
+        try {
+          if (typeof dateInput.showPicker === "function") dateInput.showPicker();
+          else { dateInput.focus(); dateInput.click(); }
+        } catch { dateInput.focus(); dateInput.click(); }
+      });
       $("#create-edition").addEventListener("click", async () => {
         const form = $("#bootstrap-form");
         if (!form.reportValidity()) return;
