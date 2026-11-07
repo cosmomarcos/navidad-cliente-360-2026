@@ -224,7 +224,7 @@ function showProfileSettings(){
  loadProfileParticipants();
  $("#edit-profile").addEventListener("click",()=>showProfileForm(currentUser.participantProfile));
  $("#logout-button").addEventListener("click",logout);
- $("#withdraw-participation").addEventListener("click",async()=>{if(!confirm("¿Seguro que deseas dejar de participar? Podrás volver a confirmar mientras la inscripción siga abierta."))return;try{await api("/api/participation/withdraw",{method:"POST"});currentUser=await api("/api/me");renderRejoinView();}catch(e){const fb=$("#profile-action-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+ $("#withdraw-participation").addEventListener("click",async()=>{if(!confirm("¿Seguro que deseas retirarte? Tu inscripción se eliminará de esta edición. Si deseas regresar, necesitarás una nueva invitación del organizador."))return;try{await api("/api/participation/withdraw",{method:"POST"});currentUser=await api("/api/me");renderRejoinView();}catch(e){const fb=$("#profile-action-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
 }
 function renderRejoinView(){
  const app=$("#member-app");app.classList.remove("hidden");
