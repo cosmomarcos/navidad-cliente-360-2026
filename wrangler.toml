@@ -10,12 +10,9 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "navidad-cliente-360-db"
-database_id = "REEMPLAZAR_CON_EL_ID_DE_D1"
+database_id = "28b8265a-5f5b-4302-bc6d-0645c14d3fc0"
 migrations_dir = "migrations"
 
 [vars]
 APP_NAME = "Navidad Cliente 360 2026"
 EDITION_YEAR = "2026"
-# Configura GOOGLE_CLIENT_ID con `wrangler secret put GOOGLE_CLIENT_ID`.
-# Configura SESSION_SECRET con `wrangler secret put SESSION_SECRET`.
-# Configura ADMIN_EMAIL con `wrangler secret put ADMIN_EMAIL`.
