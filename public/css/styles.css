@@ -86,3 +86,6 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .secret-reveal,.secret-waiting{max-width:620px;margin:20px auto;padding:28px 22px;background:#f7f0df;color:#19372d;border-radius:18px;text-align:center;box-shadow:0 15px 35px #0002}
 .secret-reveal>span,.secret-waiting>span{font-size:34px}.secret-reveal h2{font-family:'Playfair Display',serif;font-size:30px;color:#174536;margin:8px 0 12px}.secret-reveal p,.secret-waiting p{font-size:13px;color:#64766b;line-height:1.6}.secret-reveal small{font-size:11px;color:#8a7549}.secret-waiting h3{font-family:'Playfair Display',serif;margin:8px 0}
 @media(max-width:520px){.draw-admin-card{padding:15px}.draw-stats{grid-template-columns:1fr 1fr}.draw-stats span:first-child{grid-column:1/-1}}
+
+.home-team-photo-wrap{margin:18px 0 28px;overflow:hidden;border-radius:18px;border:1px solid rgba(218,201,164,.35);box-shadow:0 12px 30px rgba(0,0,0,.18);background:#10382e}
+.home-team-photo{display:block;width:100%;height:auto;max-height:560px;object-fit:cover;object-position:center;border-radius:18px}
