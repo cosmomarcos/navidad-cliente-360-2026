@@ -81,6 +81,8 @@ El flujo de validación de GitHub Actions ejecuta:
 ## Seguridad y operación
 
 - Las mutaciones de la API requieren un encabezado Origin que coincida con el origen de la aplicación.
+- El consumo de invitaciones reserva cada uso con una actualización condicional para evitar exceder el límite por solicitudes concurrentes.
+- Las asignaciones del sorteo se generan con aleatoriedad criptográfica del entorno.
 - Las respuestas de error del Worker no exponen detalles internos.
 - Las rutas administrativas requieren sesión válida y coincidencia con `ADMIN_EMAIL`.
 - Las rutas de API no se sirven desde la caché del Service Worker.
