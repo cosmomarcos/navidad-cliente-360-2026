@@ -132,3 +132,19 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .recipient-wishes{border-color:#d9c99f;background:linear-gradient(145deg,#f8f1df,#f3ead5)}
 .wish-section-description{margin:-8px 0 16px;color:#738074;font-size:11px;line-height:1.5}
 @media(max-width:520px){.wish-editor,.wish-list,.recipient-wishes{padding:17px;margin:14px auto}.wish-section-heading h3{font-size:19px}.wish-card{gap:10px;padding:12px}.wish-card-icon{width:38px;height:38px;flex-basis:38px}.wish-form-footer{align-items:flex-start;flex-direction:column}.wish-form-footer .primary-button{width:100%}}
+
+.wish-card-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.wish-edit{display:grid;place-items:center;width:32px;height:32px;border:1px solid #d9dfd2;border-radius:10px;background:#edf1e8;color:#315d48;font-size:17px;cursor:pointer;transition:background .2s,color .2s}
+.wish-edit:hover{background:#315d48;color:#fff}
+.wish-inline-edit{display:grid;gap:11px;width:100%;min-width:0}
+.wish-edit-heading{display:flex;justify-content:space-between;align-items:center;color:#19372d;font-family:'Playfair Display',serif;font-size:16px}
+.wish-edit-heading button{border:0;background:none;color:#758174;font:inherit;font-family:Arial,sans-serif;font-size:11px;cursor:pointer}
+.wish-inline-edit label{display:grid;gap:6px;color:#294b3e;font-size:11px;font-weight:700}
+.wish-inline-edit input,.wish-inline-edit textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #ded4c0;border-radius:9px;background:#fffdf7;color:#19372d;font:inherit;font-size:12px}
+.wish-inline-edit input:focus,.wish-inline-edit textarea:focus{outline:none;border-color:#9c8654;box-shadow:0 0 0 3px rgba(185,157,99,.14)}
+.wish-edit-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.wish-edit-actions button{padding:9px 14px;border-radius:9px;font-size:11px;cursor:pointer}
+.wish-edit-actions .secondary{border:1px solid #d9cfbc;background:#fffaf0;color:#536354}
+.wish-edit-actions .primary-button{border:0}
+.wish-edit-actions button:disabled{opacity:.55;cursor:wait}
+@media(max-width:520px){.wish-card-actions{gap:5px}.wish-edit,.wish-delete{width:30px;height:30px;flex-basis:30px}}
