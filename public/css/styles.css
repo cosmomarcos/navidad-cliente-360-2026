@@ -313,3 +313,17 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 /* v1.1.5 · Nieve ambiental solo en login e Inicio */
 .seasonal-snow{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:9999;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .35s ease}.seasonal-snow.is-active{opacity:1;visibility:visible}
+
+
+/* Invitación vigente: presentación profesional y acción directa de WhatsApp */
+.invite-management .admin-form{display:flex;align-items:center;margin-top:16px}
+.invite-management .admin-action{width:100%;min-height:46px;border:0;border-radius:11px;background:#174b3d;color:#fff8e8;font:600 13px 'DM Sans',sans-serif;box-shadow:0 5px 14px #143c3020;cursor:pointer}
+.invite-management .admin-action:disabled{opacity:.65;cursor:wait}
+.invite-created{margin-top:14px;padding:15px;background:#fffaf0;border:1px solid #e2d6bd;border-radius:12px;gap:11px}
+.invite-created-heading{display:flex;align-items:center;gap:10px;color:#19372d}
+.invite-created-heading>span{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#e1eadb;color:#28543d;font-weight:800}
+.invite-created-heading b,.invite-created-heading small{display:block}.invite-created-heading b{font-size:13px}.invite-created-heading small{margin-top:3px;color:#758174;font-size:10px}
+.invite-created .invite-url{display:block;padding:11px 12px;border:1px solid #e4dac7;border-radius:9px;background:#fff;color:#285343;font-size:11px;line-height:1.5;overflow-wrap:anywhere;text-decoration:none}
+.invite-whatsapp{display:flex;justify-content:center;align-items:center;gap:8px;padding:12px;border-radius:10px;background:#16834a;color:#fff!important;text-decoration:none;font-size:12px;font-weight:700}
+.invite-whatsapp span{font-size:18px}.invite-note{margin:0;color:#788174;font-size:10px;line-height:1.5}.admin-invite-error{color:#a83e36;font-size:12px}
+@media(max-width:600px){.invite-management .admin-form{display:flex}.invite-management .admin-action{width:100%}}
