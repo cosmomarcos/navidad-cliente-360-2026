@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.2" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -122,14 +122,14 @@ async function handleApi(request, env, url) {
       }
       if (request.method === "POST" && url.pathname === "/api/admin/draw/execute") {
         const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
-        if (!state || state.state !== "ready" || edition.status !== "ready") return json({ error: "Primero confirma que todos están listos en Ajustes." }, 409);
+        if (!state || state.state !== "ready") return json({ error: "La preparación ya no está vigente. Actualiza el estado y vuelve a confirmar que todos están listos." }, 409);
         const membersResult = await env.DB.prepare("SELECT em.user_id, p.first_name, p.last_name FROM edition_members em JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed'").bind(edition.id).all();
         const members = membersResult.results || [];
         if (members.length < 2 || members.some(m => !m.first_name || !m.last_name)) return json({ error: "La lista de participantes cambió o hay perfiles incompletos. Vuelve a validar la preparación." }, 409);
         const exclusions = await env.DB.prepare("SELECT user_a_id, user_b_id FROM edition_exclusions WHERE edition_id=?").bind(edition.id).all();
         const assignments = buildSecretAssignments(members, exclusions.results || []);
         if (!assignments) return json({ error: "No existe una combinación válida con las exclusiones actuales." }, 409);
-        const lock = await env.DB.prepare("UPDATE editions SET status='drawing' WHERE id=? AND status='ready'").bind(edition.id).run();
+        const lock = await env.DB.prepare("UPDATE editions SET status='drawing' WHERE id=? AND status NOT IN ('drawing','drawn','completed')").bind(edition.id).run();
         if (!lock.meta.changes) return json({ error: "El sorteo ya está siendo ejecutado o el estado cambió. Actualiza la pantalla." }, 409);
         try {
           const prior = await env.DB.prepare("SELECT COALESCE(MAX(run_number),0) AS n FROM draw_runs WHERE edition_id=?").bind(edition.id).first();
