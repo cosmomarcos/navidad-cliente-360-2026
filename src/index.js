@@ -28,7 +28,7 @@ async function currentUser(request, env) {
 }
 async function isPrimaryAdmin(user, env) { return !!user && !!env.ADMIN_EMAIL && user.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase(); }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.2.3" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.3.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -58,6 +58,45 @@ async function handleApi(request, env, url) {
       const edition = workspace ? await env.DB.prepare("SELECT id, title, year, budget_amount, event_date, status FROM editions WHERE workspace_id = ? ORDER BY year DESC LIMIT 1").bind(workspace.id).first() : null;
       const members = edition ? await env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id = ?").bind(edition.id).first() : { total: 0 };
       return json({ isPrimaryAdmin: true, email: user.email, initialized: !!edition, edition, participants: members.total || 0 });
+    }
+    if (request.method === "GET" && url.pathname === "/api/admin/participants") {
+      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if (!edition) return json({ participants: [] });
+      const result = await env.DB.prepare("SELECT em.user_id, u.display_name, u.email, u.avatar_url, em.status, em.joined_at FROM edition_members em JOIN users u ON u.id=em.user_id WHERE em.edition_id=? ORDER BY em.joined_at ASC").bind(edition.id).all();
+      return json({ participants: result.results || [] });
+    }
+    if (request.method === "PATCH" && url.pathname.startsWith("/api/admin/participants/")) {
+      const userId = decodeURIComponent(url.pathname.split("/").pop());
+      const body = await request.json();
+      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if (!edition || typeof body.active !== "boolean") return json({ error: "Solicitud inválida." }, 400);
+      const result = await env.DB.prepare("UPDATE edition_members SET status=? WHERE edition_id=? AND user_id=?").bind(body.active ? "confirmed" : "withdrawn", edition.id, userId).run();
+      if (!result.meta.changes) return json({ error: "Participante no encontrado." }, 404);
+      return json({ ok: true });
+    }
+    if (request.method === "GET" && url.pathname === "/api/admin/exclusions") {
+      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if (!edition) return json({ exclusions: [] });
+      const result = await env.DB.prepare("SELECT x.id, x.user_a_id, x.user_b_id, a.display_name AS user_a_name, b.display_name AS user_b_name FROM edition_exclusions x JOIN users a ON a.id=x.user_a_id JOIN users b ON b.id=x.user_b_id WHERE x.edition_id=? ORDER BY x.created_at DESC").bind(edition.id).all();
+      return json({ exclusions: result.results || [] });
+    }
+    if (request.method === "POST" && url.pathname === "/api/admin/exclusions") {
+      const body = await request.json();
+      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if (!edition || !body.userA || !body.userB || body.userA === body.userB) return json({ error: "Selecciona dos participantes diferentes." }, 400);
+      const members = await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed' AND user_id IN (?, ?)").bind(edition.id, body.userA, body.userB).all();
+      if ((members.results || []).length !== 2) return json({ error: "Ambas personas deben estar activas en esta edición." }, 400);
+      const [a, b] = [body.userA, body.userB].sort();
+      const existing = await env.DB.prepare("SELECT id FROM edition_exclusions WHERE edition_id=? AND user_a_id=? AND user_b_id=?").bind(edition.id, a, b).first();
+      if (existing) return json({ error: "Esa exclusión ya existe." }, 409);
+      await env.DB.prepare("INSERT INTO edition_exclusions (id, edition_id, user_a_id, user_b_id) VALUES (?, ?, ?, ?)").bind(crypto.randomUUID(), edition.id, a, b).run();
+      return json({ ok: true });
+    }
+    if (request.method === "DELETE" && url.pathname.startsWith("/api/admin/exclusions/")) {
+      const id = decodeURIComponent(url.pathname.split("/").pop());
+      const result = await env.DB.prepare("DELETE FROM edition_exclusions WHERE id=?").bind(id).run();
+      if (!result.meta.changes) return json({ error: "Exclusión no encontrada." }, 404);
+      return json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/api/admin/bootstrap") {
       if (await env.DB.prepare("SELECT id FROM workspace LIMIT 1").first()) return json({ error: "El grupo principal ya fue inicializado." }, 409);
