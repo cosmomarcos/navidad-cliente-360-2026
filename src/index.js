@@ -1,3 +1,4 @@
+import { buildPushPayload } from "@block65/webcrypto-web-push";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...extra } }); }
 function base64url(bytes) { let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
@@ -67,9 +68,51 @@ function buildSecretAssignments(members, exclusions) {
   }
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
+
+async function sendPushToUser(env, userId, payload, subject) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
+  const rows = await env.DB.prepare("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id=?").bind(userId).all();
+  await Promise.all((rows.results || []).map(async row => {
+    try {
+      const subscription = { endpoint: row.endpoint, expirationTime: null, keys: { p256dh: row.p256dh, auth: row.auth } };
+      const init = await buildPushPayload({ data: JSON.stringify(payload), options: { ttl: 3600 } }, subscription, {
+        subject, publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY
+      });
+      const response = await fetch(row.endpoint, init);
+      if (response.status === 404 || response.status === 410) await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(row.endpoint).run();
+      else if (!response.ok) console.warn("Web Push delivery failed", { status: response.status });
+    } catch (error) { console.warn("Web Push delivery error", error?.message || String(error)); }
+  }));
+}
+
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.0.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.1.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
+  if (request.method === "GET" && url.pathname === "/api/push/public-key") {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    return json({ publicKey: env.VAPID_PUBLIC_KEY || null });
+  }
+  if (url.pathname.startsWith("/api/push/")) {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    if (request.method === "POST" && url.pathname === "/api/push/subscribe") {
+      const body = await request.json(), endpoint = String(body.endpoint || "");
+      const p256dh = String(body.keys?.p256dh || ""), auth = String(body.keys?.auth || "");
+      if (!endpoint.startsWith("https://") || endpoint.length > 2048 || !p256dh || !auth || p256dh.length > 256 || auth.length > 128) return json({ error: "La suscripción de notificaciones no es válida." }, 400);
+      const membership = await env.DB.prepare("SELECT id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+      if (!membership) return json({ error: "Necesitas una participación activa para activar notificaciones." }, 403);
+      await env.DB.prepare("INSERT INTO push_subscriptions (id,user_id,endpoint,p256dh,auth) VALUES (?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,updated_at=datetime('now')").bind(crypto.randomUUID(),user.id,endpoint,p256dh,auth).run();
+      return json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/api/push/unsubscribe") {
+      const body = await request.json();
+      await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?").bind(user.id,String(body.endpoint || "")).run();
+      return json({ ok: true });
+    }
+    return json({ error: "Ruta de notificaciones no encontrada." }, 404);
+  }
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
       const identity = await googleUser((await request.json()).credential, env.GOOGLE_CLIENT_ID);
@@ -260,6 +303,16 @@ async function handleApi(request, env, url) {
     if (!member) return json({ error: "Necesitas una participación activa para entrar a la comunidad." }, 403);
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clue_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
+    if (request.method === "GET" && url.pathname === "/api/community/unread") {
+      const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
+      if (draw?.state !== "drawn") return json({ unread: 0 });
+      const assignment = await env.DB.prepare("SELECT run_number FROM draw_assignments WHERE edition_id=? AND recipient_user_id=?").bind(member.edition_id,user.id).first();
+      if (!assignment) return json({ unread: 0 });
+      const read = await env.DB.prepare("SELECT last_seen_at FROM anonymous_clue_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND recipient_user_id=? AND run_number=? AND created_at > ?").bind(member.edition_id,user.id,assignment.run_number,read?.last_seen_at || "1970-01-01 00:00:00").first();
+      return json({ unread: count?.total || 0 });
+    }
     if (request.method === "GET" && url.pathname === "/api/community/clues") {
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
       if (draw?.state !== "drawn") return json({ state: draw?.state || "registration", clues: [], sentCount: 0, limit: 5 });
@@ -267,6 +320,7 @@ async function handleApi(request, env, url) {
       if (!assignment) return json({ state: "not_assigned", clues: [], sentCount: 0, limit: 5 });
       const clues = await env.DB.prepare("SELECT id, message, created_at FROM anonymous_clues WHERE edition_id=? AND recipient_user_id=? AND run_number=? ORDER BY created_at DESC LIMIT 30").bind(member.edition_id, user.id, assignment.run_number).all();
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
+      await env.DB.prepare("INSERT INTO anonymous_clue_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
       return json({ state: "drawn", clues: clues.results || [], sentCount: count.total || 0, limit: 5 });
     }
     if (request.method === "POST" && url.pathname === "/api/community/clues") {
@@ -278,7 +332,9 @@ async function handleApi(request, env, url) {
       if (!assignment) return json({ error: "Todavía no tienes una asignación. El administrador debe incluirte en el sorteo." }, 409);
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
       if (count.total >= 5) return json({ error: "Ya enviaste las 5 pistas permitidas para este sorteo." }, 409);
-      await env.DB.prepare("INSERT INTO anonymous_clues (id, edition_id, giver_user_id, recipient_user_id, run_number, message) VALUES (?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), member.edition_id, user.id, assignment.recipient_user_id, assignment.run_number, message).run();
+      const clueId = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO anonymous_clues (id, edition_id, giver_user_id, recipient_user_id, run_number, message) VALUES (?, ?, ?, ?, ?, ?)").bind(clueId,member.edition_id,user.id,assignment.recipient_user_id,assignment.run_number,message).run();
+      await sendPushToUser(env,assignment.recipient_user_id,{title:"¡Tienes una nueva pista! 🎁",body:"Tu amigo secreto te ha dejado un mensaje. Entra a descubrirlo.",url:"/?tab=community",tag:"clue-"+clueId},url.origin);
       return json({ ok: true, sentCount: count.total + 1 });
     }
     return json({ error: "Ruta de comunidad no encontrada." }, 404);
