@@ -277,7 +277,7 @@ async function handleApi(request, env, url) {
       const link = String(body.url || "").trim();
       if (title.length < 2 || title.length > 100) return json({ error: "El deseo debe tener entre 2 y 100 caracteres." }, 400);
       if (note.length > 300) return json({ error: "La descripción no puede superar los 300 caracteres." }, 400);
-      if (link && (link.length > 500 || !/^https?:\\/\\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
+      if (link && (link.length > 500 || !/^https?:\/\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
       const result = await env.DB.prepare("UPDATE participant_wishes SET title=?, note=?, url=?, updated_at=datetime('now') WHERE id=? AND edition_id=? AND user_id=?").bind(title, note || null, link || null, match[1], membership.edition_id, user.id).run();
       if (!result.meta.changes) return json({ error: "No encontramos ese deseo." }, 404);
       return json({ ok: true });
