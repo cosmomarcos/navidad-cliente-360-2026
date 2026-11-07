@@ -300,12 +300,16 @@ async function handleApi(request, env, url) {
       return json({ ok: true, edition: { id: editionId, title, year }, invitationUrl: `${url.origin}/?invite=${token}` });
     }
     if (request.method === "POST" && url.pathname === "/api/admin/invitations") {
-      const body = await request.json();
       const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition) return json({ error: "Primero crea la edición." }, 409);
       const token = base64url(crypto.getRandomValues(new Uint8Array(24))), hash = await sha256(token);
-      await env.DB.prepare("INSERT INTO invitations (id, edition_id, token_hash, max_uses) VALUES (?, ?, ?, ?)").bind(crypto.randomUUID(), edition.id, hash, Math.max(1, Math.min(500, Number(body.maxUses || 1)))).run();
-      return json({ ok: true, invitationUrl: `${url.origin}/?invite=${token}` });
+      const invitationId = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE invitations SET revoked_at=datetime('now') WHERE edition_id=? AND revoked_at IS NULL").bind(edition.id),
+        env.DB.prepare("INSERT INTO invitations (id, edition_id, token_hash, expires_at, max_uses, uses) VALUES (?, ?, ?, ?, 500, 0)").bind(invitationId, edition.id, hash, expiresAt)
+      ]);
+      return json({ ok: true, invitationUrl: `${url.origin}/?invite=${token}`, expiresAt });
     }
     return json({ error: "Ruta administrativa no encontrada." }, 404);
   }
@@ -456,7 +460,7 @@ async function handleApi(request, env, url) {
   if (request.method === "GET" && inviteMatch) {
     const tokenHash = await sha256(inviteMatch[1]);
     const invite = await env.DB.prepare("SELECT i.id, i.expires_at, i.max_uses, i.uses, i.revoked_at, e.title, e.year, e.status FROM invitations i JOIN editions e ON e.id=i.edition_id WHERE i.token_hash=?").bind(tokenHash).first();
-    if (!invite || invite.revoked_at || invite.uses >= invite.max_uses || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ valid: false }, 404);
+    if (!invite || invite.revoked_at || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ valid: false }, 404);
     return json({ valid: true, edition: { title: invite.title, year: invite.year, status: invite.status } });
   }
   if (request.method === "POST" && url.pathname === "/api/invitations/join") {
@@ -465,18 +469,11 @@ async function handleApi(request, env, url) {
     const body = await request.json(); if (!body.token) return json({ error: "Falta el código de invitación." }, 400);
     const hash = await sha256(body.token);
     const invite = await env.DB.prepare("SELECT id, edition_id, expires_at, max_uses, uses, revoked_at FROM invitations WHERE token_hash=?").bind(hash).first();
-    if (!invite || invite.revoked_at || invite.uses >= invite.max_uses || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ error: "La invitación no es válida o ya venció." }, 404);
+    if (!invite || invite.revoked_at || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ error: "La invitación no es válida o ya venció." }, 404);
     const existing = await env.DB.prepare("SELECT id FROM edition_members WHERE edition_id=? AND user_id=?").bind(invite.edition_id, user.id).first();
     if (!existing) {
-      const reservation = await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses AND revoked_at IS NULL AND (expires_at IS NULL OR julianday(expires_at) > julianday('now'))").bind(invite.id).run();
-      if (!reservation.meta.changes) return json({ error: "La invitación ya no está disponible." }, 409);
-      try {
-        const memberId = crypto.randomUUID();
-        await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
-      } catch (error) {
-        await env.DB.prepare("UPDATE invitations SET uses=MAX(0, uses-1) WHERE id=?").bind(invite.id).run();
-        throw error;
-      }
+      const memberId = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
     }
     return json({ ok: true, message: "Ya formas parte de la edición." });
   }
