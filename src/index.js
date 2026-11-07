@@ -87,7 +87,7 @@ async function sendPushToUser(env, userId, payload, subject) {
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.1.8" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.1.9" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -329,13 +329,13 @@ async function handleApi(request, env, url) {
     }
     if (request.method === "GET" && url.pathname === "/api/community/clues") {
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
-      if (draw?.state !== "drawn") return json({ state: draw?.state || "registration", clues: [], sentCount: 0, limit: 5 });
+      if (draw?.state !== "drawn") return json({ state: draw?.state || "registration", clues: [], sentCount: 0, limit: null });
       const assignment = await env.DB.prepare("SELECT recipient_user_id, run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(member.edition_id, user.id).first();
-      if (!assignment) return json({ state: "not_assigned", clues: [], sentCount: 0, limit: 5 });
+      if (!assignment) return json({ state: "not_assigned", clues: [], sentCount: 0, limit: null });
       const clues = await env.DB.prepare("SELECT id, message, created_at FROM anonymous_clues WHERE edition_id=? AND recipient_user_id=? AND run_number=? ORDER BY created_at DESC LIMIT 30").bind(member.edition_id, user.id, assignment.run_number).all();
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
       await env.DB.prepare("INSERT INTO anonymous_clue_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
-      return json({ state: "drawn", clues: clues.results || [], sentCount: count.total || 0, limit: 5 });
+      return json({ state: "drawn", clues: clues.results || [], sentCount: count.total || 0, limit: null });
     }
     if (request.method === "POST" && url.pathname === "/api/community/clues") {
       const body = await request.json(); const message = String(body.message || "").trim();
@@ -345,7 +345,6 @@ async function handleApi(request, env, url) {
       const assignment = await env.DB.prepare("SELECT recipient_user_id, run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(member.edition_id, user.id).first();
       if (!assignment) return json({ error: "Todavía no tienes una asignación. El administrador debe incluirte en el sorteo." }, 409);
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
-      if (count.total >= 5) return json({ error: "Ya enviaste las 5 pistas permitidas para este sorteo." }, 409);
       const clueId = crypto.randomUUID();
       await env.DB.prepare("INSERT INTO anonymous_clues (id, edition_id, giver_user_id, recipient_user_id, run_number, message) VALUES (?, ?, ?, ?, ?, ?)").bind(clueId,member.edition_id,user.id,assignment.recipient_user_id,assignment.run_number,message).run();
       await sendPushToUser(env,assignment.recipient_user_id,{title:"¡Tienes un mensaje! 🎁",body:"Tu amigo secreto te envio un mensaje",url:"/?tab=community",tag:"clue-"+clueId},url.origin);
