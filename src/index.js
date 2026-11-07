@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.3" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.6.4" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -129,7 +129,7 @@ async function handleApi(request, env, url) {
         const exclusions = await env.DB.prepare("SELECT user_a_id, user_b_id FROM edition_exclusions WHERE edition_id=?").bind(edition.id).all();
         const assignments = buildSecretAssignments(members, exclusions.results || []);
         if (!assignments) return json({ error: "No existe una combinación válida con las exclusiones actuales." }, 409);
-        const lock = await env.DB.prepare("UPDATE editions SET status='drawing' WHERE id=? AND status NOT IN ('drawing','drawn','completed')").bind(edition.id).run();
+        const lock = await env.DB.prepare("UPDATE edition_draw_state SET state='drawing', updated_at=datetime('now') WHERE edition_id=? AND state='ready'").bind(edition.id).run();
         if (!lock.meta.changes) return json({ error: "El sorteo ya está siendo ejecutado o el estado cambió. Actualiza la pantalla." }, 409);
         try {
           const prior = await env.DB.prepare("SELECT COALESCE(MAX(run_number),0) AS n FROM draw_runs WHERE edition_id=?").bind(edition.id).first();
@@ -144,7 +144,7 @@ async function handleApi(request, env, url) {
           await env.DB.batch(statements);
           return json({ ok: true, state: "drawn", participants: assignments.length, runNumber });
         } catch (error) {
-          await env.DB.prepare("UPDATE editions SET status='ready' WHERE id=? AND status='drawing'").bind(edition.id).run();
+          await env.DB.prepare("UPDATE edition_draw_state SET state='ready', updated_at=datetime('now') WHERE edition_id=? AND state='drawing'").bind(edition.id).run();
           throw error;
         }
       }
