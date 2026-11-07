@@ -175,6 +175,12 @@ async function enablePushNotifications(button){
  }
 }
 
+function formatCommunityTime(value){
+ const date=new Date(value);
+ if(Number.isNaN(date.getTime()))return "";
+ return new Intl.DateTimeFormat("es-PE",{dateStyle:"medium",timeStyle:"short"}).format(date);
+}
+
 async function renderCommunityTab(){
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Buzón secreto ✉️</h2><p>Deja un mensaje anónimo para tu amigo secreto y revisa las sorpresas que te envíe.</p></div><div class="tab-skeleton" aria-label="Preparando buzón"><span></span><span></span><span></span></div>';
