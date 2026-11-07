@@ -1,4 +1,4 @@
-const CACHE = "cliente360-shell-v1.0.0";
+const CACHE = "cliente360-shell-v1.1.0";
 const SHELL = ["/", "/css/styles.css", "/js/app.js", "/js/participants.js", "/manifest.webmanifest", "/icons/icon.svg"];
 self.addEventListener("install", event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
@@ -24,5 +24,26 @@ self.addEventListener("fetch", event => {
       if (cached) return cached;
       throw error;
     }
+  })());
+});
+self.addEventListener("push", event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data?.text() || "" }; }
+  event.waitUntil(self.registration.showNotification(data.title || "Amigo secreto 🎁", {
+    body: data.body || "Tu amigo secreto te ha dejado una nueva pista.",
+    icon: "/icons/icon.svg", badge: "/icons/icon.svg",
+    tag: data.tag || "amigo-secreto-pista", renotify: false,
+    data: { url: data.url || "/?tab=community" }
+  }));
+});
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/?tab=community", self.location.origin).href;
+  event.waitUntil((async () => {
+    const openClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of openClients) if (client.url.startsWith(self.location.origin)) {
+      await client.navigate(target); return client.focus();
+    }
+    return self.clients.openWindow(target);
   })());
 });
