@@ -1,0 +1,15 @@
+{
+  "name": "Navidad Cliente 360 2026",
+  "short_name": "Cliente 360",
+  "description": "Una Navidad, muchas sorpresas.",
+  "lang": "es-PE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b251f",
+  "theme_color": "#123b31",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

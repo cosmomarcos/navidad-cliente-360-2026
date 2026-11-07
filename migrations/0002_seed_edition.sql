@@ -1,0 +1,2 @@
+-- Workspace and edition are created lazily by the first authorized organizer.
+-- This keeps the migration portable across environments and avoids hard-coded user IDs.
