@@ -39,9 +39,10 @@ function renderMemberApp(){
  const budgetAmount=currentUser.membership?.budget_amount;
  const budgetCurrency=currentUser.membership?.currency||"PEN";
  const budgetLabel=budgetAmount==null?"Por definir":new Intl.NumberFormat("es-PE",{style:"currency",currency:budgetCurrency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(budgetAmount));
- const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Monto acordado para el intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><p>Presupuesto acordado por participante</p></div><div class="exchange-budget-amount">${esc(budgetLabel)}</div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
+ const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><p>Presupuesto acordado por participante</p></div><div class="exchange-budget-amount">${esc(budgetLabel)}</div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div></div></section><section class="home-participants-card" aria-labelledby="home-participants-title"><div class="home-participants-heading"><div><span class="exchange-budget-kicker">EL EQUIPO QUE CELEBRA</span><h2 id="home-participants-title">Lista de Participantes <span id="home-participants-count">(—)</span></h2></div><span class="home-participants-icon">🎄</span></div><div id="home-participants-list" class="home-participants-list" aria-live="polite"><p class="participants-loading">Cargando participantes…</p></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
  app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto</button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes <span class="nav-unread-badge" id="community-unread-badge" hidden></span></button><button data-tab="wishes"><span>💝</span>Deseos</button><button data-tab="profile"><span>👤</span>Perfil</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
  updateMemberCountdown(currentUser.membership?.event_date);
+ loadHomeParticipants();
  prefetchMemberTabs();
  if(communityPollTimer)clearInterval(communityPollTimer);
  updateCommunityUnreadBadge();
@@ -49,6 +50,23 @@ function renderMemberApp(){
  app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileSettings();return;}if(btn.dataset.tab==="admin-settings"){showAdminSettings();return;}if(btn.dataset.tab==="secret"){renderSecretTab();return;}if(btn.dataset.tab==="wishes"){renderWishesTab();return;}if(btn.dataset.tab==="community"){renderCommunityTab();return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Mensajes",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>${labels[btn.dataset.tab]}</h2></div><article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
  const requestedTab=new URLSearchParams(location.search).get("tab");
  if(requestedTab==="community")app.querySelector('[data-tab="community"]')?.click();
+}
+async function loadHomeParticipants(){
+ const list=$("#home-participants-list"),count=$("#home-participants-count");
+ if(!list||!count)return;
+ try{
+  const data=await api("/api/participants",{noMemoryCache:true});
+  const participants=data.participants||[];
+  count.textContent="("+participants.length+")";
+  list.innerHTML=participants.length?participants.map((p,index)=>{
+   const initials=String(p.display_name||"Participante").trim().split(/\\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase();
+   const avatar=p.avatar_url&&/^https:\\/\\//i.test(p.avatar_url)?'<img src="'+esc(p.avatar_url)+'" alt="">':esc(initials||"🎄");
+   return '<article class="home-participant-row"><span class="home-participant-avatar">'+avatar+'</span><span class="home-participant-name">'+esc(p.display_name||"Participante")+'</span><span class="home-participant-number">'+String(index+1).padStart(2,"0")+'</span></article>';
+  }).join(""):'<p class="participants-empty">Todavía no hay participantes inscritos.</p>';
+ }catch(error){
+  count.textContent="(—)";
+  list.innerHTML='<p class="participants-empty">No se pudo cargar la lista. Vuelve a intentarlo más tarde.</p>';
+ }
 }
 async function showAdminSettings(){
  const home=$("#member-app .member-home"); if(!currentUser?.isPrimaryAdmin||!home)return;
