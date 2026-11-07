@@ -66,7 +66,7 @@ async function handleApi(request, env, url) {
     if (request.method === "GET" && url.pathname === "/api/admin/participants") {
       const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition) return json({ participants: [] });
-      const result = await env.DB.prepare("SELECT em.user_id, u.display_name, u.email, u.avatar_url, em.status, em.joined_at FROM edition_members em JOIN users u ON u.id=em.user_id WHERE em.edition_id=? ORDER BY em.joined_at ASC").bind(edition.id).all();
+      const result = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), u.display_name) AS display_name, u.email, u.avatar_url, em.status, em.joined_at FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? ORDER BY em.joined_at ASC").bind(edition.id).all();
       return json({ participants: result.results || [] });
     }
     if (request.method === "PATCH" && url.pathname.startsWith("/api/admin/participants/")) {
