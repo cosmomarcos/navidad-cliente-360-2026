@@ -28,7 +28,7 @@ function renderMemberApp(){
 async function showAdminSettings(){
  const home=$("#member-app .member-home"); if(!currentUser?.isPrimaryAdmin||!home)return;
  home.innerHTML='<div class="admin-settings-view"><div class="settings-header"><span>⚙️</span><div><h2>Ajustes del intercambio</h2><p>Configuración general de la edición.</p></div></div><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p><div id="draw-admin-controls"></div><div class="admin-tools-section"><div id="admin-tools-slot"></div></div></div>';
- const adminPanel=$("#admin-panel");$("#admin-tools-slot").append(adminPanel);adminPanel.classList.remove("hidden");await renderAdmin();
+ let adminPanel=$("#admin-panel");if(!adminPanel){adminPanel=document.createElement("section");adminPanel.id="admin-panel";adminPanel.className="admin-panel";}$("#admin-tools-slot").append(adminPanel);adminPanel.classList.remove("hidden");await renderAdmin();
  try{await loadAdminDrawControls();}catch(error){const slot=$("#draw-admin-controls");if(slot)slot.innerHTML=`<div class="status error">${esc(error.message)}</div>`;}
  try{
   const data=await api("/api/admin/status");const e=data.edition||{};const form=$("#edition-settings-form");
