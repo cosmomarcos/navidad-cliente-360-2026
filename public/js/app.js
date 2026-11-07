@@ -3,7 +3,7 @@ const setClass = (selector, className, enabled) => { const el=$(selector); if(el
 const params = new URLSearchParams(location.search);
 const token = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
 let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null;
-const api=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||"Ocurrió un error.");return d;};
+const api=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const raw=await r.text();let d;try{d=JSON.parse(raw);}catch{const html=raw.trimStart().startsWith("<!DOCTYPE")||raw.trimStart().startsWith("<html");throw new Error(html?"El servidor devolvió la página web en lugar de la API. Cloudflare aún no ha publicado la versión del servidor o la ruta no está disponible.":"El servidor devolvió una respuesta no válida.");}if(!r.ok)throw new Error(d.error||"Ocurrió un error.");return d;};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function setLoginView(){
   setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
@@ -29,7 +29,7 @@ async function showAdminSettings(){
  const home=$("#member-app .member-home"); if(!currentUser?.isPrimaryAdmin||!home)return;
  home.innerHTML='<div class="admin-settings-view"><div class="settings-header"><span>⚙️</span><div><h2>Ajustes del intercambio</h2><p>Configuración general de la edición.</p></div></div><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p><div id="draw-admin-controls"></div><div class="admin-tools-section"><div id="admin-tools-slot"></div></div></div>';
  const adminPanel=$("#admin-panel");$("#admin-tools-slot").append(adminPanel);adminPanel.classList.remove("hidden");await renderAdmin();
- await loadAdminDrawControls();
+ try{await loadAdminDrawControls();}catch(error){const slot=$("#draw-admin-controls");if(slot)slot.innerHTML=`<div class="status error">${esc(error.message)}</div>`;}
  try{
   const data=await api("/api/admin/status");const e=data.edition||{};const form=$("#edition-settings-form");
   form.elements.title.value=e.title||"";form.elements.eventDate.value=e.event_date||"";form.elements.budgetAmount.value=e.budget_amount??"";
