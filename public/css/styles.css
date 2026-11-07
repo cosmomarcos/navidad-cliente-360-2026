@@ -62,3 +62,9 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .app-version{max-width:820px;margin:14px auto 82px;text-align:center;color:#9ab2a5;font-size:9px;letter-spacing:1px;padding:8px 4px}
 .app-version b{color:#d8bd7d;font-weight:700}
 @media(max-width:600px){.app-version{margin-bottom:82px;font-size:8px}}
+
+/* Versión integrada al encabezado, como metadato discreto de producto */
+.topbar-meta{display:flex;align-items:center;gap:10px}
+.app-version-badge{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid #446356;border-radius:20px;color:#a9c0b2;font-size:9px;letter-spacing:1px;white-space:nowrap;background:#12382e88}
+.app-version-badge:before{content:"";width:5px;height:5px;border-radius:50%;background:#d7bd7c;display:inline-block}
+@media(max-width:420px){.topbar-meta{gap:6px}.edition-tag{padding:7px 8px;font-size:8px}.app-version-badge{padding:5px 7px;font-size:8px}}
