@@ -53,7 +53,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.7.2" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.7.3" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -240,17 +240,18 @@ async function handleApi(request, env, url) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wishes (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, note TEXT, url TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wish_images (wish_id TEXT PRIMARY KEY REFERENCES participant_wishes(id) ON DELETE CASCADE, image_data TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     const membership = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
     if (!membership) return json({ error: "Necesitas una participación activa para gestionar tus deseos." }, 403);
     if (request.method === "GET" && url.pathname === "/api/wishes") {
-      const mine = await env.DB.prepare("SELECT id, title, note, url, created_at FROM participant_wishes WHERE edition_id=? AND user_id=? ORDER BY created_at DESC").bind(membership.edition_id, user.id).all();
+      const mine = await env.DB.prepare("SELECT w.id, w.title, w.note, w.url, w.created_at, (SELECT image_data FROM participant_wish_images i WHERE i.wish_id=w.id) AS image_data FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, user.id).all();
       const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
       let recipientWishes = [], recipientName = null;
       if (state?.state === "drawn") {
         const assigned = await env.DB.prepare("SELECT a.recipient_user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM draw_assignments a JOIN users u ON u.id=a.recipient_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? AND a.giver_user_id=?").bind(membership.edition_id, user.id).first();
         if (assigned) {
           recipientName = assigned.display_name;
-          const wishes = await env.DB.prepare("SELECT title, note, url FROM participant_wishes WHERE edition_id=? AND user_id=? ORDER BY created_at DESC").bind(membership.edition_id, assigned.recipient_user_id).all();
+          const wishes = await env.DB.prepare("SELECT w.title, w.note, w.url, (SELECT image_data FROM participant_wish_images i WHERE i.wish_id=w.id) AS image_data FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, assigned.recipient_user_id).all();
           recipientWishes = wishes.results || [];
         }
       }
@@ -261,12 +262,16 @@ async function handleApi(request, env, url) {
       const title = String(body.title || "").trim();
       const note = String(body.note || "").trim();
       const link = String(body.url || "").trim();
+      const imageData = String(body.imageData || "");
+      if (imageData && (!/^data:image\\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData) || imageData.length > 280000)) return json({ error: "La imagen no es válida o supera el tamaño permitido." }, 400);
       if (title.length < 2 || title.length > 100) return json({ error: "El deseo debe tener entre 2 y 100 caracteres." }, 400);
       if (note.length > 300) return json({ error: "La descripción no puede superar los 300 caracteres." }, 400);
       if (link && (link.length > 500 || !/^https?:\/\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM participant_wishes WHERE edition_id=? AND user_id=?").bind(membership.edition_id, user.id).first();
       if (count.total >= 10) return json({ error: "Puedes registrar hasta 10 deseos." }, 409);
-      await env.DB.prepare("INSERT INTO participant_wishes (id, edition_id, user_id, title, note, url) VALUES (?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), membership.edition_id, user.id, title, note || null, link || null).run();
+      const wishId = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO participant_wishes (id, edition_id, user_id, title, note, url) VALUES (?, ?, ?, ?, ?, ?)").bind(wishId, membership.edition_id, user.id, title, note || null, link || null).run();
+      if (imageData) await env.DB.prepare("INSERT INTO participant_wish_images (wish_id, image_data) VALUES (?, ?)").bind(wishId, imageData).run();
       return json({ ok: true });
     }
     const match = url.pathname.match(/^\/api\/wishes\/([A-Za-z0-9-]+)$/);
@@ -275,11 +280,15 @@ async function handleApi(request, env, url) {
       const title = String(body.title || "").trim();
       const note = String(body.note || "").trim();
       const link = String(body.url || "").trim();
+      const imageData = String(body.imageData || "");
+      if (imageData && (!/^data:image\\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData) || imageData.length > 280000)) return json({ error: "La imagen no es válida o supera el tamaño permitido." }, 400);
       if (title.length < 2 || title.length > 100) return json({ error: "El deseo debe tener entre 2 y 100 caracteres." }, 400);
       if (note.length > 300) return json({ error: "La descripción no puede superar los 300 caracteres." }, 400);
       if (link && (link.length > 500 || !/^https?:\/\//i.test(link))) return json({ error: "El enlace debe comenzar con https:// o http://." }, 400);
       const result = await env.DB.prepare("UPDATE participant_wishes SET title=?, note=?, url=?, updated_at=datetime('now') WHERE id=? AND edition_id=? AND user_id=?").bind(title, note || null, link || null, match[1], membership.edition_id, user.id).run();
       if (!result.meta.changes) return json({ error: "No encontramos ese deseo." }, 404);
+      if (body.removeImage) await env.DB.prepare("DELETE FROM participant_wish_images WHERE wish_id=?").bind(match[1]).run();
+      if (imageData) await env.DB.prepare("INSERT INTO participant_wish_images (wish_id, image_data) VALUES (?, ?) ON CONFLICT(wish_id) DO UPDATE SET image_data=excluded.image_data, updated_at=datetime('now')").bind(match[1], imageData).run();
       return json({ ok: true });
     }
     if (request.method === "DELETE" && match) {
