@@ -222,3 +222,13 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .home-team-photo{height:clamp(230px,48vw,460px);max-height:none;object-fit:cover;object-position:center 48%;border-radius:16px}
 .home-team-photo-wrap:after{content:"";position:absolute;inset:7px;border-radius:16px;pointer-events:none;background:linear-gradient(180deg,rgba(5,25,20,.02) 55%,rgba(5,25,20,.24))}
 @media(max-width:600px){.home-team-photo-wrap{margin:14px 0 22px;padding:5px;border-radius:17px}.home-team-photo-wrap:after{inset:5px;border-radius:12px}.home-team-photo{height:250px;border-radius:12px}}
+
+
+/* v0.8.7: placeholders visuales discretos, sin mensajes de carga */
+.tab-skeleton{display:grid;gap:12px;max-width:100%;margin:18px 0}
+.tab-skeleton span{display:block;height:74px;border-radius:14px;background:linear-gradient(100deg,rgba(247,240,223,.07) 20%,rgba(247,240,223,.14) 38%,rgba(247,240,223,.07) 56%);background-size:200% 100%;animation:tab-shimmer 1.35s ease-in-out infinite}
+.tab-skeleton span:nth-child(2){height:118px}
+.tab-skeleton span:nth-child(3){height:64px}
+.tab-skeleton-compact{max-width:620px}
+.tab-skeleton-compact span{height:90px}
+@keyframes tab-shimmer{to{background-position-x:-200%}}
