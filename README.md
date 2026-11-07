@@ -81,3 +81,7 @@ No incluye todavía el panel de administración para crear invitaciones ni los m
 ## Modelo de despliegue
 
 El Worker sirve los recursos estáticos desde `public/` y enruta `/api/*` al backend. D1 es la única base persistente de esta primera fase.
+
+## Cloudflare Workers Builds
+
+La rama `main` de este repositorio está conectada al Worker `navidad-cliente-360-2026`. Los nuevos commits en `main` activan la compilación y el despliegue automático mediante Wrangler.
