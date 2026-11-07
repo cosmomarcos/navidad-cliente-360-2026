@@ -71,3 +71,7 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 .brand-title{display:inline-flex;align-items:center;gap:8px}
 .app-version-inline{display:inline-flex;align-items:center;padding:3px 6px;border:1px solid #446356;border-radius:10px;background:#12382e;color:#c6b17b;font-size:8px;font-weight:600;letter-spacing:.6px;line-height:1.2}
+
+/* Separación clara entre el nombre de marca y el identificador de versión */
+.brand-title{gap:16px}
+.app-version-inline{margin-left:4px;padding:4px 8px;border-radius:12px;font-size:8px;letter-spacing:.8px}
