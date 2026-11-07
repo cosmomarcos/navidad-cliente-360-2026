@@ -18,8 +18,8 @@ window.mountParticipantAdmin = async function () {
     root.id = "participant-admin";
     root.className = "participant-admin";
     root.innerHTML = `
-      <h3>Participantes y exclusiones</h3>
-      <p class="participant-help">Administra quién participa en el sorteo y configura parejas que no deben asignarse entre sí.</p>
+      <h3>Administración de participantes</h3>
+      <p class="participant-help">La lista pública está disponible para todos en Inicio. Desde aquí puedes administrar inscripciones y exclusiones del sorteo.</p>
       <div id="participant-list" aria-live="polite">Cargando participantes…</div>
       <div class="exclusion-box">
         <h4>Agregar exclusión mutua</h4>
