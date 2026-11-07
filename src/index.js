@@ -2,6 +2,21 @@ const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...extra } }); }
 function base64url(bytes) { let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function sha256(value) { const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+function secureRandomInt(max) {
+  const range = 0x100000000;
+  const limit = Math.floor(range / max) * max;
+  const value = new Uint32Array(1);
+  do { crypto.getRandomValues(value); } while (value[0] >= limit);
+  return value[0] % max;
+}
+function shuffled(values) {
+  const result = [...values];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 async function sign(value, secret) { const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return base64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)))); }
 async function createSession(user, secret) { const payload = base64url(new TextEncoder().encode(JSON.stringify({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 604800 }))); return `${payload}.${await sign(payload, secret)}`; }
 async function readSession(request, secret) {
@@ -36,13 +51,13 @@ async function ensureDrawSchema(env) {
 }
 function buildSecretAssignments(members, exclusions) {
   const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
-  const recipients = [...members].sort(() => Math.random() - 0.5);
+  const recipients = shuffled(members);
   const assigned = new Map(), used = new Set(); let steps = 0;
   function solve(index) {
     if (index === members.length) return true;
     if (++steps > 250000) return false;
     const giver = members[index];
-    const candidates = recipients.filter(r => r.user_id !== giver.user_id && !used.has(r.user_id) && !blocked.has(giver.user_id + ":" + r.user_id)).sort(() => Math.random() - 0.5);
+    const candidates = shuffled(recipients.filter(r => r.user_id !== giver.user_id && !used.has(r.user_id) && !blocked.has(giver.user_id + ":" + r.user_id)));
     for (const recipient of candidates) {
       assigned.set(giver.user_id, recipient.user_id); used.add(recipient.user_id);
       if (solve(index + 1)) return true;
@@ -390,9 +405,15 @@ async function handleApi(request, env, url) {
     if (!invite || invite.revoked_at || invite.uses >= invite.max_uses || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ error: "La invitación no es válida o ya venció." }, 404);
     const existing = await env.DB.prepare("SELECT id FROM edition_members WHERE edition_id=? AND user_id=?").bind(invite.edition_id, user.id).first();
     if (!existing) {
-      const memberId = crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
-      await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses").bind(invite.id).run();
+      const reservation = await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > datetime('now'))").bind(invite.id).run();
+      if (!reservation.meta.changes) return json({ error: "La invitación ya no está disponible." }, 409);
+      try {
+        const memberId = crypto.randomUUID();
+        await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
+      } catch (error) {
+        await env.DB.prepare("UPDATE invitations SET uses=MAX(0, uses-1) WHERE id=?").bind(invite.id).run();
+        throw error;
+      }
     }
     return json({ ok: true, message: "Ya formas parte de la edición." });
   }
