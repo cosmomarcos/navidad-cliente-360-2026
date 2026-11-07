@@ -2,6 +2,21 @@ const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...extra } }); }
 function base64url(bytes) { let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function sha256(value) { const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+function secureRandomInt(max) {
+  const range = 0x100000000;
+  const limit = Math.floor(range / max) * max;
+  const value = new Uint32Array(1);
+  do { crypto.getRandomValues(value); } while (value[0] >= limit);
+  return value[0] % max;
+}
+function shuffled(values) {
+  const result = [...values];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 async function sign(value, secret) { const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return base64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)))); }
 async function createSession(user, secret) { const payload = base64url(new TextEncoder().encode(JSON.stringify({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 604800 }))); return `${payload}.${await sign(payload, secret)}`; }
 async function readSession(request, secret) {
@@ -36,13 +51,13 @@ async function ensureDrawSchema(env) {
 }
 function buildSecretAssignments(members, exclusions) {
   const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
-  const recipients = [...members].sort(() => Math.random() - 0.5);
+  const recipients = shuffled(members);
   const assigned = new Map(), used = new Set(); let steps = 0;
   function solve(index) {
     if (index === members.length) return true;
     if (++steps > 250000) return false;
     const giver = members[index];
-    const candidates = recipients.filter(r => r.user_id !== giver.user_id && !used.has(r.user_id) && !blocked.has(giver.user_id + ":" + r.user_id)).sort(() => Math.random() - 0.5);
+    const candidates = shuffled(recipients.filter(r => r.user_id !== giver.user_id && !used.has(r.user_id) && !blocked.has(giver.user_id + ":" + r.user_id)));
     for (const recipient of candidates) {
       assigned.set(giver.user_id, recipient.user_id); used.add(recipient.user_id);
       if (solve(index + 1)) return true;
@@ -53,7 +68,7 @@ function buildSecretAssignments(members, exclusions) {
   return solve(0) ? members.map(m => ({ giver_user_id: m.user_id, recipient_user_id: assigned.get(m.user_id) })) : null;
 }
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "0.8.3" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.0.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "POST" && url.pathname === "/api/auth/google") {
     try {
@@ -243,22 +258,8 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
     if (!member) return json({ error: "Necesitas una participación activa para entrar a la comunidad." }, 403);
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS community_messages (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
-    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_community_messages_edition ON community_messages(edition_id, created_at)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
-    if (request.method === "GET" && url.pathname === "/api/community") {
-      const messages = await env.DB.prepare("SELECT m.id, m.message, m.created_at, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS sender_name, m.user_id=? AS is_mine FROM community_messages m JOIN users u ON u.id=m.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE m.edition_id=? ORDER BY m.created_at DESC LIMIT 100").bind(user.id, member.edition_id).all();
-      return json({ messages: (messages.results || []).reverse() });
-    }
-    if (request.method === "POST" && url.pathname === "/api/community") {
-      const body = await request.json(); const message = String(body.message || "").trim();
-      if (message.length < 1 || message.length > 500) return json({ error: "El mensaje debe tener entre 1 y 500 caracteres." }, 400);
-      const recent = await env.DB.prepare("SELECT created_at FROM community_messages WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 1").bind(member.edition_id, user.id).first();
-      if (recent && (Date.now() - new Date(recent.created_at.replace(" ", "T") + "Z").getTime()) < 2000) return json({ error: "Espera un momento antes de enviar otro mensaje." }, 429);
-      await env.DB.prepare("INSERT INTO community_messages (id, edition_id, user_id, message) VALUES (?, ?, ?, ?)").bind(crypto.randomUUID(), member.edition_id, user.id, message).run();
-      return json({ ok: true });
-    }
     if (request.method === "GET" && url.pathname === "/api/community/clues") {
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
       if (draw?.state !== "drawn") return json({ state: draw?.state || "registration", clues: [], sentCount: 0, limit: 5 });
@@ -404,9 +405,15 @@ async function handleApi(request, env, url) {
     if (!invite || invite.revoked_at || invite.uses >= invite.max_uses || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) return json({ error: "La invitación no es válida o ya venció." }, 404);
     const existing = await env.DB.prepare("SELECT id FROM edition_members WHERE edition_id=? AND user_id=?").bind(invite.edition_id, user.id).first();
     if (!existing) {
-      const memberId = crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
-      await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses").bind(invite.id).run();
+      const reservation = await env.DB.prepare("UPDATE invitations SET uses=uses+1 WHERE id=? AND uses<max_uses AND revoked_at IS NULL AND (expires_at IS NULL OR julianday(expires_at) > julianday('now'))").bind(invite.id).run();
+      if (!reservation.meta.changes) return json({ error: "La invitación ya no está disponible." }, 409);
+      try {
+        const memberId = crypto.randomUUID();
+        await env.DB.prepare("INSERT INTO edition_members (id, edition_id, user_id) VALUES (?, ?, ?)").bind(memberId, invite.edition_id, user.id).run();
+      } catch (error) {
+        await env.DB.prepare("UPDATE invitations SET uses=MAX(0, uses-1) WHERE id=?").bind(invite.id).run();
+        throw error;
+      }
     }
     return json({ ok: true, message: "Ya formas parte de la edición." });
   }
@@ -416,31 +423,16 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      const mutatingApiRequest = url.pathname.startsWith("/api/") && ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
+      if (mutatingApiRequest && request.headers.get("Origin") !== url.origin) return json({ error: "Origen no permitido." }, 403);
       if (url.pathname.startsWith("/api/")) return await handleApi(request, env, url);
       return await env.ASSETS.fetch(request);
     } catch (error) {
       console.error("Unhandled Worker error", { path: url.pathname, method: request.method, message: error?.message || String(error) });
       if (url.pathname.startsWith("/api/")) {
-        return json({ error: "Error interno del servidor al procesar " + url.pathname + ": " + (error?.message || "Error desconocido"), code: "WORKER_EXCEPTION" }, 500);
+        return json({ error: "Error interno del servidor. Intenta nuevamente.", code: "WORKER_EXCEPTION" }, 500);
       }
       return new Response("Error interno. Intenta nuevamente.", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
     }
   },
-  async scheduled(controller, env, ctx) {
-    try {
-      await env.DB.prepare("CREATE TABLE IF NOT EXISTS community_messages (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
-      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_community_messages_created_at ON community_messages(created_at)").run();
-      let deleted = 0;
-      for (let batch = 0; batch < 20; batch++) {
-        const result = await env.DB.prepare("DELETE FROM community_messages WHERE id IN (SELECT id FROM community_messages WHERE created_at < datetime('now', '-30 days') ORDER BY created_at ASC LIMIT 500)").run();
-        const changes = result.meta?.changes || 0;
-        deleted += changes;
-        if (changes < 500) break;
-      }
-      console.log("Community chat retention cleanup completed", { deleted, retentionDays: 30, batches: Math.ceil(deleted / 500) });
-    } catch (error) {
-      console.error("Community chat retention cleanup failed", { message: error?.message || String(error) });
-      throw error;
-    }
-  }
 };

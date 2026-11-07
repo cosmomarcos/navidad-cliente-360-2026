@@ -17,5 +17,3 @@ migrations_dir = "migrations"
 APP_NAME = "Navidad Cliente 360 2026"
 EDITION_YEAR = "2026"
 
-[triggers]
-crons = ["0 8 * * *"]

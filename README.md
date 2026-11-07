@@ -1,87 +1,91 @@
-# Navidad Cliente 360 2026
+# Navidad Cliente 360 · 2026
 
-PWA pública para presentar la celebración; la participación en la edición se limita a personas con invitación válida.
+Aplicación PWA para organizar el intercambio navideño del equipo Cliente 360. La participación está restringida a personas con una invitación válida.
 
-## Versión 0.1.0
+## Versión
 
-Incluye:
-- Landing page navideña responsive.
-- Manifest y Service Worker para instalación PWA.
-- Worker con API inicial.
-- Esquema D1 para usuarios, grupo, edición, invitaciones y miembros.
-- Validación de Google ID token en backend.
-- Sesión firmada en cookie HttpOnly, Secure y SameSite=Lax.
-- Invitaciones almacenadas como hash y flujo de incorporación.
-- Endpoint de salud.
+**1.0.0 — Release candidate para producción.**
 
-No incluye todavía el panel de administración para crear invitaciones ni los módulos de sorteo, chat, deseos, pistas y notificaciones. Se implementarán en siguientes versiones.
+## Funcionalidades
 
-## Requisitos
+- Inicio navideño responsive e instalable como PWA.
+- Inicio de sesión con Google y sesiones mediante cookie HttpOnly, Secure y SameSite=Lax.
+- Invitaciones privadas para incorporarse a la edición.
+- Perfil de participante y administración de integrantes.
+- Configuración del presupuesto y fecha del intercambio.
+- Sorteo privado con exclusiones mutuas.
+- Consulta individual de la asignación del amigo secreto.
+- Lista de deseos con notas, enlaces e imágenes.
+- Buzón privado para recibir y enviar mensajes anónimos al amigo secreto.
 
-- Node.js LTS
-- Cuenta Cloudflare
-- Proyecto OAuth de Google con Google Identity Services habilitado
+El chat comunitario general fue retirado. La migración `0004_remove_legacy_community_chat.sql` elimina exclusivamente el historial de ese chat; no elimina usuarios, integrantes, perfiles, invitaciones, deseos ni asignaciones del sorteo.
 
-## Configuración inicial
+## Arquitectura
 
-1. Instala dependencias:
+- Frontend: HTML, CSS y JavaScript en `public/`.
+- Backend: Cloudflare Worker en `src/index.js`.
+- Persistencia: Cloudflare D1.
+- Autenticación: Google Identity Services validado en el backend.
+- PWA: manifest y Service Worker.
 
-   ```bash
-   npm install
-   ```
+## Configuración requerida en Cloudflare
 
-2. Crea la base D1:
+El archivo `wrangler.toml` contiene el nombre del Worker y el binding D1 de producción. Verifica que el Worker tenga estos valores configurados:
 
-   ```bash
-   npx wrangler d1 create navidad-cliente-360-db
-   ```
+**Secretos**
+- `GOOGLE_CLIENT_ID`: ID del cliente OAuth web de Google.
+- `SESSION_SECRET`: secreto aleatorio robusto de al menos 32 bytes.
 
-3. Copia el `database_id` devuelto a `wrangler.toml`.
+**Variables**
+- `ADMIN_EMAIL`: correo Google exacto del administrador principal.
+- `APP_NAME` y `EDITION_YEAR`: ya declaradas en `wrangler.toml`.
 
-4. Aplica migraciones:
+En Google Cloud Console, registra el dominio de producción como origen JavaScript autorizado y configura el cliente OAuth web correspondiente.
 
-   ```bash
-   npm run db:remote
-   ```
+## Preparación de base de datos
 
-5. Configura secretos:
+Antes de activar la versión 1.0.0, revisa el destino D1 y aplica las migraciones pendientes:
 
-   ```bash
-   npx wrangler secret put GOOGLE_CLIENT_ID
-   npx wrangler secret put SESSION_SECRET
-   ```
+```bash
+npm install
+npm run db:remote
+```
 
-   `SESSION_SECRET` debe ser una cadena aleatoria robusta de al menos 32 bytes.
+La migración 0004 elimina únicamente la tabla del antiguo chat comunitario. No ejecutes migraciones contra una base distinta de la producción prevista.
 
-6. En Google Cloud Console configura el origen autorizado de tu dominio y el cliente OAuth para web.
+## Validación local
 
-7. Ejecuta localmente:
+Requisitos: Node.js 22 o superior.
 
-   ```bash
-   npm run dev
-   ```
+```bash
+npm install
+npm test
+npx wrangler dev
+```
 
-8. Despliega:
+El flujo de validación de GitHub Actions ejecuta:
+- Comprobación sintáctica de los archivos JavaScript.
+- Validación del manifest PWA.
+- Empaquetado de Wrangler en modo dry-run, sin desplegar.
 
-   ```bash
-   npm run deploy
-   ```
+## Lanzamiento
 
-## Importante antes de producción
+1. Confirmar secretos y variables del Worker en Cloudflare.
+2. Confirmar que el binding D1 apunta a `navidad-cliente-360-db`.
+3. Aplicar las migraciones pendientes en D1 de producción.
+4. Revisar el resultado de GitHub Actions en la rama de release.
+5. Integrar la rama `release/v1.0.0` en `main` únicamente con validaciones aprobadas.
+6. Cloudflare Workers Builds desplegará automáticamente los commits de `main`.
+7. Verificar `GET /api/health`, login, invitación, sesión, buzón secreto, deseos y consulta de asignación después del despliegue.
 
-- Configurar `ADMIN_EMAIL` con el correo Google que inicializará el grupo.
-- Después de iniciar sesión como administrador, invocar `POST /api/admin/bootstrap` con `{ "title": "Navidad Cliente 360 2026", "year": 2026, "budgetAmount": 80, "eventDate": "2026-12-18", "maxUses": 100 }`. El endpoint crea el workspace, la edición y un enlace de invitación. Guardar ese enlace: el token solo se muestra una vez.
-- Restringir CORS si se separa el frontend del Worker.
-- Añadir protección CSRF a mutaciones autenticadas.
-- Añadir rate limiting para login e invitaciones.
-- Implementar el alta inicial del workspace, edición 2026 y generación de invitaciones desde un panel administrativo protegido.
-- Revisar transacciones de consumo de invitaciones para concurrencia; se requiere una operación condicional atómica.
-- Añadir pruebas automatizadas y revisión de seguridad.
+## Seguridad y operación
 
-## Modelo de despliegue
+- Las mutaciones de la API requieren un encabezado Origin que coincida con el origen de la aplicación.
+- El consumo de invitaciones reserva cada uso con una actualización condicional para evitar exceder el límite por solicitudes concurrentes.
+- Las asignaciones del sorteo se generan con aleatoriedad criptográfica del entorno.
+- Las respuestas de error del Worker no exponen detalles internos.
+- Las rutas administrativas requieren sesión válida y coincidencia con `ADMIN_EMAIL`.
+- Las rutas de API no se sirven desde la caché del Service Worker.
+- El chat general y su tarea programada de retención ya no forman parte del Worker.
 
-El Worker sirve los recursos estáticos desde `public/` y enruta `/api/*` al backend. D1 es la única base persistente de esta primera fase.
-
-## Cloudflare Workers Builds
-
-La rama `main` de este repositorio está conectada al Worker `navidad-cliente-360-2026`. Los nuevos commits en `main` activan la compilación y el despliegue automático mediante Wrangler.
+**Importante:** el dry-run y las pruebas estáticas no sustituyen las pruebas funcionales en el dominio de producción ni la verificación de secretos y permisos en Cloudflare.
