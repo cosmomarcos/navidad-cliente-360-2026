@@ -1,138 +1,46 @@
-const $ = (selector) => document.querySelector(selector);
+const $ = selector => document.querySelector(selector);
 const params = new URLSearchParams(location.search);
-const token = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
-const statusBox = $("#invite-status"), joinButton = $("#join-button");
-let inviteValid = false, signedIn = false, currentUser = null;
-function showStatus(message, error = false) {
-  statusBox.textContent = message; statusBox.classList.remove("hidden", "error"); if (error) statusBox.classList.add("error");
+const token = params.get("invite") || location.pathname.match(/\\/unirse\\/([^/]+)/)?.[1] || "";
+let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null;
+const api=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||"Ocurrió un error.");return d;};
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function setLoginView(){
+  $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");
+  $("#join-card").classList.remove("hidden");
+  $("#join-card").innerHTML=`<div class="login-brand"><span>🎄</span><p class="kicker">CLIENTE 360 · NAVIDAD 2026</p><h1>Navidad Cliente 360</h1><p>Una Navidad, muchas sorpresas.</p></div><div id="login-context" class="login-context">${token?"Inicia sesión con Google para validar tu invitación y unirte a la celebración.":"Inicia sesión con tu cuenta de Google para continuar."}</div><div id="google-button" class="google-button"></div><div id="login-feedback" class="status hidden" role="status"></div><div class="privacy-note">🔒 Tu participación y tu asignación secreta estarán protegidas.</div>`;
 }
-function updateCountdown() {
-  const target = new Date("2026-12-25T00:00:00-05:00"), days = Math.max(0, Math.ceil((target - new Date()) / 86400000));
-  $("#countdown").textContent = days === 0 ? "¡Llegó Navidad!" : `${days} días`;
+function showFeedback(message,error=false){const el=$("#login-feedback");if(!el)return;el.textContent=message;el.classList.remove("hidden","error");if(error)el.classList.add("error");}
+async function loadInvite(){if(!token)return;try{const r=await api("/api/invitations/"+encodeURIComponent(token));inviteValid=true;inviteEdition=r.edition;}catch{inviteValid=false;}}
+function showProfileForm(profile=null){
+ const card=$("#join-card");card.classList.remove("hidden");card.innerHTML=`<div class="card-heading"><div class="icon-bubble">👤</div><div><p class="kicker">TU PERFIL DE PARTICIPANTE</p><h2>¿Cómo te llamas?</h2></div></div><p class="muted">Escribe tus nombres y apellidos reales. Estos datos serán utilizados para identificarte durante el sorteo; no mostraremos tu correo como nombre.</p><form id="participant-profile-form" class="profile-form"><label>Nombres<input name="firstName" autocomplete="given-name" maxlength="80" required value="${esc(profile?.first_name||"")}"></label><label>Apellidos<input name="lastName" autocomplete="family-name" maxlength="100" required value="${esc(profile?.last_name||"")}"></label><button class="primary-button" type="submit">Guardar mi nombre <span>→</span></button></form><div id="profile-feedback" class="status hidden" role="status"></div>`;
+ $("#participant-profile-form").addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget));const fb=$("#profile-feedback");try{await api("/api/profile/participant",{method:"POST",body:JSON.stringify(values)});currentUser=await api("/api/me");renderMemberApp();}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});
 }
-async function api(path, options = {}) {
-  const response = await fetch(path, { credentials: "same-origin", ...options, headers: { "content-type": "application/json", ...(options.headers || {}) } });
-  const data = await response.json(); if (!response.ok) throw new Error(data.error || "Ocurrió un error."); return data;
+function renderMemberApp(){
+ $("#join-card").classList.add("hidden");$("#admin-panel").classList.add("hidden");
+ let app=$("#member-app");app.classList.remove("hidden");
+ const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";
+ app.innerHTML=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p></section><section class="member-home"><article class="member-feature"><span>🎁</span><div><b>Mi amigo secreto</b><p>Tu asignación estará disponible cuando el organizador realice el sorteo.</p></div><small>Próximamente</small></article><div class="member-shortcuts"><article><span>💝</span><b>Lista de deseos</b><small>Próximamente</small></article><article><span>💌</span><b>Mensajes y pistas</b><small>Próximamente</small></article></div></section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto</button><button data-tab="community"><span>💬</span>Comunidad</button><button data-tab="wishes"><span>💝</span>Deseos</button><button data-tab="profile"><span>👤</span>Perfil</button></nav>`;
+ app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileForm(currentUser.participantProfile);return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Comunidad",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
 }
-async function checkInvite() {
-  if (!token) {
-    showStatus("Para participar necesitas abrir un enlace de invitación del organizador.", true);
-    $("#invite-description").textContent = "Esta página es pública. La participación está protegida mediante invitaciones personales."; return;
-  }
-  try {
-    const result = await api(`/api/invitations/${encodeURIComponent(token)}`); inviteValid = result.valid;
-    showStatus(`Invitación válida: ${result.edition.title} · ${result.edition.year}`);
-    $("#invite-description").textContent = "Tu invitación está lista. Inicia sesión con Google para confirmar tu participación.";
-    joinButton.classList.toggle("hidden", !signedIn);
-  } catch { showStatus("Esta invitación no es válida, venció o ya alcanzó su límite de usos.", true); }
+async function renderAdmin(){
+ const panel=$("#admin-panel");if(!currentUser?.isPrimaryAdmin){panel.classList.add("hidden");return;}panel.classList.remove("hidden");
+ try{const s=await api("/api/admin/status");panel.innerHTML=`<h2>Panel del administrador principal</h2><p>Sesión administrativa: ${esc(s.email)}</p><div class="admin-result"><b>${esc(s.edition?.title||"Edición sin configurar")}</b> · ${s.edition?.year||""}<br>Presupuesto: ${s.edition?.budget_amount==null?"No definido":"S/ "+s.edition.budget_amount}<br>Evento: ${esc(s.edition?.event_date||"Por definir")}<br>Participantes inscritos: ${s.participants||0}</div><form id="invite-form" class="admin-form"><label>Usos del nuevo enlace<input name="maxUses" type="number" min="1" max="500" value="1"></label></form><button class="admin-action" id="new-invite">Generar invitación</button><div id="admin-result" aria-live="polite"></div>`;
+ $("#new-invite").addEventListener("click",async()=>{try{const v=Object.fromEntries(new FormData($("#invite-form")));const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify(v)});$("#admin-result").innerHTML=`<div class="admin-result">Enlace generado: <a href="${esc(r.invitationUrl)}">${esc(r.invitationUrl)}</a></div>`;}catch(e){$("#admin-result").textContent=e.message;}});
+ if(window.mountParticipantAdmin)await window.mountParticipantAdmin();
+ }catch(e){panel.innerHTML=`<h2>Error al cargar el panel</h2><p>${esc(e.message)}</p>`;}
 }
-async function renderAdmin() {
-  const panel = $("#admin-panel");
-  if (!signedIn || !currentUser?.isPrimaryAdmin) { panel.classList.add("hidden"); return; }
-  panel.classList.remove("hidden");
-  try {
-    const state = await api("/api/admin/status");
-    if (!state.initialized) {
-      panel.innerHTML = `<h2>Panel del administrador principal</h2><p>Bienvenido, ${escapeHtml(currentUser.user.display_name || currentUser.user.email)}. Configura la edición para generar tu primera invitación.</p>
-      <form id="bootstrap-form" class="admin-form">
-        <label>Nombre de la edición<input name="title" value="Navidad Cliente 360 2026" maxlength="100" required></label>
-        <label>Año<input name="year" type="number" min="2026" value="2026" required></label>
-        <label>Presupuesto por persona (S/)<input name="budgetAmount" type="number" min="0" step="0.01" value="80"></label>
-        <label>Fecha del evento<div class="date-control"><input id="event-date" name="eventDate" type="date" value="2026-12-18" min="2026-01-01" max="2027-12-31" required><button type="button" class="date-picker-button" id="open-event-calendar" aria-label="Abrir calendario">📅 Elegir fecha</button></div><small class="date-help">Selecciona el día del evento en el calendario o escribe la fecha.</small></label>
-        <label>Usos de la invitación inicial<input name="maxUses" type="number" min="1" max="500" value="100"></label>
-      </form><button class="admin-action" id="create-edition">Crear edición y generar invitación</button><div id="admin-result" aria-live="polite"></div>`;
-      $("#open-event-calendar").addEventListener("click", () => {
-        const dateInput = $("#event-date");
-        try {
-          if (typeof dateInput.showPicker === "function") dateInput.showPicker();
-          else { dateInput.focus(); dateInput.click(); }
-        } catch { dateInput.focus(); dateInput.click(); }
-      });
-      $("#create-edition").addEventListener("click", async () => {
-        const form = $("#bootstrap-form");
-        if (!form.reportValidity()) return;
-        const values = Object.fromEntries(new FormData(form).entries());
-        try { const result = await api("/api/admin/bootstrap", { method: "POST", body: JSON.stringify(values) });
-          $("#admin-result").innerHTML = `<div class="admin-result"><b>Edición creada.</b><br>Invitación inicial: <a href="${escapeAttr(result.invitationUrl)}">${escapeHtml(result.invitationUrl)}</a></div>`;
-          await renderAdmin();
-      if (window.mountParticipantAdmin) await window.mountParticipantAdmin();
-        } catch (error) { $("#admin-result").textContent = error.message; }
-      });
-    } else {
-      panel.innerHTML = `<h2>Panel del administrador principal</h2><p>Sesión administrativa: ${escapeHtml(state.email)}</p>
-      <div class="admin-result"><b>${escapeHtml(state.edition.title)}</b> · ${state.edition.year}<br>Presupuesto: ${state.edition.budget_amount == null ? "No definido" : "S/ " + state.edition.budget_amount}<br>Evento: ${escapeHtml(state.edition.event_date || "Por definir")}<br>Participantes inscritos: ${state.participants}</div>
-      <form id="invite-form" class="admin-form"><label>Usos del nuevo enlace<input name="maxUses" type="number" min="1" max="500" value="1"></label></form>
-      <button class="admin-action" id="new-invite">Generar invitación</button><div id="admin-result" aria-live="polite"></div>`;
-      $("#new-invite").addEventListener("click", async () => {
-        try { const values = Object.fromEntries(new FormData($("#invite-form")).entries()); const result = await api("/api/admin/invitations", { method: "POST", body: JSON.stringify(values) });
-          $("#admin-result").innerHTML = `<div class="admin-result">Enlace generado: <a href="${escapeAttr(result.invitationUrl)}">${escapeHtml(result.invitationUrl)}</a></div>`;
-        } catch (error) { $("#admin-result").textContent = error.message; }
-      });
-    }
-  } catch (error) { panel.classList.remove("hidden"); panel.innerHTML = `<h2>Error al cargar el panel</h2><p>${escapeHtml(error.message)}</p><button class="admin-action" id="retry-admin">Reintentar</button>`; $("#retry-admin").addEventListener("click", renderAdmin); console.error("Navidad Cliente 360: error al cargar panel", error); }
+async function checkSession(){
+ currentUser=await api("/api/me");signedIn=!!currentUser.authenticated;
+ if(!signedIn){setLoginView();await initGoogle();return;}
+ $("#hero").classList.add("hidden");$("#features").classList.add("hidden");$("#site-footer").classList.add("hidden");$("#google-area").classList.add("hidden");
+ if(token&&!currentUser.membership){$("#join-card").classList.remove("hidden");$("#join-card").innerHTML=`<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">INVITACIÓN</p><h2>${esc(inviteEdition?.title||"Navidad Cliente 360")}</h2></div></div><p class="muted">${inviteValid?"Tu invitación está lista. Confirma tu participación para continuar.":"La invitación no es válida o venció."}</p><button id="confirm-join" class="primary-button" ${inviteValid?"":"disabled"}>Confirmar mi participación →</button><div id="join-feedback" class="status hidden"></div>`;
+ $("#confirm-join").addEventListener("click",async()=>{try{await api("/api/invitations/join",{method:"POST",body:JSON.stringify({token})});currentUser=await api("/api/me");showProfileForm();}catch(e){const fb=$("#join-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+ }else if(currentUser.membership?.status==="confirmed"&&!currentUser.participantProfile){$("#join-card").classList.add("hidden");showProfileForm();}
+ else if(currentUser.membership?.status==="confirmed"){renderMemberApp();}
+ else {$("#join-card").classList.remove("hidden");$("#join-card").innerHTML="<h2>Tu cuenta está activa</h2><p>Solicita una invitación válida al organizador para participar.</p>";}
+ await renderAdmin();
 }
-function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function escapeAttr(value) { return escapeHtml(value); }
-async function checkSession() {
-  const panel = $("#admin-panel");
-  try {
-    currentUser = await api("/api/me");
-    signedIn = Boolean(currentUser?.authenticated);
-    window.__NC360_DIAGNOSTICS = {
-      version: "0.3.2",
-      authenticated: signedIn,
-      isPrimaryAdmin: Boolean(currentUser?.isPrimaryAdmin),
-      sessionChecked: true
-    };
-    if (!signedIn) {
-      $("#google-area").classList.remove("hidden");
-      panel.classList.add("hidden");
-      return;
-    }
-    $("#google-area").classList.add("hidden");
-    if (inviteValid) joinButton.classList.remove("hidden");
-    showStatus(`Sesión iniciada: ${currentUser.user?.display_name || currentUser.user?.email || "usuario"}`);
-    if (currentUser.isPrimaryAdmin) {
-      panel.classList.remove("hidden");
-      panel.innerHTML = "<h2>Panel del administrador principal</h2><p>Cargando configuración de la edición…</p>";
-      await renderAdmin();
-      if (window.mountParticipantAdmin) await window.mountParticipantAdmin();
-    } else {
-      panel.classList.add("hidden");
-    }
-  } catch (error) {
-    window.__NC360_DIAGNOSTICS = { version: "0.3.2", sessionChecked: false, error: error.message };
-    panel.classList.remove("hidden");
-    panel.innerHTML = `<h2>No se pudo cargar tu sesión</h2><p>${escapeHtml(error.message)}</p><button class="admin-action" id="retry-admin">Reintentar</button>`;
-    $("#retry-admin").addEventListener("click", checkSession);
-    console.error("Navidad Cliente 360: error al comprobar sesión", error);
-  }
-}
-joinButton.addEventListener("click", async () => {
-  try { await api("/api/invitations/join", { method: "POST", body: JSON.stringify({ token }) }); showStatus("¡Listo! Ya formas parte de Navidad Cliente 360 2026. 🎄"); joinButton.classList.add("hidden"); }
-  catch (error) { showStatus(error.message, true); }
-});
-window.handleGoogleCredential = async (response) => {
-  try {
-    await api("/api/auth/google", { method: "POST", body: JSON.stringify({ credential: response.credential }) });
-    signedIn = true; $("#google-area").classList.add("hidden");
-    showStatus("Identidad verificada. Cargando tu espacio…");
-    await checkInvite();
-    currentUser = await api("/api/me");
-    if (inviteValid) joinButton.classList.remove("hidden");
-    await renderAdmin();
-    if (window.mountParticipantAdmin) await window.mountParticipantAdmin();
-  } catch (error) { showStatus(error.message, true); }
-};
-async function initGoogle() {
-  const config = await fetch("/api/config").then(r => r.ok ? r.json() : null).catch(() => null);
-  if (!config?.googleClientId) return;
-  const deadline = Date.now() + 10000;
-  while (!window.google?.accounts?.id && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 150));
-  if (!window.google?.accounts?.id) { showStatus("No se pudo cargar el acceso de Google. Comprueba tu conexión e inténtalo nuevamente.", true); return; }
-  window.google.accounts.id.initialize({ client_id: config.googleClientId, callback: window.handleGoogleCredential });
-  window.google.accounts.id.renderButton($("#google-button"), { theme: "outline", size: "large", shape: "pill", text: "continue_with", width: 280 });
-}
-updateCountdown(); setInterval(updateCountdown, 60 * 60 * 1000);
-await checkInvite(); await checkSession(); initGoogle();
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+window.handleGoogleCredential=async response=>{try{await api("/api/auth/google",{method:"POST",body:JSON.stringify({credential:response.credential})});await loadInvite();await checkSession();}catch(e){showFeedback(e.message,true);}};
+async function initGoogle(){const c=await fetch("/api/config").then(r=>r.json());if(!c.googleClientId)return;const deadline=Date.now()+10000;while(!window.google?.accounts?.id&&Date.now()<deadline)await new Promise(r=>setTimeout(r,150));if(!window.google?.accounts?.id){showFeedback("No se pudo cargar Google. Intenta nuevamente.",true);return;}window.google.accounts.id.initialize({client_id:c.googleClientId,callback:window.handleGoogleCredential});window.google.accounts.id.renderButton($("#google-button"),{theme:"outline",size:"large",shape:"pill",text:"continue_with",width:280});}
+await loadInvite();await checkSession();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
