@@ -104,11 +104,14 @@ async function sendPushToUser(env, userId, payload, subject) {
 
 async function notifySpiritParticipants(env, editionId, authorUserId, submissionId, authorName, subject) {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
+  const author = await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?")
+    .bind(authorUserId).first();
+  const displayName = author?.display_name || authorName || "Un participante";
   const recipients = await env.DB.prepare("SELECT DISTINCT user_id FROM edition_members WHERE edition_id=? AND status='confirmed' AND user_id<>?")
     .bind(editionId, authorUserId).all();
   const payload = {
     title: "🎄 ¡Nueva participación en Espíritu Navideño!",
-    body: (authorName || "Un participante") + " ya publicó. ¡Envía tu participación ahora y participa por el premio! 🎁",
+    body: displayName + " publicó. ¡Envía tu participación ahora y participa por el premio! 🎁",
     tag: "spirit-new-submission-" + submissionId,
     url: "/?tab=spirit"
   };
