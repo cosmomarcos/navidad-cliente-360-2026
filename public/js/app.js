@@ -98,7 +98,7 @@ function renderMemberApp(){
 
 async function renderSpiritTab(){
  const home=$("#member-app .member-home");if(!home)return;
- home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas.</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
+ home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
   const data=await api("/api/spirit/board",{noMemoryCache:true}),host=$("#spirit-content"),challenge=data.challenge;
   const ranking=data.ranking||[],submissions=data.submissions||[];
