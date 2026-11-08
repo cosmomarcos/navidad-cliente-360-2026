@@ -83,7 +83,7 @@ async function seedSpiritChallenges(env, editionId) {
   for(let i=0;i<tasks.length;i++){
     const start=new Date(now+i*86400000).toISOString().slice(0,19).replace("T"," ");
     const end=new Date(now+(i+1)*86400000).toISOString().slice(0,19).replace("T"," ");
-    await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,tasks[i][0],tasks[i][1],tasks[i][2],tasks[i][3],start,end).run();
+    await env.DB.prepare("undefined").bind("seed-"+editionId+"-"+(i+1),editionId,tasks[i][0],tasks[i][1],tasks[i][2],tasks[i][3],start,end).run();
   }
 }
 
