@@ -65,6 +65,7 @@ async function ensureSpiritSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_votes (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_points_ranking ON spirit_points(edition_id,user_id)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submission_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
 }
 function buildSecretAssignments(members, exclusions) {
   const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
@@ -116,6 +117,15 @@ async function notifySpiritParticipants(env, editionId, authorUserId, submission
     url: "/?tab=spirit"
   };
   await Promise.all((recipients.results || []).map(row => sendPushToUser(env, row.user_id, payload, subject)));
+}
+
+async function notifyWishOwner(env, editionId, authorUserId, wishTitle, subject) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
+  const assignment = await env.DB.prepare("SELECT giver_user_id FROM draw_assignments WHERE edition_id=? AND recipient_user_id=?").bind(editionId, authorUserId).first();
+  if (!assignment?.giver_user_id) return;
+  const author = await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(authorUserId).first();
+  const name = author?.display_name || "Tu amigo secreto";
+  await sendPushToUser(env, assignment.giver_user_id, { title: "💝 ¡Tu amigo secreto agregó un deseo!", body: name + " agregó o actualizó: " + String(wishTitle || "un deseo").slice(0,80), tag: "wish-update-" + editionId + "-" + authorUserId, url: "/?tab=wishes" }, subject);
 }
 
 async function handleApi(request, env, url) {
@@ -193,6 +203,11 @@ async function handleApi(request, env, url) {
       challenge={...challenge,config:{question:config.question||"",options:Array.isArray(config.options)?config.options:[]}};
       delete challenge.config_json;
     }
+    if (request.method === "GET" && url.pathname === "/api/spirit/unread") {
+      const read = await env.DB.prepare("SELECT last_seen_at FROM spirit_submission_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_submissions WHERE edition_id=? AND user_id<>? AND created_at>?").bind(member.edition_id,user.id,read?.last_seen_at || "1970-01-01 00:00:00").first();
+      return json({ unread: count?.total || 0 });
+    }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
       const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(SUM(sp.points),0) AS points,COUNT(DISTINCT CASE WHEN sp.source_type='submission' THEN sp.source_id END) AS completed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
       const rows=ranking.results||[];
@@ -202,6 +217,7 @@ async function handleApi(request, env, url) {
         const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.media_data,s.media_type,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
         submissions=(feed.results||[]).map(item=>({...item,eligibleForVoting:challenge.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
       }
+      await env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
       return json({challenge:challenge||null,submissions,ranking:rows.slice(0,3),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     if (request.method === "POST" && url.pathname === "/api/spirit/submissions") {
@@ -535,8 +551,18 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wishes (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, note TEXT, url TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wish_images (wish_id TEXT PRIMARY KEY REFERENCES participant_wishes(id) ON DELETE CASCADE, image_data TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wish_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
     const membership = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
     if (!membership) return json({ error: "Necesitas una participación activa para gestionar tus deseos." }, 403);
+    if (request.method === "GET" && url.pathname === "/api/wishes/unread") {
+      const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
+      if (state?.state !== "drawn") return json({ unread: 0 });
+      const assigned = await env.DB.prepare("SELECT recipient_user_id FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(membership.edition_id,user.id).first();
+      if (!assigned) return json({ unread: 0 });
+      const read = await env.DB.prepare("SELECT last_seen_at FROM participant_wish_reads WHERE edition_id=? AND user_id=?").bind(membership.edition_id,user.id).first();
+      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM participant_wishes WHERE edition_id=? AND user_id=? AND updated_at>?").bind(membership.edition_id,assigned.recipient_user_id,read?.last_seen_at || "1970-01-01 00:00:00").first();
+      return json({ unread: count?.total || 0 });
+    }
     if (request.method === "GET" && url.pathname === "/api/wishes") {
       const mine = await env.DB.prepare("SELECT w.id, w.title, w.note, w.url, w.created_at, (SELECT image_data FROM participant_wish_images i WHERE i.wish_id=w.id) AS image_data FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, user.id).all();
       const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
@@ -549,6 +575,7 @@ async function handleApi(request, env, url) {
           recipientWishes = wishes.results || [];
         }
       }
+      await env.DB.prepare("INSERT INTO participant_wish_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(membership.edition_id,user.id).run();
       return json({ wishes: mine.results || [], recipientName, recipientWishes, canSeeRecipientWishes: state?.state === "drawn" && !!recipientName });
     }
     if (request.method === "POST" && url.pathname === "/api/wishes") {
@@ -566,6 +593,7 @@ async function handleApi(request, env, url) {
       const wishId = crypto.randomUUID();
       await env.DB.prepare("INSERT INTO participant_wishes (id, edition_id, user_id, title, note, url) VALUES (?, ?, ?, ?, ?, ?)").bind(wishId, membership.edition_id, user.id, title, note || null, link || null).run();
       if (imageData) await env.DB.prepare("INSERT INTO participant_wish_images (wish_id, image_data) VALUES (?, ?)").bind(wishId, imageData).run();
+      await notifyWishOwner(env,membership.edition_id,user.id,title,url.origin);
       return json({ ok: true });
     }
     const match = url.pathname.match(/^\/api\/wishes\/([A-Za-z0-9-]+)$/);
@@ -583,6 +611,7 @@ async function handleApi(request, env, url) {
       if (!result.meta.changes) return json({ error: "No encontramos ese deseo." }, 404);
       if (body.removeImage) await env.DB.prepare("DELETE FROM participant_wish_images WHERE wish_id=?").bind(match[1]).run();
       if (imageData) await env.DB.prepare("INSERT INTO participant_wish_images (wish_id, image_data) VALUES (?, ?) ON CONFLICT(wish_id) DO UPDATE SET image_data=excluded.image_data, updated_at=datetime('now')").bind(match[1], imageData).run();
+      await notifyWishOwner(env,membership.edition_id,user.id,title,url.origin);
       return json({ ok: true });
     }
     if (request.method === "DELETE" && match) {
