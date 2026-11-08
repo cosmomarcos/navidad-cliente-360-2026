@@ -261,7 +261,7 @@ async function handleApi(request, env, url) {
       const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim();
       const points=Number(body.points||10),bonus=Number(body.bonusPoints||5);
       if(title.length<3||title.length>80||description.length<5||description.length>300)return json({error:"Completa un título y una descripción válidos."},400);
-      if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<0||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
+      if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<1||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
       const now=new Date().toISOString().slice(0,19).replace("T"," ");
       const end=new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
       await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND ends_at>datetime('now')").bind(now,edition.id).run();
