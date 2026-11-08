@@ -271,7 +271,7 @@ async function handleApi(request, env, url) {
         }
       }
       const voter=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
-      await sendPushToUser(env,submission.user_id,{title:"❤️ ¡Nueva reacción en Espíritu!",body:(voter?.name||"Un participante")+" le dio me gusta a tu publicación.",tag:"spirit-like-"+submission.id,url:"/?tab=spirit"},"mailto:admin@navidadcliente360.com");
+      await sendPushToUser(env,submission.user_id,{title:"❤️ ¡Nueva reacción en Espíritu!",body:(voter?.name||"Un participante")+" le dio me gusta a tu publicación.",tag:"spirit-like-"+submission.id,url:"/?tab=spirit"},url.origin);
       return json({ok:true,votes:count?.total||0,bonusAwarded});
     }
     return json({error:"Ruta de Espíritu Navideño no encontrada."},404);
