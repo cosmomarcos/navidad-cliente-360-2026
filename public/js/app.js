@@ -183,6 +183,14 @@ async function showAdminSettings(){
  try{const data=await api("/api/admin/status"),e=data.edition||{},form=$("#edition-settings-form");form.elements.title.value=e.title||"";form.elements.eventDate.value=e.event_date||"";form.elements.budgetAmount.value=e.budget_amount??"";if(e.status!=="registration"){form.querySelector("button").disabled=true;form.querySelectorAll("input").forEach(x=>x.disabled=true);$("#edition-settings-feedback").textContent="Los ajustes están bloqueados porque el sorteo ya fue realizado o la edición terminó.";$("#edition-settings-feedback").classList.remove("hidden");}form.addEventListener("submit",async ev=>{ev.preventDefault();const values=Object.fromEntries(new FormData(form)),fb=$("#edition-settings-feedback");try{await api("/api/admin/edition",{method:"PATCH",body:JSON.stringify(values)});currentUser=await api("/api/me");updateMemberCountdown(currentUser.membership?.event_date);fb.textContent="Los ajustes del intercambio se guardaron correctamente.";fb.classList.remove("hidden","error");}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});}catch(err){const fb=$("#edition-settings-feedback");fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}
  try{await loadSpiritAdmin();}catch(error){$("#spirit-admin-controls").innerHTML='<div class="status error">'+esc(error.message)+'</div>';}
 }
+async function loadDrawRevelationTracker(){
+ const host=$("#draw-revelation-tracker");if(!host)return;
+ try{
+  const data=await api("/api/admin/draw/revelations",{noMemoryCache:true}),people=data.participants||[];
+  const total=Number(data.total||people.length),revealed=Number(data.revealed||0),pending=Math.max(0,total-revealed),percent=total?Math.round(revealed*100/total):0;
+  host.innerHTML='<div class="draw-revelation-heading"><div><b>👁️ Estado de revelaciones</b><small>Seguimiento privado · sin mostrar las asignaciones</small></div><strong>'+percent+'%</strong></div><div class="draw-revelation-progress"><span style="width:'+percent+'%"></span></div><div class="draw-revelation-stats"><span><b>'+revealed+'</b> ya revelaron</span><span><b>'+pending+'</b> pendientes</span><span><b>'+total+'</b> participantes</span></div><div class="draw-revelation-list">'+people.map(p=>'<div><span>'+esc(p.displayName)+'</span><b class="'+(p.revealed?'is-revealed':'is-pending')+'">'+(p.revealed?'✓ Ya reveló':'Pendiente')+'</b></div>').join('')+'</div>';
+ }catch(error){host.innerHTML='<p class="status error">'+esc(error.message)+'</p>';}
+}
 async function loadAdminDrawControls(){
  const host=$("#draw-admin-controls");if(!host||!currentUser?.isPrimaryAdmin)return;
  host.innerHTML='<div class="draw-admin-card"><h3>Preparación y sorteo</h3><p>Valida a los participantes y ejecuta el sorteo cuando todos estén listos.</p><div id="draw-admin-status" class="draw-status">Consultando estado…</div><div id="draw-admin-actions"></div><div id="draw-admin-feedback" class="status hidden"></div></div>';
@@ -192,7 +200,7 @@ async function loadAdminDrawControls(){
   const readyText=d.state==="drawn"?"Sorteo realizado":d.state==="ready"?"Todos listos · pendiente de ejecutar":"Inscripción y preparación";
   status.innerHTML='<div class="draw-stats"><span><b>'+d.participants+'</b> participantes activos</span><span><b>'+d.missingProfiles+'</b> perfiles incompletos</span><span><b>'+d.exclusions+'</b> exclusiones</span></div><p class="draw-state-label">'+readyText+'</p>';
   if(d.state==="drawn"){
-   actions.innerHTML='<p class="draw-success">El sorteo está activo. Cada participante puede consultar únicamente su asignación en Mi amigo secreto.</p><button id="reveal-draw-results" class="admin-action">👁 Revelar resultados del sorteo</button><div id="draw-results-panel" class="draw-results-panel hidden"></div><button id="reset-draw-button" class="admin-action danger-action">Volver a sortear</button><small>Esto eliminará las asignaciones actuales y conservará los perfiles, exclusiones y el historial de las demás secciones.</small>';
+   actions.innerHTML='<p class="draw-success">El sorteo está activo. Cada participante puede consultar únicamente su asignación en Mi amigo secreto.</p><div id="draw-revelation-tracker" class="draw-revelation-tracker"><p>Consultando quiénes ya revelaron su amigo secreto…</p></div><button id="reveal-draw-results" class="admin-action">👁 Revelar resultados del sorteo</button><div id="draw-results-panel" class="draw-results-panel hidden"></div><button id="reset-draw-button" class="admin-action danger-action">Volver a sortear</button><small>Esto eliminará las asignaciones actuales y conservará los perfiles, exclusiones y el historial de las demás secciones.</small>';
    $("#reveal-draw-results").addEventListener("click",async()=>{
     const button=$("#reveal-draw-results"),panel=$("#draw-results-panel");
     if(!panel.classList.contains("hidden")){panel.classList.add("hidden");panel.innerHTML="";button.textContent="👁 Revelar resultados del sorteo";return;}
@@ -206,6 +214,7 @@ async function loadAdminDrawControls(){
     finally{button.disabled=false;}
    });
    $("#reset-draw-button").addEventListener("click",async()=>{if(!confirm("¿Estás seguro de volver a sortear? Se eliminarán las asignaciones actuales para todos los participantes, pero se conservarán los perfiles, exclusiones y el historial de las demás secciones."))return;const confirmation="VOLVER A SORTEAR";try{await api("/api/admin/draw/reset",{method:"POST",body:JSON.stringify({confirmation})});await loadAdminDrawControls();const fb=$("#draw-admin-feedback");fb.textContent="Asignaciones anteriores eliminadas. Ya puedes incorporar participantes y preparar un nuevo sorteo.";fb.classList.remove("hidden","error");}catch(e){const fb=$("#draw-admin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+   loadDrawRevelationTracker();
   }else if(d.state==="ready"){
    actions.innerHTML='<p class="draw-ready">La lista fue validada. Solo el administrador puede ejecutar el sorteo.</p><button id="execute-draw-button" class="admin-action">Ejecutar sorteo</button>';
    $("#execute-draw-button").addEventListener("click",async()=>{if(!confirm("¿Confirmas ejecutar el sorteo? Las asignaciones serán privadas y no se podrán editar individualmente."))return;try{const result=await api("/api/admin/draw/execute",{method:"POST",body:JSON.stringify({})});const fb=$("#draw-admin-feedback");fb.textContent="Sorteo realizado correctamente para "+result.participants+" participantes.";fb.classList.remove("hidden","error");await loadAdminDrawControls();}catch(e){const fb=$("#draw-admin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
@@ -343,8 +352,22 @@ async function renderSecretTab(){
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Mi amigo secreto</h2></div><div class="tab-skeleton tab-skeleton-compact" aria-label="Consultando tu asignación"><span></span><span></span></div>';
  try{
-  const data=await api("/api/secret/me");
-  if(data.state==="drawn")section.innerHTML='<div class="member-section-heading"><p class="kicker">TU ASIGNACIÓN SECRETA</p><h2>Tu amigo secreto 🎁</h2></div><article class="secret-reveal"><span>🎄</span><p>Este año te toca regalarle a</p><h2>'+esc(data.recipient.displayName)+'</h2><small>Recuerda mantenerlo en secreto 🤫</small></article>';
+  const data=await api("/api/secret/me",{noMemoryCache:true});
+  if(data.state==="drawn"){
+   section.innerHTML='<div class="member-section-heading"><p class="kicker">TU ASIGNACIÓN SECRETA</p><h2>Tu amigo secreto 🎁</h2><p>Tu asignación estará protegida hasta que decidas revelarla.</p></div><article class="secret-reveal secret-reveal-private"><span class="secret-gift-icon">🎄</span><p>Este año te toca regalarle a</p><h2 id="secret-recipient-name" class="secret-recipient-hidden" aria-live="polite">••••••••••</h2><small id="secret-privacy-hint">🔒 Tu amigo secreto está oculto.</small><button type="button" id="secret-visibility-toggle" class="secret-visibility-button" aria-pressed="false"><span aria-hidden="true">👁️</span> Revelar mi amigo secreto</button><p class="secret-privacy-note">Puedes ocultarlo nuevamente en cualquier momento. Al revelarlo por primera vez, se registrará tu confirmación.</p></article>';
+   const toggle=$("#secret-visibility-toggle"),name=$("#secret-recipient-name"),hint=$("#secret-privacy-hint");
+   let visible=false,busy=false;
+   toggle.addEventListener("click",async()=>{
+    if(busy)return;
+    if(visible){visible=false;name.textContent="••••••••••";name.classList.add("secret-recipient-hidden");toggle.innerHTML='<span aria-hidden="true">👁️</span> Revelar mi amigo secreto';toggle.setAttribute("aria-pressed","false");hint.textContent="🔒 Tu amigo secreto está oculto.";return;}
+    busy=true;toggle.disabled=true;toggle.textContent="Registrando revelación…";
+    try{
+     if(!data.hasRevealed){await api("/api/secret/reveal",{method:"POST",body:JSON.stringify({})});data.hasRevealed=true;}
+     visible=true;name.textContent=data.recipient.displayName;name.classList.remove("secret-recipient-hidden");toggle.innerHTML='<span aria-hidden="true">🙈</span> Ocultar mi amigo secreto';toggle.setAttribute("aria-pressed","true");hint.textContent="🎁 ¡Ya puedes ver a quién te toca regalar!";
+    }catch(error){hint.textContent=error.message;hint.classList.add("secret-privacy-error");}
+    finally{busy=false;toggle.disabled=false;}
+   });
+  }
   else if(data.state==="ready")section.innerHTML='<div class="member-section-heading"><p class="kicker">MI AMIGO SECRETO</p><h2>¡Ya casi! 🎁</h2></div><article class="secret-waiting"><span>✨</span><h3>Todos están listos</h3><p>El administrador está por realizar el sorteo. Cuando termine, aquí descubrirás a quién debes regalar.</p></article>';
   else if(data.state==="not_participating")section.innerHTML='<div class="member-section-heading"><h2>Mi amigo secreto</h2></div><p>No tienes una participación activa en esta edición.</p>';
   else if(data.state==="not_assigned")section.innerHTML='<div class="member-section-heading"><h2>Mi amigo secreto</h2></div><p>Tu participación se registró después del último sorteo. El administrador deberá volver a sortear para incluirte.</p>';
