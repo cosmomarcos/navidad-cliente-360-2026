@@ -66,7 +66,7 @@ async function seedSpiritChallenges(env, editionId) {
   const edition=await env.DB.prepare("SELECT event_date FROM editions WHERE id=?").bind(editionId).first();
   const eventDate=String(edition?.event_date||"");
   let challengeDays=30;
-  if(/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)){
+  if(/^\d{4}-\d{2}-\d{2}$/.test(eventDate)){
     const parts=eventDate.split("-").map(Number);
     const eventMidnight=Date.UTC(parts[0],parts[1]-1,parts[2]);
     challengeDays=Math.min(90,Math.max(1,Math.ceil((eventMidnight-Date.now())/86400000)+1));
