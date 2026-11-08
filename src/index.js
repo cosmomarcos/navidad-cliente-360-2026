@@ -168,8 +168,10 @@ async function handleApi(request, env, url) {
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     await ensureSpiritSchema(env);
     let challenge = await env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+    let challengeCorrectAnswer=null;
     if(challenge){
       let config={};try{config=JSON.parse(challenge.config_json||"{}");}catch{}
+      challengeCorrectAnswer=String(config.correctAnswer||"");
       challenge={...challenge,config:{question:config.question||"",options:Array.isArray(config.options)?config.options:[]}};
       delete challenge.config_json;
     }
@@ -180,7 +182,7 @@ async function handleApi(request, env, url) {
       let submissions=[];
       if(challenge){
         const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.media_data,s.media_type,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
-        submissions=feed.results||[];
+        submissions=(feed.results||[]).map(item=>({...item,eligibleForVoting:challenge.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
       }
       return json({challenge:challenge||null,submissions,ranking:rows.slice(0,3),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
@@ -219,9 +221,14 @@ async function handleApi(request, env, url) {
     const voteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/vote$/);
     if(request.method==="POST"&&voteMatch){
       if(!challenge)return json({error:"El reto ya terminó."},409);
-      const submission=await env.DB.prepare("SELECT s.id,s.user_id,s.edition_id,s.challenge_id FROM spirit_submissions s WHERE s.id=? AND s.edition_id=? AND s.challenge_id=?").bind(voteMatch[1],member.edition_id,challenge.id).first();
+      const submission=await env.DB.prepare("SELECT s.id,s.user_id,s.edition_id,s.challenge_id,s.caption FROM spirit_submissions s WHERE s.id=? AND s.edition_id=? AND s.challenge_id=?").bind(voteMatch[1],member.edition_id,challenge.id).first();
       if(!submission)return json({error:"La publicación no pertenece al reto activo."},404);
       if(submission.user_id===user.id)return json({error:"No puedes votar por tu propia publicación."},409);
+      if(challenge.challenge_type==="trivia"){
+        const trivia=await env.DB.prepare("SELECT config_json FROM spirit_challenges WHERE id=?").bind(submission.challenge_id).first();
+        let answer="";try{answer=JSON.parse(trivia?.config_json||"{}").correctAnswer||"";}catch{}
+        if(String(submission.caption)!==String(answer))return json({error:"Esta respuesta no fue correcta y no puede recibir votos."},409);
+      }
       try{await env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) VALUES (?,?,?)").bind(crypto.randomUUID(),submission.id,user.id).run();}
       catch{return json({error:"Ya votaste por esta publicación."},409);}
       const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes WHERE submission_id=?").bind(submission.id).first();
