@@ -102,8 +102,21 @@ async function sendPushToUser(env, userId, payload, subject) {
   }));
 }
 
+async function notifySpiritParticipants(env, editionId, authorUserId, submissionId, authorName, subject) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
+  const recipients = await env.DB.prepare("SELECT DISTINCT user_id FROM edition_members WHERE edition_id=? AND status='confirmed' AND user_id<>?")
+    .bind(editionId, authorUserId).all();
+  const payload = {
+    title: "🎄 ¡Nueva participación en Espíritu Navideño!",
+    body: (authorName || "Un participante") + " ya publicó. ¡Envía tu participación ahora y participa por el premio! 🎁",
+    tag: "spirit-new-submission-" + submissionId,
+    url: "/?tab=spirit"
+  };
+  await Promise.all((recipients.results || []).map(row => sendPushToUser(env, row.user_id, payload, subject)));
+}
+
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.4.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.6.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -208,6 +221,7 @@ async function handleApi(request, env, url) {
         env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),null,mediaData||null,mediaType||null),
         ...(awardedPoints>0?[env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"submission",id,awardedPoints,"Reto: "+challenge.title)]:[])
       ]);
+      await notifySpiritParticipants(env, member.edition_id, user.id, id, user.display_name, url.origin);
       return json({ok:true,points:awardedPoints,correct});
     }
     const deleteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
