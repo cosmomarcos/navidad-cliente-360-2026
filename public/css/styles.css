@@ -425,3 +425,5 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .spirit-admin>small{display:block;margin-top:7px;color:#8b8d7e;font-size:9px}
 @media(max-width:520px){.admin-settings-nav{gap:4px;padding:5px}.admin-settings-nav button{font-size:10px;min-height:40px}.spirit-suggestion-grid{gap:7px}.spirit-suggestion-card{padding:9px;grid-template-columns:30px 1fr}.spirit-trivia-admin-options{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.admin-settings-section{animation:none}}
+
+.spirit-trivia-wrong{font-size:10px;color:#a13b32;font-weight:800}
