@@ -49,6 +49,8 @@ async function ensureDrawSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_assignments (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id, giver_user_id))").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_runs (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, run_number INTEGER NOT NULL, status TEXT NOT NULL, participant_count INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_draw_assignments_edition ON draw_assignments(edition_id)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_revelations (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, revealed_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_draw_revelations_edition ON draw_revelations(edition_id,revealed_at)").run();
 }
 
 async function ensureSpiritSchema(env) {
@@ -321,6 +323,11 @@ async function handleApi(request, env, url) {
         integrity.valid = integrity.participants >= 2 && integrity.assignments === integrity.participants && integrity.uniqueRecipients === integrity.participants && integrity.selfAssignments === 0 && integrity.exclusionViolations === 0;
         return json({ runNumber: run.run_number, createdAt: run.created_at, integrity, assignments: assignments.map(a => ({ giverName: a.giver_name, recipientName: a.recipient_name })) });
       }
+      if (request.method === "GET" && url.pathname === "/api/admin/draw/revelations") {
+        const members = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name, CASE WHEN r.user_id IS NULL THEN 0 ELSE 1 END AS revealed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN draw_revelations r ON r.edition_id=em.edition_id AND r.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY revealed DESC, display_name COLLATE NOCASE ASC").bind(edition.id).all();
+        const participants=(members.results||[]).map(m=>({displayName:m.display_name,revealed:!!m.revealed}));
+        return json({total:participants.length,revealed:participants.filter(p=>p.revealed).length,participants});
+      }
       if (request.method === "GET" && url.pathname === "/api/admin/draw/status") {
         const state = await env.DB.prepare("SELECT state, ready_at, drawn_at FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
         const members = await env.DB.prepare("SELECT em.user_id, p.first_name, p.last_name FROM edition_members em LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed'").bind(edition.id).all();
@@ -355,7 +362,8 @@ async function handleApi(request, env, url) {
           const prior = await env.DB.prepare("SELECT COALESCE(MAX(run_number),0) AS n FROM draw_runs WHERE edition_id=?").bind(edition.id).first();
           const runNumber = (prior?.n || 0) + 1, runId = crypto.randomUUID();
           const statements = [
-            env.DB.prepare("DELETE FROM draw_assignments WHERE edition_id=?").bind(edition.id),
+            env.DB.prepare("DELETE FROM draw_revelations WHERE edition_id=?").bind(edition.id),
+          env.DB.prepare("DELETE FROM draw_assignments WHERE edition_id=?").bind(edition.id),
             env.DB.prepare("INSERT INTO draw_runs (id, edition_id, run_number, status, participant_count) VALUES (?, ?, ?, 'completed', ?)").bind(runId, edition.id, runNumber, assignments.length)
           ];
           for (const a of assignments) statements.push(env.DB.prepare("INSERT INTO draw_assignments (id, edition_id, giver_user_id, recipient_user_id, run_number) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), edition.id, a.giver_user_id, a.recipient_user_id, runNumber));
@@ -577,7 +585,20 @@ async function handleApi(request, env, url) {
     if (!state || state.state !== "drawn") return json({ state: state?.state || "registration", title: membership.title });
     const assignment = await env.DB.prepare("SELECT u.id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM draw_assignments a JOIN users u ON u.id=a.recipient_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? AND a.giver_user_id=?").bind(membership.edition_id, participant.id).first();
     if (!assignment) return json({ state: "not_assigned", title: membership.title });
-    return json({ state: "drawn", title: membership.title, recipient: { displayName: assignment.display_name } });
+    const revealed = await env.DB.prepare("SELECT 1 AS revealed FROM draw_revelations WHERE edition_id=? AND user_id=?").bind(membership.edition_id,participant.id).first();
+    return json({ state: "drawn", title: membership.title, hasRevealed: !!revealed, recipient: { displayName: assignment.display_name } });
+  }
+  if (request.method === "POST" && url.pathname === "/api/secret/reveal") {
+    const participant = await currentUser(request, env);
+    if (!participant) return json({ error: "Inicia sesión primero." }, 401);
+    await ensureDrawSchema(env);
+    const membership = await env.DB.prepare("SELECT em.status, em.edition_id FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(participant.id).first();
+    if (!membership || membership.status !== "confirmed") return json({ error: "No tienes una participación activa." }, 403);
+    const assignment = await env.DB.prepare("SELECT 1 AS assigned FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(membership.edition_id,participant.id).first();
+    if (!assignment) return json({ error: "Tu asignación todavía no está disponible." }, 409);
+    await env.DB.prepare("INSERT OR IGNORE INTO draw_revelations (edition_id,user_id) VALUES (?,?)").bind(membership.edition_id,participant.id).run();
+    const record = await env.DB.prepare("SELECT revealed_at FROM draw_revelations WHERE edition_id=? AND user_id=?").bind(membership.edition_id,participant.id).first();
+    return json({ ok: true, revealedAt: record?.revealed_at || null });
   }
   if (request.method === "POST" && url.pathname === "/api/participation/withdraw") {
     const user = await currentUser(request, env);
