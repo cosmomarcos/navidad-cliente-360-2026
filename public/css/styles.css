@@ -530,3 +530,7 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .draw-revelation-list .is-revealed{color:#28734b}
 .draw-revelation-list .is-pending{color:#9a6d2d}
 @media(max-width:520px){.draw-revelation-tracker{padding:11px}.draw-revelation-stats{gap:5px}.draw-revelation-list>div{align-items:flex-start;flex-direction:column;gap:4px}}
+
+/* v1.7.0 · Indicadores de novedades en las pestañas */
+.bottom-nav button{position:relative}
+.bottom-nav .nav-unread-badge{margin-left:3px;vertical-align:middle;box-shadow:0 1px 4px rgba(0,0,0,.18)}
