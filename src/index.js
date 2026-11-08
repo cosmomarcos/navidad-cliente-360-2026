@@ -277,7 +277,8 @@ async function handleApi(request, env, url) {
       try{
         await env.DB.batch([
           env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) VALUES (?,?,?)").bind(voteId,submission.id,user.id),
-          env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT ?,s.edition_id,s.user_id,'like',?,1,'Me gusta recibido' FROM spirit_submissions s WHERE s.id=? AND (SELECT COUNT(*) FROM spirit_points WHERE edition_id=? AND user_id=s.user_id AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=s.id))<10").bind(crypto.randomUUID(),voteId,submission.id,member.edition_id)
+          env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(member.edition_id,submission.id),
+          env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE v.submission_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submission.id)
         ]);
       }catch{return json({error:"Ya diste Me gusta a esta publicación."},409);}
       const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes WHERE submission_id=?").bind(submission.id).first();
@@ -293,8 +294,9 @@ async function handleApi(request, env, url) {
       const vote=await env.DB.prepare("SELECT id FROM spirit_votes WHERE submission_id=? AND voter_user_id=?").bind(submission.id,user.id).first();
       if(!vote)return json({error:"Todavía no has dado Me gusta a esta publicación."},404);
       await env.DB.batch([
-        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id=?").bind(member.edition_id,vote.id),
-        env.DB.prepare("DELETE FROM spirit_votes WHERE id=?").bind(vote.id)
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(member.edition_id,submission.id),
+        env.DB.prepare("DELETE FROM spirit_votes WHERE id=?").bind(vote.id),
+        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE v.submission_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submission.id)
       ]);
       const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes WHERE submission_id=?").bind(submission.id).first();
       return json({ok:true,voted:false,votes:count?.total||0});
