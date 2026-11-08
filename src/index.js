@@ -132,7 +132,7 @@ async function sendPushToUser(env, userId, payload, subject) {
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.3.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.3.1" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -209,7 +209,7 @@ async function handleApi(request, env, url) {
         const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
         submissions=feed.results||[];
       }
-      return json({challenge:challenge||null,submissions,ranking:rows.slice(0,20),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
+      return json({challenge:challenge||null,submissions,ranking:rows.slice(0,3),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     if (request.method === "POST" && url.pathname === "/api/spirit/submissions") {
       if(!challenge)return json({error:"No hay un reto activo en este momento."},409);
@@ -224,6 +224,16 @@ async function handleApi(request, env, url) {
         env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"submission",id,challenge.points,"Reto: "+challenge.title)
       ]);
       return json({ok:true,points:challenge.points});
+    }
+    const deleteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
+    if(request.method==="DELETE"&&deleteMatch){
+      const submission=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(deleteMatch[1],member.edition_id,user.id).first();
+      if(!submission)return json({error:"No encontramos una participación tuya para eliminar."},404);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=? AND source_id=? AND source_type IN (?,?)").bind(member.edition_id,user.id,submission.id,"submission","community_bonus"),
+        env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(submission.id,member.edition_id,user.id)
+      ]);
+      return json({ok:true,message:"Tu participación y los puntos asociados fueron eliminados."});
     }
     const voteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/vote$/);
     if(request.method==="POST"&&voteMatch){
