@@ -327,3 +327,11 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .invite-whatsapp{display:flex;justify-content:center;align-items:center;gap:8px;padding:12px;border-radius:10px;background:#16834a;color:#fff!important;text-decoration:none;font-size:12px;font-weight:700}
 .invite-whatsapp span{font-size:18px}.invite-note{margin:0;color:#788174;font-size:10px;line-height:1.5}.admin-invite-error{color:#a83e36;font-size:12px}
 @media(max-width:600px){.invite-management .admin-form{display:flex}.invite-management .admin-action{width:100%}}
+
+
+/* Montos mínimos y cuota logística del intercambio */
+.exchange-minimum-list{display:grid;gap:7px;margin-top:9px}
+.exchange-minimum-list>div{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 11px;border:1px solid rgba(25,55,45,.10);border-radius:10px;background:rgba(255,253,247,.72)}
+.exchange-minimum-list span{color:#42594e;font-size:12px;font-weight:600}
+.exchange-minimum-list strong{color:#174536;font-size:13px;white-space:nowrap}
+@media(max-width:600px){.exchange-minimum-list>div{padding:7px 9px}.exchange-minimum-list span{font-size:11px}.exchange-minimum-list strong{font-size:12px}}
