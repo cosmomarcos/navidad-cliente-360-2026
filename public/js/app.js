@@ -1,7 +1,11 @@
 const $ = selector => document.querySelector(selector);
 const setClass = (selector, className, enabled) => { const el=$(selector); if(el) el.classList.toggle(className, !!enabled); return el; };
 const params = new URLSearchParams(location.search);
-const token = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
+const urlInvite = params.get("invite") || location.pathname.match(/\\/unirse\\/([^/]+)/)?.[1] || "";
+if(urlInvite)sessionStorage.setItem("navidad_invite_token",urlInvite);
+const token = urlInvite || sessionStorage.getItem("navidad_invite_token") || "";
+const isWhatsAppInApp = /WhatsApp/i.test(navigator.userAgent) && !!token;
+
 let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null;
 const apiMemoryCache=new Map();
 const api=async(path,options={})=>{
@@ -322,13 +326,26 @@ async function checkSession(){
  if(!signedIn){setLoginView();await initGoogle();return;}
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);setClass("#google-area","hidden",true);
  if(token&&currentUser.membership?.status!=="confirmed"){$("#join-card").classList.remove("hidden");$("#join-card").innerHTML=`<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">INVITACIÓN</p><h2>${esc(inviteEdition?.title||"Navidad Cliente 360")}</h2></div></div><p class="muted">${inviteValid?"Tu invitación está lista. Confirma tu participación para continuar.":"La invitación no es válida o venció."}</p><button id="confirm-join" class="primary-button" ${inviteValid?"":"disabled"}>Confirmar mi participación →</button><div id="join-feedback" class="status hidden"></div>`;
- $("#confirm-join").addEventListener("click",async()=>{try{await api("/api/invitations/join",{method:"POST",body:JSON.stringify({token})});currentUser=await api("/api/me");showProfileForm();}catch(e){const fb=$("#join-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+ $("#confirm-join").addEventListener("click",async()=>{try{await api("/api/invitations/join",{method:"POST",body:JSON.stringify({token})});sessionStorage.removeItem("navidad_invite_token");currentUser=await api("/api/me");showProfileForm();}catch(e){const fb=$("#join-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
  }else if(currentUser.membership?.status==="confirmed"&&!currentUser.participantProfile){$("#join-card").classList.add("hidden");showProfileForm();}
  else if(currentUser.membership?.status==="confirmed"){renderMemberApp();} else if(currentUser.membership?.status==="withdrawn"){renderRejoinView();}
  else {$("#join-card").classList.remove("hidden");$("#join-card").innerHTML="<h2>Tu cuenta está activa</h2><p>Tu participación aún no está confirmada. Abre el enlace de invitación vigente para unirte.</p>";}
  await renderAdmin();
 }
-window.handleGoogleCredential=async response=>{try{if(!response?.credential)throw new Error("Google no devolvió una credencial válida. Intenta nuevamente.");await api("/api/auth/google",{method:"POST",body:JSON.stringify({credential:response.credential})});try{try {
+window.handleGoogleCredential=async response=>{try{if(!response?.credential)throw new Error("Google no devolvió una credencial válida. Intenta nuevamente.");await api("/api/auth/google",{method:"POST",body:JSON.stringify({credential:response.credential})});try{if(isWhatsAppInApp){
+  document.body.classList.remove("app-booting");
+  const loader=$("#app-loader");if(loader)loader.remove();
+  const panel=document.createElement("main");
+  panel.className="wa-invite-guide";
+  panel.innerHTML='<div class="wa-guide-card"><div class="wa-guide-icon">🎄</div><p class="kicker">NAVIDAD CLIENTE 360 · INVITACIÓN</p><h1>Abre tu invitación en Safari</h1><p>Para confirmar tu participación correctamente, abre este enlace en Safari. El navegador interno de WhatsApp puede interferir con el acceso mediante Google.</p><ol><li>Toca el menú <b>⋯</b> de WhatsApp.</li><li>Selecciona <b>Abrir en Safari</b> o <b>Abrir en navegador</b>.</li><li>Inicia sesión con Google y confirma tu participación.</li></ol><button type="button" id="copy-invite-link" class="wa-copy-button">Copiar enlace de invitación</button><p id="wa-copy-feedback" class="wa-copy-feedback" role="status"></p><small>Tu invitación se conservará al continuar en Safari.</small></div>';
+  document.body.append(panel);
+  panel.querySelector("#copy-invite-link").addEventListener("click",async()=>{
+    const feedback=panel.querySelector("#wa-copy-feedback");
+    try{await navigator.clipboard.writeText(location.href);feedback.textContent="Enlace copiado. Pégalo en Safari.";}
+    catch{feedback.textContent="Mantén pulsado el enlace original de WhatsApp y selecciona Copiar.";}
+  });
+}else{
+try {
   await loadInvite();
   await checkSession();
 } catch (error) {
@@ -344,6 +361,7 @@ window.handleGoogleCredential=async response=>{try{if(!response?.credential)thro
   document.body.classList.remove("app-booting");
   const loader = $("#app-loader");
   if (loader) loader.remove();
+}
 }}catch(error){console.error("No se pudo inicializar la sesión:",error);setLoginView();try{await initGoogle();}catch(loginError){showFeedback("No se pudo conectar con el servicio. Recarga la página e inténtalo nuevamente.",true);}}finally{document.body.classList.remove("app-booting");const loader=$("#app-loader");if(loader)loader.remove();}}catch(e){console.error("Error al completar el inicio de sesión:",e);showFeedback("No se pudo completar el inicio de sesión. Recarga la página e inténtalo nuevamente.",true);}};
 async function initGoogle(){const c=await fetch("/api/config").then(r=>r.json());if(!c.googleClientId)return;const deadline=Date.now()+10000;while(!window.google?.accounts?.id&&Date.now()<deadline)await new Promise(r=>setTimeout(r,150));if(!window.google?.accounts?.id){showFeedback("No se pudo cargar Google. Intenta nuevamente.",true);return;}window.google.accounts.id.initialize({client_id:c.googleClientId,callback:window.handleGoogleCredential});window.google.accounts.id.renderButton($("#google-button"),{theme:"outline",size:"large",shape:"pill",text:"continue_with",width:280});}
 try {
