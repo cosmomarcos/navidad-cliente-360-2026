@@ -427,3 +427,70 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 @media(prefers-reduced-motion:reduce){.admin-settings-section{animation:none}}
 
 .spirit-trivia-wrong{font-size:10px;color:#a13b32;font-weight:800}
+
+
+/* v1.4.1 · Diseño coherente para las pestañas de participantes y corrección de desbordamientos */
+.member-home{min-width:0;overflow:visible}
+.member-home>*{min-width:0}
+.member-section-heading{position:relative;display:flex;flex-direction:column;gap:5px;padding:22px 22px 20px;margin:0 0 14px;border:1px solid #dfd2b5;border-radius:18px;background:linear-gradient(135deg,#fbf5e7,#f0e6d1);box-shadow:0 8px 22px rgba(7,29,23,.10)}
+.member-section-heading:before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:3px;border-radius:0 4px 4px 0;background:#b99b5c}
+.member-section-heading .kicker{margin:0 0 2px}
+.member-section-heading h2{font-family:'Playfair Display',serif;font-size:clamp(22px,5vw,27px);line-height:1.18;letter-spacing:-.3px;color:#19372d;margin:0}
+.member-section-heading>p:not(.kicker){max-width:58ch;margin:4px 0 0;color:#68786b;font-size:12px;line-height:1.6}
+.member-home .member-feature,.member-home .secret-reveal,.member-home .secret-waiting,.member-home .home-participants-card,.member-home .profile-actions{margin:14px 0}
+.member-home .member-feature,.member-home .home-participants-card,.member-home .profile-actions{box-shadow:0 8px 22px rgba(7,29,23,.09)}
+.member-home .secret-reveal,.member-home .secret-waiting{border:1px solid #dfd2b5}
+.member-home .wish-editor,.member-home .wish-list,.member-home .recipient-wishes,.member-home .community-clues,.member-home .spirit-section,.member-home .spirit-submit-form{width:100%;max-width:100%;min-width:0;margin:14px 0;padding:clamp(15px,4vw,22px);border-radius:17px;box-shadow:0 8px 22px rgba(7,29,23,.08)}
+.member-home .wish-editor,.member-home .wish-list,.member-home .recipient-wishes{border-color:#e2d7c2}
+.member-home .community-clues{padding:clamp(14px,4vw,22px)}
+.member-home .push-settings{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0;padding:15px 17px;border:1px solid #d8cfbb;border-radius:15px;background:#f7f0df;color:#19372d;box-shadow:0 8px 22px rgba(7,29,23,.07)}
+.member-home .push-settings>div:first-child{flex:1 1 190px;min-width:0}
+.member-home .push-settings b{font-size:12px}.member-home .push-settings p{margin:4px 0 0;color:#64766b;font-size:11px;line-height:1.5}
+.member-home .push-settings button{flex:0 1 auto;max-width:100%;margin:0}
+.member-home .spirit-heading{margin-bottom:14px;box-shadow:0 10px 25px rgba(0,0,0,.16)}
+.member-home .spirit-score-card,.member-home .spirit-challenge{box-shadow:0 8px 22px rgba(7,29,23,.10)}
+.member-home .spirit-submit-form{display:grid;grid-template-columns:minmax(0,1fr);gap:13px;overflow:hidden;border:1px solid #e2d7c2;background:#f7f0df}
+.member-home .spirit-submit-form>*{min-width:0;max-width:100%}
+.member-home .spirit-submit-form label{min-width:0}
+.member-home .spirit-submit-form input:not([type=file]),.member-home .spirit-submit-form textarea,.member-home .spirit-submit-form select{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.member-home .spirit-voice-recorder{width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
+.member-home .spirit-voice-recorder button{width:100%;max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}
+.member-home .spirit-voice-recorder audio,.member-home .spirit-post-audio{display:block;width:100%;max-width:100%;min-width:0;height:48px}
+.member-home .spirit-submit-form .primary-button{width:100%;max-width:100%;min-width:0;margin:0;white-space:normal;overflow-wrap:anywhere}
+.member-home .spirit-post-actions{flex-wrap:wrap;align-items:flex-start}
+.member-home .spirit-post-actions>*{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.member-home .spirit-post-actions button{white-space:normal}
+.member-home .spirit-trivia-options{min-width:0;max-width:100%}
+.member-home .spirit-trivia-options label{min-width:0;overflow-wrap:anywhere}
+.member-home .spirit-trivia-options label span{min-width:0;overflow-wrap:anywhere}
+.member-home .wish-editor form,.member-home .clue-compose,.member-home .clue-compose form{min-width:0;max-width:100%}
+.member-home .wish-editor input,.member-home .wish-editor textarea,.member-home .clue-compose textarea{min-width:0;max-width:100%}
+.member-home .wish-form-footer,.member-home .clue-compose-footer{min-width:0;flex-wrap:wrap}
+.member-home .wish-form-footer .primary-button,.member-home .clue-compose-footer .primary-button{min-width:0;max-width:100%;white-space:normal}
+.member-home .wish-card{min-width:0;max-width:100%;flex-wrap:wrap}
+.member-home .wish-card-content{min-width:0;overflow-wrap:anywhere}
+.member-home .wish-card-content h4,.member-home .wish-card-content p{overflow-wrap:anywhere}
+.member-home .wish-card-actions{flex:0 0 auto}
+.member-home .home-participants-card{min-width:0;overflow:hidden}
+.member-home .home-participants-heading{min-width:0;flex-wrap:wrap}
+.member-home .home-participant-row{min-width:0;flex-wrap:wrap}
+.member-home .home-participant-name{min-width:0;overflow-wrap:anywhere}
+.member-home .profile-actions .secondary-action{width:100%;min-width:0;white-space:normal}
+.member-home .spirit-carousel{width:100%;max-width:100%;min-width:0}
+.member-home .spirit-carousel-track{width:max-content;max-width:none}
+.member-home .spirit-post{box-sizing:border-box;min-width:0}
+.member-home .spirit-post-image{max-width:100%}
+.member-home .member-section-heading+.tab-skeleton{margin-top:14px}
+@media(max-width:600px){
+ .member-section-heading{padding:19px 17px 17px;border-radius:15px}
+ .member-home .spirit-submit-form{padding:14px}
+ .member-home .spirit-voice-recorder{padding:11px}
+ .member-home .spirit-voice-recorder audio{height:44px}
+ .member-home .spirit-post-actions{gap:9px}
+ .member-home .wish-form-footer{align-items:stretch;flex-direction:column}
+ .member-home .wish-form-footer .primary-button{width:100%}
+ .member-home .push-settings{align-items:stretch}
+ .member-home .push-settings button{width:100%}
+ .member-home .clue-compose-footer{flex-direction:column;align-items:stretch}
+ .member-home .clue-compose-footer .primary-button{width:100%}
+}
