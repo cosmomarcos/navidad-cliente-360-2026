@@ -312,7 +312,7 @@ async function renderCommunityTab(){
    pushButton.addEventListener("click",()=>enablePushNotifications(pushButton));
    refreshPushButtonState(pushButton);
   }
-  updateCommunityUnreadBadge();
+  updateTabUnreadBadges();
   const clueForm=$("#clue-form");if(clueForm)clueForm.addEventListener("submit",async ev=>{ev.preventDefault();const form=ev.currentTarget;const fb=$("#clue-feedback");const send=form.querySelector('button[type="submit"]');send.disabled=true;try{await api("/api/community/clues",{method:"POST",body:JSON.stringify({message:form.elements.message.value})});await renderCommunityTab();}catch(e){fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");send.disabled=false;}});
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Buzón secreto</h2></div><p class="status error">'+esc(e.message)+'</p>';}
 }
