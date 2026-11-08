@@ -87,7 +87,7 @@ async function sendPushToUser(env, userId, payload, subject) {
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.2.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.2.1" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -168,6 +168,21 @@ async function handleApi(request, env, url) {
       await ensureDrawSchema(env);
       const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition) return json({ error: "No hay una edición configurada." }, 404);
+      if (request.method === "GET" && url.pathname === "/api/admin/draw/results") {
+        const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
+        if (!state || state.state !== "drawn" || !["drawn","completed"].includes(edition.status)) return json({ error: "Todavía no hay un sorteo ejecutado para revelar." }, 409);
+        const run = await env.DB.prepare("SELECT run_number, participant_count, created_at FROM draw_runs WHERE edition_id=? AND status='completed' ORDER BY run_number DESC LIMIT 1").bind(edition.id).first();
+        if (!run) return json({ error: "No se encontró el registro de ejecución del sorteo." }, 404);
+        const rows = await env.DB.prepare("SELECT a.giver_user_id, a.recipient_user_id, COALESCE(NULLIF(TRIM(COALESCE(pg.first_name,'') || ' ' || COALESCE(pg.last_name,'')),''), ug.display_name) AS giver_name, COALESCE(NULLIF(TRIM(COALESCE(pr.first_name,'') || ' ' || COALESCE(pr.last_name,'')),''), ur.display_name) AS recipient_name FROM draw_assignments a JOIN users ug ON ug.id=a.giver_user_id JOIN users ur ON ur.id=a.recipient_user_id LEFT JOIN participant_profiles pg ON pg.user_id=ug.id LEFT JOIN participant_profiles pr ON pr.user_id=ur.id WHERE a.edition_id=? AND a.run_number=? ORDER BY giver_name COLLATE NOCASE").bind(edition.id, run.run_number).all();
+        const assignments = rows.results || [];
+        const participants = await env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).first();
+        const uniqueRecipients = new Set(assignments.map(a => a.recipient_user_id)).size;
+        const selfAssignments = assignments.filter(a => a.giver_user_id === a.recipient_user_id).length;
+        const violations = await env.DB.prepare("SELECT COUNT(*) AS total FROM draw_assignments a JOIN edition_exclusions x ON x.edition_id=a.edition_id AND ((x.user_a_id=a.giver_user_id AND x.user_b_id=a.recipient_user_id) OR (x.user_b_id=a.giver_user_id AND x.user_a_id=a.recipient_user_id)) WHERE a.edition_id=? AND a.run_number=?").bind(edition.id, run.run_number).first();
+        const integrity = { participants: participants?.total || 0, assignments: assignments.length, uniqueRecipients, missingAssignments: Math.max(0, (participants?.total || 0) - assignments.length), duplicateRecipients: Math.max(0, assignments.length - uniqueRecipients), selfAssignments, exclusionViolations: violations?.total || 0 };
+        integrity.valid = integrity.participants >= 2 && integrity.assignments === integrity.participants && integrity.uniqueRecipients === integrity.participants && integrity.selfAssignments === 0 && integrity.exclusionViolations === 0;
+        return json({ runNumber: run.run_number, createdAt: run.created_at, integrity, assignments: assignments.map(a => ({ giverName: a.giver_name, recipientName: a.recipient_name })) });
+      }
       if (request.method === "GET" && url.pathname === "/api/admin/draw/status") {
         const state = await env.DB.prepare("SELECT state, ready_at, drawn_at FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
         const members = await env.DB.prepare("SELECT em.user_id, p.first_name, p.last_name FROM edition_members em LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed'").bind(edition.id).all();
