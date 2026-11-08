@@ -534,3 +534,38 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 /* v1.7.0 · Indicadores de novedades en las pestañas */
 .bottom-nav button{position:relative}
 .bottom-nav .nav-unread-badge{margin-left:3px;vertical-align:middle;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+
+
+/* v1.7.1 · Carruseles de deseos propios y del amigo secreto */
+.member-home .wish-carousel{width:100%;min-width:0;overflow:hidden;margin:12px 0 2px}
+.wish-carousel-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 9px;color:#8a7957}
+.wish-carousel-top>span{font-size:10px;font-weight:800;letter-spacing:.7px}
+.wish-carousel-top small{font-size:9px;color:#8a8d7d}
+.wish-carousel-track{display:flex;gap:12px;width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:2px 1px 9px;scroll-snap-type:x mandatory;scroll-padding:1px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#c9b98f transparent}
+.member-home .wish-carousel .wish-card{box-sizing:border-box;flex:0 0 100%;width:100%;max-width:100%;min-height:190px;margin:0;scroll-snap-align:start;scroll-snap-stop:always;align-items:center;padding:16px;border-radius:16px;background:#fffaf0;border-color:#e7decc}
+.member-home .wish-carousel .wish-card:hover{transform:none}
+.member-home .wish-carousel .wish-card-content{flex:1 1 0}
+.member-home .wish-carousel .wish-card-content h4{font-size:clamp(15px,4vw,18px);line-height:1.35}
+.member-home .wish-carousel .wish-card-content p{font-size:12px;line-height:1.65}
+.member-home .wish-carousel .wish-image-link{display:grid;place-items:center;flex:0 0 104px;width:104px;height:112px;overflow:hidden;border-radius:14px;background:#fff}
+.member-home .wish-carousel .wish-image{display:block;width:100%;height:100%;max-height:112px;object-fit:contain}
+.member-home .wish-carousel .wish-card-icon{width:82px;height:92px;flex:0 0 82px;border-radius:14px;font-size:30px}
+.member-home .wish-carousel .wish-card-actions{display:flex;flex-direction:column;gap:8px;flex:0 0 auto}
+.member-home .wish-carousel .wish-edit,.member-home .wish-carousel .wish-delete{width:42px;height:42px;flex:0 0 42px;border-radius:13px;font-size:19px}
+.member-home .wish-carousel .wish-view-image{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:9px 14px;border:1px solid #d8c9a9;border-radius:999px;background:#f5eedc;color:#365746;font-size:11px;font-weight:800}
+.wish-carousel-dots{display:flex;justify-content:center;align-items:center;gap:6px;padding:7px 0 1px}
+.wish-carousel-dots span{width:6px;height:6px;border-radius:99px;background:#d9d1bf;transition:width .2s,background .2s}
+.wish-carousel-dots span.active{width:19px;background:#315d49}
+@media(max-width:520px){
+ .member-home .wish-carousel .wish-card{gap:11px;min-height:178px;padding:13px}
+ .member-home .wish-carousel .wish-image-link{flex-basis:88px;width:88px;height:100px}
+ .member-home .wish-carousel .wish-image{max-height:100px}
+ .member-home .wish-carousel .wish-card-icon{width:68px;height:78px;flex-basis:68px;font-size:26px}
+ .member-home .wish-carousel .wish-edit,.member-home .wish-carousel .wish-delete{width:37px;height:37px;flex-basis:37px}
+ .wish-carousel-top small{font-size:8px}
+}
+@media(max-width:370px){
+ .member-home .wish-carousel .wish-card{gap:8px;padding:10px}
+ .member-home .wish-carousel .wish-image-link{flex-basis:72px;width:72px;height:86px}
+ .member-home .wish-carousel .wish-card-icon{width:58px;height:68px;flex-basis:58px}
+}
