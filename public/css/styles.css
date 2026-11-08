@@ -335,3 +335,8 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .exchange-minimum-list span{color:#42594e;font-size:12px;font-weight:600}
 .exchange-minimum-list strong{color:#174536;font-size:13px;white-space:nowrap}
 @media(max-width:600px){.exchange-minimum-list>div{padding:7px 9px}.exchange-minimum-list span{font-size:11px}.exchange-minimum-list strong{font-size:12px}}
+
+
+/* Botón para compartir la información del intercambio por WhatsApp */
+.exchange-whatsapp-share{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;box-sizing:border-box;padding:14px 16px;border:0;border-radius:12px;background:#16834a;color:#fff!important;text-decoration:none;font-size:13px;font-weight:800;box-shadow:0 6px 16px rgba(22,131,74,.18);transition:transform .18s ease,background .18s ease}.exchange-whatsapp-share:hover{background:#116d3d;transform:translateY(-1px)}.exchange-whatsapp-share span{font-size:18px;line-height:1}
+@media(max-width:600px){.exchange-whatsapp-share{padding:13px 12px;font-size:12px}}
