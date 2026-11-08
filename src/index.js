@@ -64,41 +64,6 @@ async function ensureSpiritSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_points_ranking ON spirit_points(edition_id,user_id)").run();
 }
-async function seedSpiritChallenges(env, editionId) {
-  const existing = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_challenges WHERE edition_id=?").bind(editionId).first();
-  if (existing?.total) return;
-  const edition=await env.DB.prepare("SELECT event_date FROM editions WHERE id=?").bind(editionId).first();
-  const eventDate=String(edition?.event_date||"");
-  let challengeDays=30;
-  if(/^\d{4}-\d{2}-\d{2}$/.test(eventDate)){
-    const parts=eventDate.split("-").map(Number);
-    const eventMidnight=Date.UTC(parts[0],parts[1]-1,parts[2]);
-    challengeDays=Math.min(90,Math.max(1,Math.ceil((eventMidnight-Date.now())/86400000)+1));
-  }
-  const tasks = [
-    ["Modo Navidad","Comparte una foto de tu decoración navideña o de algún detalle que te recuerde estas fiestas.",15,5],
-    ["El meme navideño","Publica un meme navideño que haga reír a la comunidad.",10,5],
-    ["Voz de Papá Noel","Escribe una felicitación navideña divertida como si fueras Papá Noel.",20,5],
-    ["Trivia navideña","Comparte una curiosidad o pregunta navideña para poner a prueba a los demás.",10,5],
-    ["Un deseo para todos","Comparte un deseo positivo para la comunidad en estas fiestas.",15,5],
-    ["Tu canción navideña","Cuéntanos cuál es tu canción navideña favorita y por qué.",10,5],
-    ["Espíritu de compartir","Comparte una buena acción o gesto amable que te gustaría promover esta Navidad.",20,5],
-    ["Decoración improvisada","Muestra o describe una decoración navideña hecha con lo que tienes en casa.",15,5],
-    ["Recuerdo navideño","Cuenta un recuerdo navideño que siempre te haga sonreír.",15,5],
-    ["El Grinch también celebra","Comparte una frase divertida para convencer al Grinch de celebrar la Navidad.",10,5],
-    ["Villancico relámpago","Escribe una línea original de un villancico inventado por ti.",15,5],
-    ["Cuenta regresiva","Comparte qué es lo que más esperas de nuestro encuentro navideño.",10,5],
-    ["Navidad en equipo","Etiqueta simbólicamente a la comunidad con un mensaje de agradecimiento (sin etiquetar fuera de la app).",15,5],
-    ["Gran espíritu navideño","Deja un mensaje que anime a todos a participar y disfrutar la celebración.",20,5]
-  ];
-  const now=Date.now();
-  for(let i=0;i<challengeDays;i++){
-    const start=new Date(now+i*86400000).toISOString().slice(0,19).replace("T"," ");
-    const end=new Date(now+(i+1)*86400000).toISOString().slice(0,19).replace("T"," ");
-    await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?)").bind("seed-"+editionId+"-"+(i+1),editionId,tasks[i%tasks.length][0],tasks[i%tasks.length][1],tasks[i%tasks.length][2],tasks[i%tasks.length][3],start,end).run();
-  }
-}
-
 function buildSecretAssignments(members, exclusions) {
   const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
   const recipients = shuffled(members);
@@ -202,7 +167,6 @@ async function handleApi(request, env, url) {
     const member = await env.DB.prepare("SELECT em.edition_id FROM edition_members em WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     await ensureSpiritSchema(env);
-    await seedSpiritChallenges(env,member.edition_id);
     let challenge = await env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
     if(challenge){
       let config={};try{config=JSON.parse(challenge.config_json||"{}");}catch{}
@@ -294,7 +258,6 @@ async function handleApi(request, env, url) {
       await ensureSpiritSchema(env);
       const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if(!edition)return json({error:"No hay una edición configurada."},404);
-      await seedSpiritChallenges(env,edition.id);
       const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text");
       const points=Number(body.points||10),bonus=Number(body.bonusPoints||5),config=body.config&&typeof body.config==="object"?body.config:{};
       if(!["text","photo","voice","trivia"].includes(type))return json({error:"Tipo de reto no válido."},400);
