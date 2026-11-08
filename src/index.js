@@ -220,7 +220,7 @@ async function handleApi(request, env, url) {
       return json({ unread: count?.total || 0 });
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
-      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(SUM(sp.points),0) AS points,COUNT(DISTINCT s.id) AS completed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id LEFT JOIN spirit_submissions s ON s.edition_id=em.edition_id AND s.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
+      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
       const rows=ranking.results||[];
       const mine=rows.findIndex(x=>x.user_id===user.id);
       let submissions=[];
