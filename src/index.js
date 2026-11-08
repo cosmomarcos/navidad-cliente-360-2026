@@ -63,6 +63,14 @@ async function ensureSpiritSchema(env) {
 async function seedSpiritChallenges(env, editionId) {
   const existing = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_challenges WHERE edition_id=?").bind(editionId).first();
   if (existing?.total) return;
+  const edition=await env.DB.prepare("SELECT event_date FROM editions WHERE id=?").bind(editionId).first();
+  const eventDate=String(edition?.event_date||"");
+  let challengeDays=30;
+  if(/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)){
+    const parts=eventDate.split("-").map(Number);
+    const eventMidnight=Date.UTC(parts[0],parts[1]-1,parts[2]);
+    challengeDays=Math.min(90,Math.max(1,Math.ceil((eventMidnight-Date.now())/86400000)+1));
+  }
   const tasks = [
     ["Modo Navidad","Comparte una foto de tu decoración navideña o de algún detalle que te recuerde estas fiestas.",15,5],
     ["El meme navideño","Publica un meme navideño que haga reír a la comunidad.",10,5],
@@ -80,10 +88,10 @@ async function seedSpiritChallenges(env, editionId) {
     ["Gran espíritu navideño","Deja un mensaje que anime a todos a participar y disfrutar la celebración.",20,5]
   ];
   const now=Date.now();
-  for(let i=0;i<tasks.length;i++){
+  for(let i=0;i<challengeDays;i++){
     const start=new Date(now+i*86400000).toISOString().slice(0,19).replace("T"," ");
     const end=new Date(now+(i+1)*86400000).toISOString().slice(0,19).replace("T"," ");
-    await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?)").bind("seed-"+editionId+"-"+(i+1),editionId,tasks[i][0],tasks[i][1],tasks[i][2],tasks[i][3],start,end).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?)").bind("seed-"+editionId+"-"+(i+1),editionId,tasks[i%tasks.length][0],tasks[i%tasks.length][1],tasks[i%tasks.length][2],tasks[i%tasks.length][3],start,end).run();
   }
 }
 
