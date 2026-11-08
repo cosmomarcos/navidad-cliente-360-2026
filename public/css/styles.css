@@ -501,3 +501,32 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .member-home .spirit-voice-recorder button{width:100%;max-width:100%;min-width:0;justify-self:stretch}
 .member-home .spirit-voice-recorder audio{width:100%;max-width:100%;min-width:0;display:block;box-sizing:border-box}
 .member-home .spirit-submit-form .spirit-feedback{min-width:0;overflow-wrap:anywhere}
+
+
+/* v1.5.0 · Privacidad de Mi amigo secreto y seguimiento de revelaciones */
+.secret-reveal-private{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:clamp(22px,6vw,34px)}
+.secret-reveal-private .secret-gift-icon{font-size:38px}
+.secret-reveal-private>p{margin:0;color:#64766b;font-size:13px}
+.secret-reveal-private .secret-recipient-hidden{letter-spacing:5px;color:#8b8d7e;font-family:inherit}
+.secret-visibility-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:48px;margin-top:7px;padding:12px 22px;border:0;border-radius:999px;background:#174536;color:#fff8e8;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px #17453626}
+.secret-visibility-button:disabled{opacity:.65;cursor:wait}
+.secret-privacy-note{max-width:42ch;margin:2px 0 0;color:#8b8d7e;font-size:10px;line-height:1.55}
+.secret-privacy-error{color:#a13b32!important}
+.draw-revelation-tracker{margin:14px 0;padding:15px;border:1px solid #d8cfbb;border-radius:13px;background:#fffaf0;color:#19372d}
+.draw-revelation-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.draw-revelation-heading b,.draw-revelation-heading small{display:block}
+.draw-revelation-heading b{font-size:13px}
+.draw-revelation-heading small{margin-top:4px;color:#64766b;font-size:10px}
+.draw-revelation-heading>strong{font:700 23px 'Playfair Display',serif;color:#174536}
+.draw-revelation-progress{height:8px;margin:13px 0 10px;overflow:hidden;border-radius:99px;background:#e8e1d3}
+.draw-revelation-progress span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#b99b5c,#174536);transition:width .25s ease}
+.draw-revelation-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.draw-revelation-stats span{padding:8px 5px;border-radius:8px;background:#f2ecdf;text-align:center;color:#64766b;font-size:9px}
+.draw-revelation-stats b{display:block;margin-bottom:3px;color:#19372d;font-size:16px}
+.draw-revelation-list{display:grid;gap:6px;margin-top:12px}
+.draw-revelation-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:8px;background:#f7f0df;font-size:11px}
+.draw-revelation-list>div>span{min-width:0;overflow-wrap:anywhere}
+.draw-revelation-list>div>b{flex:none;font-size:10px}
+.draw-revelation-list .is-revealed{color:#28734b}
+.draw-revelation-list .is-pending{color:#9a6d2d}
+@media(max-width:520px){.draw-revelation-tracker{padding:11px}.draw-revelation-stats{gap:5px}.draw-revelation-list>div{align-items:flex-start;flex-direction:column;gap:4px}}
