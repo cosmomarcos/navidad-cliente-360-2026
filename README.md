@@ -4,7 +4,7 @@ Aplicación PWA para organizar el intercambio navideño del equipo Cliente 360. 
 
 ## Versión
 
-**1.1.6 — Notificaciones push para nuevos mensajes del amigo secreto.**
+**1.8.1 — Puntos de Espíritu Navideño basados en Me gusta.**
 
 ## Funcionalidades
 
@@ -103,3 +103,21 @@ Los participantes pueden activar notificaciones push desde **Mensajes → Buzón
 - Las tablas `push_subscriptions` y `anonymous_clue_reads` se crean automáticamente al usar las funciones correspondientes.
 
 La suscripción se registra por dispositivo/navegador. Cada participante debe activar las notificaciones en cada dispositivo donde quiera recibirlas. En iPhone/iPad, instalar la PWA en la pantalla de inicio antes de activar las notificaciones.
+
+
+## Espíritu Navideño · puntos por interacción (v1.8.1)
+
+- Enviar una participación no otorga puntos.
+- Cada Me gusta de otro participante suma 1 punto al autor, hasta 10 puntos por publicación.
+- Se puede retirar el Me gusta; al hacerlo también se descuenta el punto correspondiente.
+- No se permiten auto-likes ni votos duplicados.
+- Al cerrar cada reto diario, la publicación con más Me gusta recibe 10 puntos adicionales. Si hay empate en el primer lugar, todos los empatados reciben la bonificación.
+- El límite de 10 puntos por likes se reinicia en cada reto diario.
+- La migración `0008_spirit_likes_scoring.sql` elimina los puntos antiguos por publicar y la bonificación anterior por alcanzar tres votos, para que el ranking arranque con reglas consistentes.
+
+Aplicar la migración antes del despliegue:
+
+```bash
+npx wrangler d1 migrations apply navidad-cliente-360-db --remote
+npx wrangler deploy
+```
