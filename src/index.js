@@ -231,8 +231,8 @@ async function handleApi(request, env, url) {
         const existingBonus=await env.DB.prepare("SELECT id FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='community_bonus' AND source_id=?").bind(member.edition_id,submission.user_id,submission.id).first();
         if(!existingBonus){
           const points=await env.DB.prepare("SELECT bonus_points FROM spirit_challenges WHERE id=?").bind(submission.challenge_id).first();
-          await env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,submission.user_id,"community_bonus",submission.id,points?.bonus_points||5,"Bonificación comunitaria: 3 votos").run();
-          bonusAwarded=true;
+          const bonusResult=await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,submission.user_id,"community_bonus",submission.id,points?.bonus_points||5,"Bonificación comunitaria: 3 votos").run();
+          bonusAwarded=!!bonusResult.meta?.changes;
         }
       }
       return json({ok:true,votes:count?.total||0,bonusAwarded});
@@ -264,7 +264,7 @@ async function handleApi(request, env, url) {
       if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<0||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
       const now=new Date().toISOString().slice(0,19).replace("T"," ");
       const end=new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
-      await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now')").bind(now,edition.id).run();
+      await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND ends_at>datetime('now')").bind(now,edition.id).run();
       const id=crypto.randomUUID();
       await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,now,end,user.id).run();
       return json({ok:true,id});
