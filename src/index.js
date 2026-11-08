@@ -263,8 +263,9 @@ async function handleApi(request, env, url) {
       if(title.length<3||title.length>80||description.length<5||description.length>300)return json({error:"Completa un título y una descripción válidos."},400);
       if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<1||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
       const now=new Date().toISOString().slice(0,19).replace("T"," ");
-      const end=new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
-      await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND ends_at>datetime('now')").bind(now,edition.id).run();
+      const nextChallenge=await env.DB.prepare("SELECT starts_at FROM spirit_challenges WHERE edition_id=? AND starts_at>datetime('now') AND ends_at>datetime('now') ORDER BY starts_at ASC LIMIT 1").bind(edition.id).first();
+      const end=nextChallenge?.starts_at || new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
+      await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now')").bind(now,edition.id).run();
       const id=crypto.randomUUID();
       await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,now,end,user.id).run();
       return json({ok:true,id});
