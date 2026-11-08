@@ -50,6 +50,43 @@ async function ensureDrawSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_runs (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, run_number INTEGER NOT NULL, status TEXT NOT NULL, participant_count INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_draw_assignments_edition ON draw_assignments(edition_id)").run();
 }
+
+async function ensureSpiritSchema(env) {
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenges (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 10, bonus_points INTEGER NOT NULL DEFAULT 5, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_challenges_active ON spirit_challenges(edition_id, starts_at, ends_at)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(challenge_id,user_id))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_submissions_challenge ON spirit_submissions(challenge_id, created_at)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_votes (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_points_ranking ON spirit_points(edition_id,user_id)").run();
+}
+async function seedSpiritChallenges(env, editionId) {
+  const existing = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_challenges WHERE edition_id=?").bind(editionId).first();
+  if (existing?.total) return;
+  const tasks = [
+    ["Modo Navidad","Comparte una foto de tu decoración navideña o de algún detalle que te recuerde estas fiestas.",15,5],
+    ["El meme navideño","Publica un meme navideño que haga reír a la comunidad.",10,5],
+    ["Voz de Papá Noel","Escribe una felicitación navideña divertida como si fueras Papá Noel.",20,5],
+    ["Trivia navideña","Comparte una curiosidad o pregunta navideña para poner a prueba a los demás.",10,5],
+    ["Un deseo para todos","Comparte un deseo positivo para la comunidad en estas fiestas.",15,5],
+    ["Tu canción navideña","Cuéntanos cuál es tu canción navideña favorita y por qué.",10,5],
+    ["Espíritu de compartir","Comparte una buena acción o gesto amable que te gustaría promover esta Navidad.",20,5],
+    ["Decoración improvisada","Muestra o describe una decoración navideña hecha con lo que tienes en casa.",15,5],
+    ["Recuerdo navideño","Cuenta un recuerdo navideño que siempre te haga sonreír.",15,5],
+    ["El Grinch también celebra","Comparte una frase divertida para convencer al Grinch de celebrar la Navidad.",10,5],
+    ["Villancico relámpago","Escribe una línea original de un villancico inventado por ti.",15,5],
+    ["Cuenta regresiva","Comparte qué es lo que más esperas de nuestro encuentro navideño.",10,5],
+    ["Navidad en equipo","Etiqueta simbólicamente a la comunidad con un mensaje de agradecimiento (sin etiquetar fuera de la app).",15,5],
+    ["Gran espíritu navideño","Deja un mensaje que anime a todos a participar y disfrutar la celebración.",20,5]
+  ];
+  const now=Date.now();
+  for(let i=0;i<tasks.length;i++){
+    const start=new Date(now+i*86400000).toISOString().slice(0,19).replace("T"," ");
+    const end=new Date(now+(i+1)*86400000).toISOString().slice(0,19).replace("T"," ");
+    await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,tasks[i][0],tasks[i][1],tasks[i][2],tasks[i][3],start,end).run();
+  }
+}
+
 function buildSecretAssignments(members, exclusions) {
   const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
   const recipients = shuffled(members);
@@ -87,7 +124,7 @@ async function sendPushToUser(env, userId, payload, subject) {
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.2.2" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.3.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -146,10 +183,93 @@ async function handleApi(request, env, url) {
     const result = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name, u.avatar_url FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY em.joined_at ASC").bind(membership.edition_id).all();
     return json({ participants: result.results || [], total: (result.results || []).length });
   }
+
+  if (url.pathname.startsWith("/api/spirit/")) {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    const member = await env.DB.prepare("SELECT em.edition_id FROM edition_members em WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
+    if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
+    await ensureSpiritSchema(env);
+    await seedSpiritChallenges(env,member.edition_id);
+    const challenge = await env.DB.prepare("SELECT id,title,description,points,bonus_points,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+    if (request.method === "GET" && url.pathname === "/api/spirit/board") {
+      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(SUM(sp.points),0) AS points,COUNT(DISTINCT CASE WHEN sp.source_type='submission' THEN sp.source_id END) AS completed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
+      const rows=ranking.results||[];
+      const mine=rows.findIndex(x=>x.user_id===user.id);
+      let submissions=[];
+      if(challenge){
+        const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
+        submissions=feed.results||[];
+      }
+      return json({challenge:challenge||null,submissions,ranking:rows.slice(0,20),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
+    }
+    if (request.method === "POST" && url.pathname === "/api/spirit/submissions") {
+      if(!challenge)return json({error:"No hay un reto activo en este momento."},409);
+      const body=await request.json(),caption=String(body.caption||"").trim(),imageData=String(body.imageData||"");
+      if(caption.length<2||caption.length>500)return json({error:"Tu participación debe tener entre 2 y 500 caracteres."},400);
+      if(imageData&&(!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData)||imageData.length>300000))return json({error:"La imagen no es válida o supera el tamaño permitido."},400);
+      const prior=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first();
+      if(prior)return json({error:"Ya participaste en el reto de hoy. ¡Vuelve mañana!"},409);
+      const id=crypto.randomUUID();
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data) VALUES (?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,imageData||null),
+        env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"submission",id,challenge.points,"Reto: "+challenge.title)
+      ]);
+      return json({ok:true,points:challenge.points});
+    }
+    const voteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/vote$/);
+    if(request.method==="POST"&&voteMatch){
+      if(!challenge)return json({error:"El reto ya terminó."},409);
+      const submission=await env.DB.prepare("SELECT s.id,s.user_id,s.edition_id,s.challenge_id FROM spirit_submissions s WHERE s.id=? AND s.edition_id=? AND s.challenge_id=?").bind(voteMatch[1],member.edition_id,challenge.id).first();
+      if(!submission)return json({error:"La publicación no pertenece al reto activo."},404);
+      if(submission.user_id===user.id)return json({error:"No puedes votar por tu propia publicación."},409);
+      try{await env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) VALUES (?,?,?)").bind(crypto.randomUUID(),submission.id,user.id).run();}
+      catch{return json({error:"Ya votaste por esta publicación."},409);}
+      const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes WHERE submission_id=?").bind(submission.id).first();
+      let bonusAwarded=false;
+      if((count?.total||0)>=3){
+        const existingBonus=await env.DB.prepare("SELECT id FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='community_bonus' AND source_id=?").bind(member.edition_id,submission.user_id,submission.id).first();
+        if(!existingBonus){
+          const points=await env.DB.prepare("SELECT bonus_points FROM spirit_challenges WHERE id=?").bind(submission.challenge_id).first();
+          await env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,submission.user_id,"community_bonus",submission.id,points?.bonus_points||5,"Bonificación comunitaria: 3 votos").run();
+          bonusAwarded=true;
+        }
+      }
+      return json({ok:true,votes:count?.total||0,bonusAwarded});
+    }
+    return json({error:"Ruta de Espíritu Navideño no encontrada."},404);
+  }
+
   if (url.pathname.startsWith("/api/admin/")) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
+
+    if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
+      await ensureSpiritSchema(env);
+      const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if(!edition)return json({challenges:[]});
+      await seedSpiritChallenges(env,edition.id);
+      const rows=await env.DB.prepare("SELECT id,title,description,points,bonus_points,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? ORDER BY starts_at DESC LIMIT 30").bind(edition.id).all();
+      return json({challenges:rows.results||[]});
+    }
+    if (url.pathname === "/api/admin/spirit/challenges" && request.method === "POST") {
+      await ensureSpiritSchema(env);
+      const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      await seedSpiritChallenges(env,edition.id);
+      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim();
+      const points=Number(body.points||10),bonus=Number(body.bonusPoints||5);
+      if(title.length<3||title.length>80||description.length<5||description.length>300)return json({error:"Completa un título y una descripción válidos."},400);
+      if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<0||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
+      const now=new Date().toISOString().slice(0,19).replace("T"," ");
+      const end=new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
+      await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now')").bind(now,edition.id).run();
+      const id=crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,now,end,user.id).run();
+      return json({ok:true,id});
+    }
+
     if (request.method === "PATCH" && url.pathname === "/api/admin/edition") {
       const body = await request.json();
       const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
