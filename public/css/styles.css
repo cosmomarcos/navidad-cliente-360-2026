@@ -340,3 +340,18 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 /* Botón para compartir la información del intercambio por WhatsApp */
 .exchange-whatsapp-share{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;box-sizing:border-box;padding:14px 16px;border:0;border-radius:12px;background:#16834a;color:#fff!important;text-decoration:none;font-size:13px;font-weight:800;box-shadow:0 6px 16px rgba(22,131,74,.18);transition:transform .18s ease,background .18s ease}.exchange-whatsapp-share:hover{background:#116d3d;transform:translateY(-1px)}.exchange-whatsapp-share span{font-size:18px;line-height:1}
 @media(max-width:600px){.exchange-whatsapp-share{padding:13px 12px;font-size:12px}}
+
+
+/* Auditoría privada de resultados del sorteo (solo administrador) */
+.draw-results-panel{margin:14px 0;padding:15px;background:#fffaf0;border:1px solid #d8cbb3;border-radius:12px;color:#19372d}
+.draw-results-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:13px}
+.draw-results-heading .draw-success,.draw-results-heading .status{margin:0;padding:6px 9px;font-size:10px}
+.draw-results-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0 18px}
+.draw-results-checks>span{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px;background:#f2ecdf;border-radius:8px}
+.draw-results-checks small{font-size:10px;color:#64766b}.draw-results-checks b{font-size:14px;color:#19372d}
+.draw-results-panel h4{margin:0 0 9px;font-size:12px}
+.draw-results-list{display:grid;gap:7px;margin:0 0 12px;padding-left:25px}
+.draw-results-list li{padding:9px 10px;background:#f2ecdf;border-radius:8px;font-size:11px;line-height:1.5}
+.draw-results-list li span{margin:0 5px;color:#64766b}
+.draw-results-panel>small{display:block;color:#64766b;font-size:10px;line-height:1.5}
+@media(max-width:520px){.draw-results-panel{padding:11px}.draw-results-checks{grid-template-columns:1fr}}
