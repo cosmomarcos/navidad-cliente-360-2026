@@ -355,3 +355,18 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .draw-results-list li span{margin:0 5px;color:#64766b}
 .draw-results-panel>small{display:block;color:#64766b;font-size:10px;line-height:1.5}
 @media(max-width:520px){.draw-results-panel{padding:11px}.draw-results-checks{grid-template-columns:1fr}}
+
+
+/* Confirmación explícita antes de marcar a todos como listos */
+.draw-confirm-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(9,24,19,.72);backdrop-filter:blur(5px)}
+.draw-confirm-dialog{width:min(100%,420px);box-sizing:border-box;padding:25px 22px;background:#fffaf0;border:1px solid #e2d7c2;border-radius:18px;color:#19372d;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.3);animation:drawConfirmIn .18s ease-out}
+.draw-confirm-icon{display:block;font-size:34px;margin-bottom:8px}
+.draw-confirm-dialog h3{margin:0 0 10px;font-family:'Playfair Display',serif;font-size:21px}
+.draw-confirm-dialog p{margin:0;color:#64766b;font-size:13px;line-height:1.65}
+.draw-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+.draw-confirm-actions button{min-height:45px;border:0;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:.04em;cursor:pointer}
+.draw-confirm-cancel{background:#e9e2d4;color:#43584e}
+.draw-confirm-accept{background:#174536;color:#fff}
+.draw-confirm-actions button:disabled{opacity:.55;cursor:wait}
+@keyframes drawConfirmIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.draw-confirm-dialog{animation:none}}
