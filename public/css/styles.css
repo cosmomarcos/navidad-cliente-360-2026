@@ -389,3 +389,39 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 /* v1.3.1 · Acción para eliminar una participación propia */
 .spirit-post-actions .spirit-delete-button{border:1px solid #d8aaa2;border-radius:20px;background:#fff0ed;color:#963f36;padding:8px 11px;font-size:10px;font-weight:800;cursor:pointer}.spirit-post-actions .spirit-delete-button:disabled{opacity:.55;cursor:wait}
+
+/* v1.4.0 · Espíritu: carrusel, retos por formato y administración por secciones */
+.spirit-carousel{overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:thin;padding:2px 2px 12px;-webkit-overflow-scrolling:touch}
+.spirit-carousel-track{display:flex;gap:12px;width:max-content;min-width:100%}
+.spirit-carousel .spirit-post{width:min(82vw,330px);max-width:330px;flex:0 0 min(82vw,330px);margin:0;scroll-snap-align:center;display:flex;flex-direction:column}
+.spirit-carousel .spirit-post>p{flex:1}
+.spirit-post-audio{width:100%;margin:8px 0}
+.spirit-voice-recorder{display:grid;gap:9px;padding:12px;border:1px dashed #c9b98f;border-radius:12px;background:#fffaf0}
+.spirit-voice-recorder button{margin:0;width:max-content}
+.spirit-voice-recorder span{font-size:11px;color:#64766b}
+.spirit-trivia-options{display:grid;gap:9px;margin:0;padding:14px;border:1px solid #d8cfbb;border-radius:12px}
+.spirit-trivia-options legend{padding:0 5px;font-size:13px;font-weight:800;color:#19372d}
+.spirit-trivia-options label{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;background:#fffaf0;font-size:12px}
+.spirit-trivia-options input{accent-color:#174536}
+.admin-settings-nav{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:14px 0;padding:8px;border:1px solid #d8cfbb;border-radius:14px;background:#f7f0df;box-shadow:0 5px 18px #19372d12}
+.admin-settings-nav button{min-height:42px;padding:8px 5px;border:1px solid transparent;border-radius:9px;background:transparent;color:#53685b;font-size:11px;font-weight:800;cursor:pointer}
+.admin-settings-nav button.active{background:#174536;color:#fff8e8;box-shadow:0 3px 9px #17453633}
+.admin-settings-section{min-height:220px;animation:adminSectionIn .16s ease-out}
+@keyframes adminSectionIn{from{opacity:.65;transform:translateY(4px)}to{opacity:1;transform:none}}
+.spirit-suggestion-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:16px 0}
+.spirit-suggestion-card{display:grid;grid-template-columns:36px 1fr;grid-template-rows:auto auto;align-items:center;gap:2px 9px;min-height:68px;padding:11px;border:1px solid #d8cfbb;border-radius:12px;background:#fffaf0;color:#19372d;text-align:left;cursor:pointer}
+.spirit-suggestion-card:active,.spirit-suggestion-card:focus-visible{outline:2px solid #b99b5c;background:#f4ead3}
+.spirit-suggestion-card>span{grid-row:1/3;font-size:25px}
+.spirit-suggestion-card>b{font-size:11px}
+.spirit-suggestion-card>small{font-size:9px;color:#8b7448}
+.spirit-admin-editor-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.spirit-admin-editor-actions .admin-action{margin:0}
+.spirit-admin-cancel{border:1px solid #c9bea8;border-radius:10px;background:#fffaf0;color:#53685b;padding:12px 15px;font-size:11px;font-weight:800}
+.spirit-trivia-admin-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.spirit-active-challenge{display:grid;gap:5px;margin:18px 0 12px;padding:12px;border-radius:10px;background:#fffaf0}
+.spirit-active-challenge b{font-size:11px;color:#174536}
+.spirit-active-challenge span{font-size:11px;color:#64766b}
+.spirit-reset-points{border:1px solid #d8aaa2;border-radius:10px;background:#fff0ed;color:#963f36;padding:10px 13px;font-size:11px;font-weight:800;cursor:pointer}
+.spirit-admin>small{display:block;margin-top:7px;color:#8b8d7e;font-size:9px}
+@media(max-width:520px){.admin-settings-nav{gap:4px;padding:5px}.admin-settings-nav button{font-size:10px;min-height:40px}.spirit-suggestion-grid{gap:7px}.spirit-suggestion-card{padding:9px;grid-template-columns:30px 1fr}.spirit-trivia-admin-options{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.admin-settings-section{animation:none}}
