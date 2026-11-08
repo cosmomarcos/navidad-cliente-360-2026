@@ -166,7 +166,20 @@ async function loadAdminDrawControls(){
    $("#execute-draw-button").addEventListener("click",async()=>{if(!confirm("¿Confirmas ejecutar el sorteo? Las asignaciones serán privadas y no se podrán editar individualmente."))return;try{const result=await api("/api/admin/draw/execute",{method:"POST",body:JSON.stringify({})});const fb=$("#draw-admin-feedback");fb.textContent="Sorteo realizado correctamente para "+result.participants+" participantes.";fb.classList.remove("hidden","error");await loadAdminDrawControls();}catch(e){const fb=$("#draw-admin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
   }else{
    actions.innerHTML='<button id="mark-ready-button" class="admin-action" '+(d.participants<2||d.missingProfiles>0?'disabled':'')+'>Confirmar que todos están listos</button><small>Se requiere al menos 2 participantes activos y todos deben tener nombres y apellidos completos.</small>';
-   $("#mark-ready-button").addEventListener("click",async()=>{try{await api("/api/admin/draw/ready",{method:"POST",body:JSON.stringify({})});await loadAdminDrawControls();const fb=$("#draw-admin-feedback");fb.textContent="Todos están listos. Ya puedes ejecutar el sorteo desde aquí.";fb.classList.remove("hidden","error");}catch(e){const fb=$("#draw-admin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+   $("#mark-ready-button").addEventListener("click",()=>{
+    const modal=document.createElement("div");modal.className="draw-confirm-overlay";modal.setAttribute("role","dialog");modal.setAttribute("aria-modal","true");modal.setAttribute("aria-labelledby","draw-confirm-title");
+    modal.innerHTML='<div class="draw-confirm-dialog"><span class="draw-confirm-icon">🎁</span><h3 id="draw-confirm-title">¿Confirmar que todos están listos?</h3><p>Al aceptar, se bloqueará la preparación de participantes y el sorteo quedará habilitado para ejecutarse. Verifica que todos hayan confirmado su participación y que los datos estén correctos.</p><div class="draw-confirm-actions"><button type="button" class="draw-confirm-cancel">CANCELAR</button><button type="button" class="draw-confirm-accept">ACEPTAR</button></div></div>';
+    const close=()=>{modal.remove();document.removeEventListener("keydown",onKey);};
+    const onKey=event=>{if(event.key==="Escape")close();};
+    modal.addEventListener("click",event=>{if(event.target===modal)close();});
+    modal.querySelector(".draw-confirm-cancel").addEventListener("click",close);
+    modal.querySelector(".draw-confirm-accept").addEventListener("click",async()=>{
+     const accept=modal.querySelector(".draw-confirm-accept"),cancel=modal.querySelector(".draw-confirm-cancel");accept.disabled=true;cancel.disabled=true;accept.textContent="PROCESANDO…";
+     try{await api("/api/admin/draw/ready",{method:"POST",body:JSON.stringify({})});close();await loadAdminDrawControls();const fb=$("#draw-admin-feedback");fb.textContent="Todos están listos. Ya puedes ejecutar el sorteo desde aquí.";fb.classList.remove("hidden","error");}
+     catch(e){close();const fb=$("#draw-admin-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}
+    });
+    document.addEventListener("keydown",onKey);document.body.appendChild(modal);modal.querySelector(".draw-confirm-cancel").focus();
+   });
   }
  }catch(e){const fb=$("#draw-admin-feedback");if(fb){fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}}
 }
