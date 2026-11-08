@@ -237,7 +237,7 @@ async function handleApi(request, env, url) {
       if(prior)return json({error:"Ya participaste en el reto de hoy. ¡Vuelve mañana!"},409);
       const id=crypto.randomUUID();
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),challengeType==="photo"?mediaData:null,mediaData||null,mediaType||null),
+        env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),null,mediaData||null,mediaType||null),
         ...(awardedPoints>0?[env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"submission",id,awardedPoints,"Reto: "+challenge.title)]:[])
       ]);
       return json({ok:true,points:awardedPoints,correct});
