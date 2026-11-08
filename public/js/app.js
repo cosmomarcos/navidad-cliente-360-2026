@@ -1,7 +1,7 @@
 const $ = selector => document.querySelector(selector);
 const setClass = (selector, className, enabled) => { const el=$(selector); if(el) el.classList.toggle(className, !!enabled); return el; };
 const params = new URLSearchParams(location.search);
-const urlInvite = params.get("invite") || location.pathname.match(/\\/unirse\\/([^/]+)/)?.[1] || "";
+const urlInvite = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
 if(urlInvite)sessionStorage.setItem("navidad_invite_token",urlInvite);
 const token = urlInvite || sessionStorage.getItem("navidad_invite_token") || "";
 const isWhatsAppInApp = /WhatsApp/i.test(navigator.userAgent) && !!token;
