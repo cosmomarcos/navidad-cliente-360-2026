@@ -53,6 +53,10 @@ async function ensureDrawSchema(env) {
 
 async function ensureSpiritSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenges (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 10, bonus_points INTEGER NOT NULL DEFAULT 5, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN challenge_type TEXT NOT NULL DEFAULT 'text'").run(); } catch {}
+  try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN config_json TEXT").run(); } catch {}
+  try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_data TEXT").run(); } catch {}
+  try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_type TEXT").run(); } catch {}
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_challenges_active ON spirit_challenges(edition_id, starts_at, ends_at)").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(challenge_id,user_id))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_submissions_challenge ON spirit_submissions(challenge_id, created_at)").run();
@@ -132,7 +136,7 @@ async function sendPushToUser(env, userId, payload, subject) {
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.3.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.4.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -199,31 +203,44 @@ async function handleApi(request, env, url) {
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     await ensureSpiritSchema(env);
     await seedSpiritChallenges(env,member.edition_id);
-    const challenge = await env.DB.prepare("SELECT id,title,description,points,bonus_points,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+    let challenge = await env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+    if(challenge){
+      let config={};try{config=JSON.parse(challenge.config_json||"{}");}catch{}
+      challenge={...challenge,config:{question:config.question||"",options:Array.isArray(config.options)?config.options:[]}};
+      delete challenge.config_json;
+    }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
       const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(SUM(sp.points),0) AS points,COUNT(DISTINCT CASE WHEN sp.source_type='submission' THEN sp.source_id END) AS completed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
       const rows=ranking.results||[];
       const mine=rows.findIndex(x=>x.user_id===user.id);
       let submissions=[];
       if(challenge){
-        const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
+        const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.media_data,s.media_type,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
         submissions=feed.results||[];
       }
       return json({challenge:challenge||null,submissions,ranking:rows.slice(0,3),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     if (request.method === "POST" && url.pathname === "/api/spirit/submissions") {
       if(!challenge)return json({error:"No hay un reto activo en este momento."},409);
-      const body=await request.json(),caption=String(body.caption||"").trim(),imageData=String(body.imageData||"");
-      if(caption.length<2||caption.length>500)return json({error:"Tu participación debe tener entre 2 y 500 caracteres."},400);
-      if(imageData&&(!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData)||imageData.length>300000))return json({error:"La imagen no es válida o supera el tamaño permitido."},400);
+      const body=await request.json(),caption=String(body.caption||"").trim(),mediaData=String(body.mediaData||body.imageData||""),mediaType=String(body.mediaType||(body.imageData?"image/jpeg":""));
+      const challengeType=challenge.challenge_type||"text";
+      if(challengeType==="text"&&(caption.length<2||caption.length>500))return json({error:"Tu participación debe tener entre 2 y 500 caracteres."},400);
+      if(challengeType==="photo"&&(!mediaData.startsWith("data:image/jpeg;base64,")||mediaData.length>300000))return json({error:"Debes adjuntar una foto JPG válida."},400);
+      if(challengeType==="voice"&&(!/^data:audio\/(webm|ogg|mp4);base64,/.test(mediaData)||mediaData.length>500000))return json({error:"Graba un audio válido de máximo 30 segundos."},400);
+      if(challengeType==="trivia"&&(caption.length<1||caption.length>120))return json({error:"Selecciona una respuesta para la trivia."},400);
+      if(challengeType==="photo"||challengeType==="voice"){if(caption.length>500)return json({error:"El texto complementario es demasiado largo."},400);}
+      const configRaw=await env.DB.prepare("SELECT config_json FROM spirit_challenges WHERE id=?").bind(challenge.id).first();
+      let challengeConfig={};try{challengeConfig=JSON.parse(configRaw?.config_json||"{}");}catch{}
+      const correct=challengeType!=="trivia"||String(caption)===String(challengeConfig.correctAnswer||"");
+      const awardedPoints=correct?Number(challenge.points):0;
       const prior=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first();
       if(prior)return json({error:"Ya participaste en el reto de hoy. ¡Vuelve mañana!"},409);
       const id=crypto.randomUUID();
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data) VALUES (?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,imageData||null),
-        env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"submission",id,challenge.points,"Reto: "+challenge.title)
+        env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),challengeType==="photo"?mediaData:null,mediaData||null,mediaType||null),
+        ...(awardedPoints>0?[env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"submission",id,awardedPoints,"Reto: "+challenge.title)]:[])
       ]);
-      return json({ok:true,points:challenge.points});
+      return json({ok:true,points:awardedPoints,correct});
     }
     const deleteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&deleteMatch){
@@ -253,6 +270,8 @@ async function handleApi(request, env, url) {
           bonusAwarded=!!bonusResult.meta?.changes;
         }
       }
+      const voter=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
+      await sendPushToUser(env,submission.user_id,{title:"❤️ ¡Nueva reacción en Espíritu!",body:(voter?.name||"Un participante")+" le dio me gusta a tu publicación.",tag:"spirit-like-"+submission.id,url:"/?tab=spirit"},"mailto:admin@navidadcliente360.com");
       return json({ok:true,votes:count?.total||0,bonusAwarded});
     }
     return json({error:"Ruta de Espíritu Navideño no encontrada."},404);
@@ -266,27 +285,37 @@ async function handleApi(request, env, url) {
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
       await ensureSpiritSchema(env);
       const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
-      if(!edition)return json({challenges:[]});
-      await seedSpiritChallenges(env,edition.id);
-      const rows=await env.DB.prepare("SELECT id,title,description,points,bonus_points,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? ORDER BY starts_at DESC LIMIT 30").bind(edition.id).all();
-      return json({challenges:rows.results||[]});
+      if(!edition)return json({active:null});
+      await env.DB.prepare("DELETE FROM spirit_challenges WHERE edition_id=? AND id LIKE 'seed-%' AND starts_at>datetime('now') AND NOT EXISTS (SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=spirit_challenges.id)").bind(edition.id).run();
+      const active=await env.DB.prepare("SELECT id,title,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
+      return json({active:active||null});
     }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "POST") {
       await ensureSpiritSchema(env);
       const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if(!edition)return json({error:"No hay una edición configurada."},404);
       await seedSpiritChallenges(env,edition.id);
-      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim();
-      const points=Number(body.points||10),bonus=Number(body.bonusPoints||5);
+      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text");
+      const points=Number(body.points||10),bonus=Number(body.bonusPoints||5),config=body.config&&typeof body.config==="object"?body.config:{};
+      if(!["text","photo","voice","trivia"].includes(type))return json({error:"Tipo de reto no válido."},400);
       if(title.length<3||title.length>80||description.length<5||description.length>300)return json({error:"Completa un título y una descripción válidos."},400);
       if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<1||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
+      if(type==="trivia"&&(!String(config.question||"").trim()||!Array.isArray(config.options)||config.options.length<2||!config.options.includes(config.correctAnswer)))return json({error:"Configura una pregunta, sus opciones y la respuesta correcta."},400);
       const now=new Date().toISOString().slice(0,19).replace("T"," ");
-      const nextChallenge=await env.DB.prepare("SELECT starts_at FROM spirit_challenges WHERE edition_id=? AND starts_at>datetime('now') AND ends_at>datetime('now') ORDER BY starts_at ASC LIMIT 1").bind(edition.id).first();
-      const end=nextChallenge?.starts_at || new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
+      const end=new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
       await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now')").bind(now,edition.id).run();
+      await env.DB.prepare("DELETE FROM spirit_challenges WHERE edition_id=? AND id LIKE 'seed-%' AND starts_at>datetime('now') AND NOT EXISTS (SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=spirit_challenges.id)").bind(edition.id).run();
       const id=crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,now,end,user.id).run();
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,type,JSON.stringify(config),now,end,user.id).run();
       return json({ok:true,id});
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/admin/spirit/reset-my-points") {
+      const member=await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+      if(!member)return json({error:"No tienes una edición activa."},403);
+      await ensureSpiritSchema(env);
+      const result=await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).run();
+      return json({ok:true,deleted:result.meta?.changes||0});
     }
 
     if (request.method === "PATCH" && url.pathname === "/api/admin/edition") {
