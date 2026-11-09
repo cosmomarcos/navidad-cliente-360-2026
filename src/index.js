@@ -276,7 +276,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.10.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.11.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
