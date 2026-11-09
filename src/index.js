@@ -1,6 +1,15 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...extra } }); }
+function dataUrlResponse(value, fallbackType = "application/octet-stream") {
+  const match = String(value || "").match(/^data:([^,]*);base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) return json({ error: "Archivo no disponible." }, 404);
+  const contentType = (match[1].split(";")[0] || fallbackType).trim();
+  const binary = atob(match[2].replace(/\s/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Response(bytes, { headers: { "content-type": contentType, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" } });
+}
 function base64url(bytes) { let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function sha256(value) { const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, "0")).join(""); }
 function secureRandomInt(max) {
@@ -260,9 +269,8 @@ async function handleApi(request, env, url) {
     if(request.method==="GET"&&spiritMediaMatch){
       const media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
       if(!media)return json({error:"No encontramos el archivo de esta publicación."},404);
-      return json({mediaData:media.media_data||media.image_data||null,mediaType:media.media_type||((media.image_data)?"image/jpeg":null)});
+      return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg");
     }
-    await finalizeExpiredSpiritChallenges(env,member.edition_id);
     let challenge = await env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
     let challengeCorrectAnswer=null;
     if(challenge){
@@ -277,7 +285,7 @@ async function handleApi(request, env, url) {
       return json({ unread: count?.total || 0 });
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
-      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed,COALESCE((SELECT current_streak FROM spirit_leader_streaks st WHERE st.edition_id=em.edition_id AND st.user_id=em.user_id),0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
+      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(subs.completed,0) AS completed,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN (SELECT user_id,COUNT(*) AS completed FROM spirit_submissions WHERE edition_id=? GROUP BY user_id) subs ON subs.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id,member.edition_id).all();
       let previousPoints=null,previousRank=0;
       const allRows=(ranking.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:previousRank+1;previousPoints=score;previousRank=rank;return {...person,rank};});
       const rows=allRows.filter(person=>person.rank<=3).map(person=>({...person,tieCount:allRows.filter(other=>other.rank===person.rank).length}));
@@ -285,7 +293,7 @@ async function handleApi(request, env, url) {
       const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
       if(challenge){
-        const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 30").bind(user.id,challenge.id).all();
+        const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(vote_counts.votes,0) AS votes,CASE WHEN mine.id IS NULL THEN 0 ELSE 1 END AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id LEFT JOIN (SELECT v.submission_id,COUNT(*) AS votes FROM spirit_votes v JOIN spirit_submissions fs ON fs.id=v.submission_id WHERE fs.challenge_id=? GROUP BY v.submission_id) vote_counts ON vote_counts.submission_id=s.id LEFT JOIN spirit_votes mine ON mine.submission_id=s.id AND mine.voter_user_id=? WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 30").bind(challenge.id,user.id,challenge.id).all();
         submissions=(feed.results||[]).map(item=>({...item,eligibleForVoting:challenge.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
       }
       await env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
@@ -648,15 +656,27 @@ async function handleApi(request, env, url) {
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM participant_wishes WHERE edition_id=? AND user_id=? AND updated_at>?").bind(membership.edition_id,assigned.recipient_user_id,read?.last_seen_at || "1970-01-01 00:00:00").first();
       return json({ unread: count?.total || 0 });
     }
+    const wishImageMatch = url.pathname.match(/^\/api\/wishes\/image\/([A-Za-z0-9-]+)$/);
+    if (request.method === "GET" && wishImageMatch) {
+      const wish = await env.DB.prepare("SELECT w.user_id, i.image_data FROM participant_wishes w JOIN participant_wish_images i ON i.wish_id=w.id WHERE w.id=? AND w.edition_id=?").bind(wishImageMatch[1],membership.edition_id).first();
+      if (!wish) return json({ error: "No encontramos la imagen de este deseo." }, 404);
+      let allowed = wish.user_id === user.id;
+      if (!allowed) {
+        const assignment = await env.DB.prepare("SELECT 1 AS allowed FROM draw_assignments WHERE edition_id=? AND giver_user_id=? AND recipient_user_id=?").bind(membership.edition_id,user.id,wish.user_id).first();
+        allowed = !!assignment;
+      }
+      if (!allowed) return json({ error: "No tienes permiso para ver esta imagen." }, 403);
+      return dataUrlResponse(wish.image_data,"image/jpeg");
+    }
     if (request.method === "GET" && url.pathname === "/api/wishes") {
-      const mine = await env.DB.prepare("SELECT w.id, w.title, w.note, w.url, w.created_at, (SELECT image_data FROM participant_wish_images i WHERE i.wish_id=w.id) AS image_data FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, user.id).all();
+      const mine = await env.DB.prepare("SELECT w.id, w.title, w.note, w.url, w.created_at, EXISTS(SELECT 1 FROM participant_wish_images i WHERE i.wish_id=w.id) AS has_image FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, user.id).all();
       const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
       let recipientWishes = [], recipientName = null;
       if (state?.state === "drawn") {
         const assigned = await env.DB.prepare("SELECT a.recipient_user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM draw_assignments a JOIN users u ON u.id=a.recipient_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? AND a.giver_user_id=?").bind(membership.edition_id, user.id).first();
         if (assigned) {
           recipientName = assigned.display_name;
-          const wishes = await env.DB.prepare("SELECT w.title, w.note, w.url, (SELECT image_data FROM participant_wish_images i WHERE i.wish_id=w.id) AS image_data FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, assigned.recipient_user_id).all();
+          const wishes = await env.DB.prepare("SELECT w.id, w.title, w.note, w.url, EXISTS(SELECT 1 FROM participant_wish_images i WHERE i.wish_id=w.id) AS has_image FROM participant_wishes w WHERE w.edition_id=? AND w.user_id=? ORDER BY w.created_at DESC").bind(membership.edition_id, assigned.recipient_user_id).all();
           recipientWishes = wishes.results || [];
         }
       }
