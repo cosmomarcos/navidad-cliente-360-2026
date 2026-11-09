@@ -686,3 +686,9 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
   #onboarding-home-form>label:has(input[type="checkbox"]){grid-column:1;min-height:46px}
   #onboarding-home-form>button.primary-button,#onboarding-home-feedback{grid-column:1}
 }
+
+
+/* Fallback accesible cuando una imagen de deseos no puede recuperarse */
+.wish-image-unavailable{display:block;min-width:58px;min-height:58px;background:linear-gradient(135deg,#f3ead7,#e7ddc8);object-fit:contain;color:#64766b;font-size:10px}
+.wish-image-link:has(.wish-image-unavailable){display:grid;place-items:center}
+.wish-image-unavailable[aria-busy="true"]{opacity:.55}
