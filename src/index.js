@@ -92,7 +92,7 @@ async function processSpiritChallengeClosures(env) {
     await finalizeExpiredSpiritChallenges(env,challenge.edition_id);
     const all=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=? AND sp.user_id=u.id),0) AS points FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(challenge.edition_id,challenge.edition_id).all();
     let prevPoints=null,prevRank=0;
-    const ranked=(all.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=prevPoints===score?prevRank:index+1;prevPoints=score;prevRank=rank;return {...person,rank};});
+    const ranked=(all.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=prevPoints===score?prevRank:prevRank+1;prevPoints=score;prevRank=rank;return {...person,rank};});
     const winners=ranked.filter(person=>person.rank<=3);
     const firstIds=new Set(winners.filter(person=>person.rank===1).map(person=>person.user_id));
     const day=spiritLimaDay(new Date(challenge.ends_at.replace(" ","T")+"Z"));
@@ -273,7 +273,7 @@ async function handleApi(request, env, url) {
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
       const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed,COALESCE((SELECT current_streak FROM spirit_leader_streaks st WHERE st.edition_id=em.edition_id AND st.user_id=em.user_id),0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
       let previousPoints=null,previousRank=0;
-      const allRows=(ranking.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:index+1;previousPoints=score;previousRank=rank;return {...person,rank};});
+      const allRows=(ranking.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:previousRank+1;previousPoints=score;previousRank=rank;return {...person,rank};});
       const rows=allRows.filter(person=>person.rank<=3).map(person=>({...person,tieCount:allRows.filter(other=>other.rank===person.rank).length}));
       const mine=allRows.findIndex(x=>x.user_id===user.id);
       const myRank=mine>=0?allRows[mine].rank:null;
