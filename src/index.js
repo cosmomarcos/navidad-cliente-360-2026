@@ -28,12 +28,12 @@ async function ensureCommunitySchema(env) {
 }
 async function ensureParticipantProfilesSchema(env) {
   return ensureSchemaOnce("participant-profiles", async () => {
-    await ensureParticipantProfilesSchema(env);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profiles (user_id TEXT PRIMARY KEY REFERENCES users(id), first_name TEXT NOT NULL, last_name TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   });
 }
 async function ensurePushSchema(env) {
   return ensureSchemaOnce("push-subscriptions", async () => {
-    await ensurePushSchema(env);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   });
 }
 function dataUrlResponse(value, fallbackType = "application/octet-stream") {
@@ -198,7 +198,7 @@ function buildSecretAssignments(members, exclusions) {
 
 async function sendPushToUser(env, userId, payload, subject) {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
-  await env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  await ensurePushSchema(env);
   const rows = await env.DB.prepare("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id=?").bind(userId).all();
   await Promise.all((rows.results || []).map(async row => {
     try {
@@ -249,7 +249,7 @@ async function handleApi(request, env, url) {
   if (url.pathname.startsWith("/api/push/")) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await ensurePushSchema(env);
     if (request.method === "POST" && url.pathname === "/api/push/subscribe") {
       const body = await request.json(), endpoint = String(body.endpoint || "");
       const p256dh = String(body.keys?.p256dh || ""), auth = String(body.keys?.auth || "");
