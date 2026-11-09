@@ -79,7 +79,8 @@ function renderMemberApp(){
  setSnowfall(false);
  setClass("#join-card","hidden",true);setClass("#admin-panel","hidden",true);
  let app=$("#member-app");app.classList.remove("hidden");
- const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";\n const isOnboarding=currentUser.membership?.team_name==="Onboarding Digital";
+ const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";
+ const isOnboarding=currentUser.membership?.team_name==="Onboarding Digital";
  const budgetAmount=currentUser.membership?.budget_amount;
  const budgetCurrency=currentUser.membership?.currency||"PEN";
  const exchangeDateLabel=formatExchangeDate(currentUser.membership?.event_date);
@@ -190,7 +191,8 @@ async function shareSpiritPodium(ranking,challenge){
 
 let spiritRecorder=null,spiritAudioChunks=[];
 async function blobToDataUrl(blob){return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error("No se pudo procesar el audio."));r.readAsDataURL(blob);});}
-async function renderSpiritTab(){\n if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Espíritu Navideño","🎄");return;}
+async function renderSpiritTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Espíritu Navideño","🎄");return;}
  const home=$("#member-app .member-home");if(!home)return;
  home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD PYME · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
@@ -439,7 +441,8 @@ function formatCommunityTime(value){
  return new Intl.DateTimeFormat("es-PE",{dateStyle:"medium",timeStyle:"short"}).format(date);
 }
 
-async function renderCommunityTab(){\n if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Mensajes","✉️");return;}
+async function renderCommunityTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Mensajes","✉️");return;}
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>Buzón secreto ✉️</h2><p>Deja un mensaje anónimo para tu amigo secreto y revisa las sorpresas que te envíe.</p></div><div class="tab-skeleton" aria-label="Preparando buzón"><span></span><span></span><span></span></div>';
  try{
@@ -458,7 +461,8 @@ async function renderCommunityTab(){\n if(currentUser.membership?.team_name==="O
   const clueForm=$("#clue-form");if(clueForm)clueForm.addEventListener("submit",async ev=>{ev.preventDefault();const form=ev.currentTarget;const fb=$("#clue-feedback");const send=form.querySelector('button[type="submit"]');send.disabled=true;try{await api("/api/community/clues",{method:"POST",body:JSON.stringify({message:form.elements.message.value})});await renderCommunityTab();}catch(e){fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");send.disabled=false;}});
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Buzón secreto</h2></div><p class="status error">'+esc(e.message)+'</p>';}
 }
-async function renderWishesTab(){\n if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Lista de deseos","💝");return;}
+async function renderWishesTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Lista de deseos","💝");return;}
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>Lista de deseos 💝</h2><p>Pequeñas ideas para inspirar el regalo perfecto.</p></div><div class="tab-skeleton" aria-label="Preparando deseos"><span></span><span></span><span></span></div>';
  try{
@@ -497,7 +501,8 @@ async function renderWishesTab(){\n if(currentUser.membership?.team_name==="Onbo
   section.querySelectorAll("[data-delete-wish]").forEach(btn=>btn.addEventListener("click",async()=>{if(!confirm("¿Eliminar este deseo de tu lista?"))return;try{await api("/api/wishes/"+encodeURIComponent(btn.dataset.deleteWish),{method:"DELETE"});await renderWishesTab();}catch(e){const fb=$("#wish-feedback");if(fb){fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}}}));
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Lista de deseos</h2></div><p class="status error">'+esc(e.message)+'</p>';}
 }
-async function renderSecretTab(){\n if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Mi amigo secreto","🎁");return;}
+async function renderSecretTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Mi amigo secreto","🎁");return;}
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>Mi amigo secreto</h2></div><div class="tab-skeleton tab-skeleton-compact" aria-label="Consultando tu asignación"><span></span><span></span></div>';
  try{
@@ -587,7 +592,8 @@ async function renderAdmin(){
 }
 async function checkSession(){
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
- currentUser=await api("/api/me"+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):""));signedIn=!!currentUser.authenticated;\n if(currentUser.membership?.edition_id){selectedEditionId=currentUser.membership.edition_id;localStorage.setItem("navidad_selected_edition",selectedEditionId);}
+ currentUser=await api("/api/me"+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):""));signedIn=!!currentUser.authenticated;
+ if(currentUser.membership?.edition_id){selectedEditionId=currentUser.membership.edition_id;localStorage.setItem("navidad_selected_edition",selectedEditionId);}
  if(!signedIn){setLoginView();await initGoogle();return;}
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);setClass("#google-area","hidden",true);
  if(token&&currentUser.membership?.status!=="confirmed"){$("#join-card").classList.remove("hidden");$("#join-card").innerHTML=`<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">INVITACIÓN</p><h2>${esc(inviteEdition?.title||"Navidad Pyme")}</h2></div></div><p class="muted">${inviteValid?"Tu invitación está lista. Confirma tu participación para continuar.":"La invitación no es válida o venció."}</p><button id="confirm-join" class="primary-button" ${inviteValid?"":"disabled"}>Confirmar mi participación →</button><div id="join-feedback" class="status hidden"></div>`;
