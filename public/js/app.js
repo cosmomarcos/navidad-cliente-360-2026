@@ -12,8 +12,16 @@ const api=async(path,options={})=>{
  const method=(options.method||"GET").toUpperCase(),cacheable=method==="GET"&&!options.noMemoryCache;
  if(method!=="GET")apiMemoryCache.clear();
  if(cacheable){const cached=apiMemoryCache.get(path);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:8000))return cached.data;}
- const r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,headers:{"content-type":"application/json",...(options.headers||{})}});
- const raw=await r.text();let d;try{d=JSON.parse(raw);}catch{const html=raw.trimStart().startsWith("<!DOCTYPE")||raw.trimStart().startsWith("<html");throw new Error(html?"El servidor devolvió la página web en lugar de la API. Cloudflare aún no ha publicado la versión del servidor o la ruta no está disponible.":"El servidor devolvió una respuesta no válida.");}
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),18000);
+ let r,raw;
+ try{
+  r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,signal:controller.signal,headers:{"content-type":"application/json",...(options.headers||{})}});
+  raw=await r.text();
+ }catch(error){
+  if(error.name==="AbortError")throw new Error("La solicitud tardó demasiado. Comprueba tu conexión e inténtalo nuevamente.");
+  throw new Error("No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo nuevamente.");
+ }finally{clearTimeout(timeout);}
+ let d;try{d=JSON.parse(raw);}catch{const html=raw.trimStart().startsWith("<!DOCTYPE")||raw.trimStart().startsWith("<html");throw new Error(html?"El servidor devolvió la página web en lugar de la API. Cloudflare aún no ha publicado la versión del servidor o la ruta no está disponible.":"El servidor devolvió una respuesta no válida.");}
  if(!r.ok)throw new Error(d.error||"Ocurrió un error.");
  if(cacheable)apiMemoryCache.set(path,{data:d,time:Date.now()});
  return d;
@@ -622,4 +630,19 @@ try {
   if (loader) loader.remove();
 }
 }
-if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+if("serviceWorker"in navigator){
+ let refreshing=false;
+ navigator.serviceWorker.addEventListener("controllerchange",()=>{
+  if(refreshing)return;
+  refreshing=true;
+  if(sessionStorage.getItem("cliente360-sw-refresh")==="1")return;
+  sessionStorage.setItem("cliente360-sw-refresh","1");
+  location.reload();
+ });
+ window.addEventListener("load",async()=>{
+  try{
+   const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});
+   await registration.update();
+  }catch(error){console.warn("No se pudo comprobar la actualización de la aplicación:",error);}
+ });
+}
