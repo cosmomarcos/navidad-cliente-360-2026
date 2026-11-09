@@ -509,7 +509,7 @@ async function handleApi(request, env, url) {
     }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "POST") {
       await ensureSpiritSchema(env);
-      const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if(!edition)return json({error:"No hay una edición configurada."},404);
       const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text");
       const points=Number(body.points||10),bonus=Number(body.bonusPoints||5),config=body.config&&typeof body.config==="object"?body.config:{};
@@ -553,7 +553,7 @@ async function handleApi(request, env, url) {
     }
     if (url.pathname.startsWith("/api/admin/draw/")) {
       await ensureDrawSchema(env);
-      const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition) return json({ error: "No hay una edición configurada." }, 404);
       if (request.method === "GET" && url.pathname === "/api/admin/draw/results") {
         const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(edition.id).first();
@@ -652,7 +652,7 @@ async function handleApi(request, env, url) {
     if (request.method === "PATCH" && url.pathname.startsWith("/api/admin/participants/")) {
       const userId = decodeURIComponent(url.pathname.split("/").pop());
       const body = await request.json();
-      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition || typeof body.active !== "boolean") return json({ error: "Solicitud inválida." }, 400);
       const result = await env.DB.prepare("UPDATE edition_members SET status=? WHERE edition_id=? AND user_id=? AND status IN ('confirmed','inactive')").bind(body.active ? "confirmed" : "inactive", edition.id, userId).run();
       if (!result.meta.changes) return json({ error: "Participante no encontrado." }, 404);
@@ -663,14 +663,14 @@ async function handleApi(request, env, url) {
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_exclusions_edition ON edition_exclusions(edition_id)").run();
     }
     if (request.method === "GET" && url.pathname === "/api/admin/exclusions") {
-      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition) return json({ exclusions: [] });
       const result = await env.DB.prepare("SELECT x.id, x.user_a_id, x.user_b_id, a.display_name AS user_a_name, b.display_name AS user_b_name FROM edition_exclusions x JOIN users a ON a.id=x.user_a_id JOIN users b ON b.id=x.user_b_id WHERE x.edition_id=? ORDER BY x.created_at DESC").bind(edition.id).all();
       return json({ exclusions: result.results || [] });
     }
     if (request.method === "POST" && url.pathname === "/api/admin/exclusions") {
       const body = await request.json();
-      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition || !body.userA || !body.userB || body.userA === body.userB) return json({ error: "Selecciona dos participantes diferentes." }, 400);
       const members = await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed' AND user_id IN (?, ?)").bind(edition.id, body.userA, body.userB).all();
       if ((members.results || []).length !== 2) return json({ error: "Ambas personas deben estar activas en esta edición." }, 400);
