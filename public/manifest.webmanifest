@@ -1,7 +1,7 @@
 {
-  "name": "Navidad Cliente 360 2026",
-  "short_name": "Cliente 360",
-  "description": "Una Navidad, muchas sorpresas.",
+  "name": "Navidad Pyme 2026",
+  "short_name": "Navidad Pyme",
+  "description": "Intercambios navideños de los equipos de Pyme.",
   "lang": "es-PE",
   "start_url": "/",
   "scope": "/",
