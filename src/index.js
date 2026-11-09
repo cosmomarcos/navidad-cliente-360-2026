@@ -847,7 +847,7 @@ async function handleApi(request, env, url) {
     const participant = await currentUser(request, env);
     if (!participant) return json({ error: "Inicia sesión primero." }, 401);
     await ensureDrawSchema(env);
-    const membership = await env.DB.prepare("SELECT em.status, em.edition_id, e.status AS edition_status, e.title FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(participant.id).first();
+    const membership = await env.DB.prepare("SELECT em.status, em.edition_id, e.status AS edition_status, e.title FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY em.joined_at DESC LIMIT 1").bind(participant.id).first();
     if (!membership || membership.status !== "confirmed") return json({ state: "not_participating" });
     const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
     if (!state || state.state !== "drawn") return json({ state: state?.state || "registration", title: membership.title });
@@ -860,7 +860,7 @@ async function handleApi(request, env, url) {
     const participant = await currentUser(request, env);
     if (!participant) return json({ error: "Inicia sesión primero." }, 401);
     await ensureDrawSchema(env);
-    const membership = await env.DB.prepare("SELECT em.status, em.edition_id FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(participant.id).first();
+    const membership = await env.DB.prepare("SELECT em.status, em.edition_id FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY em.joined_at DESC LIMIT 1").bind(participant.id).first();
     if (!membership || membership.status !== "confirmed") return json({ error: "No tienes una participación activa." }, 403);
     const assignment = await env.DB.prepare("SELECT 1 AS assigned FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(membership.edition_id,participant.id).first();
     if (!assignment) return json({ error: "Tu asignación todavía no está disponible." }, 409);
@@ -871,7 +871,7 @@ async function handleApi(request, env, url) {
   if (request.method === "POST" && url.pathname === "/api/participation/withdraw") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
+    const edition = await env.DB.prepare("SELECT e.id, e.status FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
     if (!edition) return json({ error: "No hay una edición activa." }, 404);
     if (edition.status === "drawn" || edition.status === "completed") return json({ error: "El sorteo ya se realizó o la edición terminó. Contacta al organizador." }, 409);
     const result = await env.DB.prepare("DELETE FROM edition_members WHERE edition_id=? AND user_id=?").bind(edition.id, user.id).run();
