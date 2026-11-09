@@ -256,7 +256,7 @@ async function handleApi(request, env, url) {
       return json({ unread: count?.total || 0 });
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
-      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
+      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed,COALESCE((SELECT current_streak FROM spirit_leader_streaks st WHERE st.edition_id=em.edition_id AND st.user_id=em.user_id),0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
       const rows=ranking.results||[];
       const mine=rows.findIndex(x=>x.user_id===user.id);
       let submissions=[];
@@ -351,7 +351,8 @@ async function handleApi(request, env, url) {
       if(!edition)return json({active:null});
       await env.DB.prepare("DELETE FROM spirit_challenges WHERE edition_id=? AND id LIKE 'seed-%' AND starts_at>datetime('now') AND NOT EXISTS (SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=spirit_challenges.id)").bind(edition.id).run();
       const active=await env.DB.prepare("SELECT id,title,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
-      return json({active:active||null});
+      const scheduled=await env.DB.prepare("SELECT id,title,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at>datetime('now') ORDER BY starts_at LIMIT 10").bind(edition.id).all();
+      return json({active:active||null,scheduled:scheduled.results||[]});
     }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "POST") {
       await ensureSpiritSchema(env);
@@ -760,6 +761,7 @@ async function handleApi(request, env, url) {
   return json({ error: "Ruta no encontrada." }, 404);
 }
 export default {
+  async scheduled(event, env, ctx) { ctx.waitUntil(processSpiritChallengeClosures(env).catch(error=>console.error("Spirit challenge closure failed",error?.message||String(error)))); },
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
