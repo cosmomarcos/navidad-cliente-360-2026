@@ -274,7 +274,8 @@ async function getParticipantEdition(env,user,url){
  if(requestedId)return env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed'").bind(user.id,requestedId).first();
  return env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
 }
-\nasync function handleApi(request, env, url) {
+
+async function handleApi(request, env, url) {
   if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.10.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
@@ -878,7 +879,8 @@ async function getParticipantEdition(env,user,url){
   if (request.method === "POST" && url.pathname === "/api/participation/withdraw") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const editionMember=await getParticipantEdition(env,user,url);\n    const edition=editionMember?await env.DB.prepare("SELECT id,status FROM editions WHERE id=?").bind(editionMember.edition_id).first():null;
+    const editionMember=await getParticipantEdition(env,user,url);
+    const edition=editionMember?await env.DB.prepare("SELECT id,status FROM editions WHERE id=?").bind(editionMember.edition_id).first():null;
     if (!edition) return json({ error: "No hay una edición activa." }, 404);
     if (edition.status === "drawn" || edition.status === "completed") return json({ error: "El sorteo ya se realizó o la edición terminó. Contacta al organizador." }, 409);
     const result = await env.DB.prepare("DELETE FROM edition_members WHERE edition_id=? AND user_id=?").bind(edition.id, user.id).run();
