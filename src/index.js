@@ -21,7 +21,9 @@ async function ensureWishesSchema(env) {
 }
 async function ensureCommunitySchema(env) {
   return ensureSchemaOnce("community", async () => {
-    await ensureCommunitySchema(env);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clue_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
   });
 }
 async function ensureParticipantProfilesSchema(env) {
@@ -640,9 +642,7 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
     if (!member) return json({ error: "Necesitas una participación activa para entrar a la comunidad." }, 403);
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
-    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clue_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
+    await ensureCommunitySchema(env);
     if (request.method === "GET" && url.pathname === "/api/community/unread") {
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
       if (draw?.state !== "drawn") return json({ unread: 0 });
@@ -803,7 +803,7 @@ async function handleApi(request, env, url) {
   if (request.method === "POST" && url.pathname === "/api/profile/participant") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profiles (user_id TEXT PRIMARY KEY REFERENCES users(id), first_name TEXT NOT NULL, last_name TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))" ).run();
+    await ensureParticipantProfilesSchema(env);
     const member = await env.DB.prepare("SELECT id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
     if (!member) return json({ error: "Primero confirma tu participación." }, 403);
     const body = await request.json();
