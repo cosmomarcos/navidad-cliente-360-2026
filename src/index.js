@@ -152,10 +152,11 @@ async function finalizeExpiredSpiritChallenges(env, editionId) {
 function spiritLimaDay(value) {
   return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(value);
 }
-async function processSpiritChallengeClosures(env) {
+async function processSpiritChallengeClosures(env, { runClosures = false, runOpenings = false } = {}) {
   await ensureSpiritSchema(env);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_open_notifications (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, notified_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   const now=new Date().toISOString().slice(0,19).replace("T"," ");
+  if(runClosures) {
   const due=await env.DB.prepare("SELECT c.id,c.edition_id,c.title,c.ends_at FROM spirit_challenges c LEFT JOIN spirit_challenge_results r ON r.challenge_id=c.id WHERE c.ends_at<=? AND r.challenge_id IS NULL ORDER BY c.ends_at").bind(now).all();
   for(const challenge of due.results||[]) {
     await finalizeExpiredSpiritChallenges(env,challenge.edition_id);
@@ -188,6 +189,8 @@ async function processSpiritChallengeClosures(env) {
       await sendPushToUser(env,person.user_id,{title,body,tag:"spirit-result-"+challenge.id+"-"+person.user_id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"https://navidad-cliente-360-2026.torresmarcos16.workers.dev");
     }
   }
+  }
+  if(runOpenings) {
   const opening=await env.DB.prepare("SELECT c.id,c.edition_id FROM spirit_challenges c LEFT JOIN spirit_challenge_open_notifications n ON n.challenge_id=c.id WHERE c.starts_at<=? AND c.ends_at>? AND n.challenge_id IS NULL ORDER BY c.starts_at").bind(now,now).all();
   for(const challenge of opening.results||[]) {
     const recipients=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(challenge.edition_id).all();
@@ -195,6 +198,7 @@ async function processSpiritChallengeClosures(env) {
       await sendPushToUser(env,recipient.user_id,{title:"🎄 ¡NUEVO RETO ACTIVO!",body:"¡Ve y demuestra tu espíritu navideño! 🎁",tag:"spirit-open-"+challenge.id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"https://navidad-cliente-360-2026.torresmarcos16.workers.dev");
     }
     await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenge_open_notifications (challenge_id,edition_id) VALUES (?,?)").bind(challenge.id,challenge.edition_id).run();
+  }
   }
 }
 function buildSecretAssignments(members, exclusions) {
@@ -890,7 +894,7 @@ async function handleApi(request, env, url) {
   return json({ error: "Ruta no encontrada." }, 404);
 }
 export default {
-  async scheduled(event, env, ctx) { ctx.waitUntil(processSpiritChallengeClosures(env).catch(error=>console.error("Spirit challenge closure failed",error?.message||String(error)))); },
+  async scheduled(event, env, ctx) { const cron=event.cron; const runClosures=cron==="0 4 * * *"; const runOpenings=cron==="0 14 * * *"; if(!runClosures&&!runOpenings){console.warn("Unknown Spirit cron trigger",cron);return;} ctx.waitUntil(processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error)))); },
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
