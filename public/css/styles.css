@@ -573,3 +573,6 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 /* v1.11.0 · Compartir podio como imagen navideña */
 .spirit-share-podium{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:48px;margin:14px 0 2px;padding:13px 18px;border:1px solid #b99b5c;border-radius:999px;background:linear-gradient(110deg,#174536,#0c3027);color:#fff8e8;font-size:12px;font-weight:900;letter-spacing:.2px;box-shadow:0 7px 18px rgba(23,69,54,.18);cursor:pointer}.spirit-share-podium:disabled{opacity:.65;cursor:wait}.spirit-share-podium:active{transform:scale(.99)}
+
+/* v1.12.0 · Podio agrupado por puesto y empates */
+.spirit-rank-group{min-height:74px;align-items:center}.spirit-rank-group .spirit-rank-name{display:grid;gap:5px;min-width:0}.spirit-rank-place{display:block;color:#9a7a3e;font-size:9px;font-weight:900;letter-spacing:.65px;text-transform:uppercase}.spirit-rank-names{display:block;line-height:1.5;overflow-wrap:anywhere}.spirit-rank-person{display:inline}.spirit-tie-join{color:#987d45;font-size:11px;font-weight:800}.spirit-streak{white-space:nowrap;color:#c06b27;font-size:10px}
