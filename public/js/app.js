@@ -6,16 +6,18 @@ if(urlInvite)sessionStorage.setItem("navidad_invite_token",urlInvite);
 const token = urlInvite || sessionStorage.getItem("navidad_invite_token") || "";
 const isWhatsAppInApp = /WhatsApp/i.test(navigator.userAgent) && !!token;
 
-let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null;
+let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null, selectedEditionId="";
 const apiMemoryCache=new Map();
 const api=async(path,options={})=>{
  const method=(options.method||"GET").toUpperCase(),cacheable=method==="GET"&&!options.noMemoryCache;
+ let requestPath=path;
+ if(path.startsWith("/api/admin/") && !path.startsWith("/api/admin/editions") && selectedEditionId){const separator=path.includes("?")?"&":"?";requestPath=path+separator+"editionId="+encodeURIComponent(selectedEditionId);}
  if(method!=="GET")apiMemoryCache.clear();
- if(cacheable){const cached=apiMemoryCache.get(path);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:8000))return cached.data;}
+ if(cacheable){const cached=apiMemoryCache.get(requestPath);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:8000))return cached.data;}
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),18000);
  let r,raw;
  try{
-  r=await fetch(path,{credentials:"same-origin",cache:"no-store",...options,signal:controller.signal,headers:{"content-type":"application/json",...(options.headers||{})}});
+  r=await fetch(requestPath,{credentials:"same-origin",cache:"no-store",...options,signal:controller.signal,headers:{"content-type":"application/json",...(options.headers||{})}});
   raw=await r.text();
  }catch(error){
   if(error.name==="AbortError")throw new Error("La solicitud tardó demasiado. Comprueba tu conexión e inténtalo nuevamente.");
@@ -23,7 +25,7 @@ const api=async(path,options={})=>{
  }finally{clearTimeout(timeout);}
  let d;try{d=JSON.parse(raw);}catch{const html=raw.trimStart().startsWith("<!DOCTYPE")||raw.trimStart().startsWith("<html");throw new Error(html?"El servidor devolvió la página web en lugar de la API. Cloudflare aún no ha publicado la versión del servidor o la ruta no está disponible.":"El servidor devolvió una respuesta no válida.");}
  if(!r.ok)throw new Error(d.error||"Ocurrió un error.");
- if(cacheable)apiMemoryCache.set(path,{data:d,time:Date.now()});
+ if(cacheable)apiMemoryCache.set(requestPath,{data:d,time:Date.now()});
  return d;
 };
 function prefetchMemberTabs(){ /* Las pestañas se consultan bajo demanda al abrirse. */ }
@@ -548,26 +550,39 @@ async function renderAdmin(){
  if(!panel.parentElement?.matches("#admin-tools-slot")){panel.classList.add("hidden");return;}
  panel.classList.remove("hidden");
  try{
+  const data=await api("/api/admin/editions",{noMemoryCache:true});
+  const editions=data.editions||[];
+  if(!selectedEditionId||!editions.some(item=>item.id===selectedEditionId))selectedEditionId=editions[0]?.id||"";
+  const selected=editions.find(item=>item.id===selectedEditionId);
   panel.innerHTML=`<section class="invite-management">
-   <div class="management-heading"><div><h3>Invitación para participantes</h3><p>Un enlace único, válido durante 24 horas. Al generar otro, el anterior se desactiva.</p></div><span class="management-icon">✉️</span></div>
-   <form id="invite-form" class="admin-form"><button class="admin-action" id="new-invite" type="submit">＋ Generar invitación</button></form>
+   <div class="management-heading"><div><h3>Navidad Pyme · Intercambios</h3><p>Administra cada equipo por separado. Los participantes solo acceden mediante la invitación de su edición.</p></div><span class="management-icon">🎄</span></div>
+   <label class="admin-edition-label" for="admin-edition-select">Intercambio seleccionado</label>
+   <select id="admin-edition-select" class="admin-edition-select">${editions.map(item=>`<option value="${esc(item.id)}" ${item.id===selectedEditionId?"selected":""}>${esc(item.team_name)} · ${esc(item.year)} · ${esc(item.participants)} participantes</option>`).join("")}</select>
+   <div class="admin-team-actions">${editions.some(item=>item.team_name==="Onboarding Digital")?"":'<button class="admin-action" id="create-onboarding-edition" type="button">＋ Crear intercambio Onboarding Digital</button>'}</div>
+   <div class="admin-invite-actions"><button class="admin-action" id="new-invite" type="button" ${selected?"":"disabled"}>＋ Generar invitación para ${esc(selected?.team_name||"el equipo")}</button></div>
    <div id="admin-result" aria-live="polite"></div>
+   <p class="invite-note">Cada equipo tiene su propia edición y enlace. Crear una invitación en un equipo no revoca la del otro.</p>
   </section>`;
-  $("#invite-form").addEventListener("submit",async ev=>{
-   ev.preventDefault();
-   const button=$("#new-invite"),result=$("#admin-result");
-   button.disabled=true;button.textContent="Generando…";
+  $("#admin-edition-select")?.addEventListener("change",async ev=>{selectedEditionId=ev.target.value;apiMemoryCache.clear();await renderAdmin();});
+  $("#create-onboarding-edition")?.addEventListener("click",async ev=>{
+   const button=ev.currentTarget;button.disabled=true;button.textContent="Creando intercambio…";
+   try{await api("/api/admin/editions",{method:"POST",body:JSON.stringify({teamName:"Onboarding Digital",title:"Navidad Onboarding Digital 2026",year:2026})});selectedEditionId="";apiMemoryCache.clear();await renderAdmin();}
+   catch(error){const result=$("#admin-result");if(result)result.innerHTML='<p class="admin-invite-error">'+esc(error.message)+'</p>';button.disabled=false;button.textContent="＋ Crear intercambio Onboarding Digital";}
+  });
+  $("#new-invite")?.addEventListener("click",async ev=>{
+   const button=ev.currentTarget,result=$("#admin-result");button.disabled=true;button.textContent="Generando…";
    try{
-    const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify({})});
-    const shareText="¡Estás invitado a Navidad Cliente 360! Únete desde este enlace: "+r.invitationUrl;
+    const r=await api("/api/admin/invitations",{method:"POST",body:JSON.stringify({editionId:selectedEditionId})});
+    const shareText="¡Estás invitado a "+(selected?.team_name||"Navidad Pyme")+"! Únete desde este enlace: "+r.invitationUrl;
     const whatsappUrl="https://wa.me/?text="+encodeURIComponent(shareText);
     const expiry=new Date(r.expiresAt).toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short"});
-    result.innerHTML=`<div class="admin-result invite-created"><div class="invite-created-heading"><span>✓</span><div><b>Invitación generada</b><small>Válida hasta ${esc(expiry)}</small></div></div><a class="invite-url" href="${esc(r.invitationUrl)}" target="_blank" rel="noopener noreferrer">${esc(r.invitationUrl)}</a><a class="invite-whatsapp" href="${esc(whatsappUrl)}" target="_blank" rel="noopener noreferrer"><span>◉</span> Compartir por WhatsApp</a><p class="invite-note">Este enlace puede ser utilizado por todos los participantes durante su vigencia. Si generas otro, este quedará invalidado.</p></div>`;
-   }catch(e){result.innerHTML=`<p class="admin-invite-error">${esc(e.message)}</p>`;}
-   finally{button.disabled=false;button.textContent="＋ Generar invitación";}
+    result.innerHTML='<div class="admin-result invite-created"><div class="invite-created-heading"><span>✓</span><div><b>Invitación de '+esc(selected?.team_name||"tu equipo")+' generada</b><small>Válida hasta '+esc(expiry)+'</small></div></div><a class="invite-url" href="'+esc(r.invitationUrl)+'" target="_blank" rel="noopener noreferrer">'+esc(r.invitationUrl)+'</a><button type="button" class="invite-copy-button" id="copy-team-invite">Copiar enlace</button><a class="invite-whatsapp" href="'+esc(whatsappUrl)+'" target="_blank" rel="noopener noreferrer"><span>◉</span> Compartir por WhatsApp</a><p class="invite-note">Este enlace pertenece únicamente a '+esc(selected?.team_name||"esta edición")+'.</p></div>';
+    $("#copy-team-invite")?.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(r.invitationUrl);$("#copy-team-invite").textContent="✓ Copiado";}catch{$("#copy-team-invite").textContent="No se pudo copiar";}});
+   }catch(error){result.innerHTML='<p class="admin-invite-error">'+esc(error.message)+'</p>';}
+   finally{button.disabled=false;button.textContent="＋ Generar invitación para "+(selected?.team_name||"el equipo");}
   });
   if(window.mountParticipantAdmin)await window.mountParticipantAdmin();
- }catch(e){panel.innerHTML=`<p class="admin-error">${esc(e.message)}</p>`;}
+ }catch(error){panel.innerHTML='<p class="admin-error">'+esc(error.message)+'</p>';}
 }
 async function checkSession(){
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
