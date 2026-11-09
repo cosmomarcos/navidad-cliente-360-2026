@@ -566,7 +566,7 @@ async function renderAdmin(){
   $("#admin-edition-select")?.addEventListener("change",async ev=>{selectedEditionId=ev.target.value;apiMemoryCache.clear();await renderAdmin();});
   $("#create-onboarding-edition")?.addEventListener("click",async ev=>{
    const button=ev.currentTarget;button.disabled=true;button.textContent="Creando intercambio…";
-   try{await api("/api/admin/editions",{method:"POST",body:JSON.stringify({teamName:"Onboarding Digital",title:"Navidad Onboarding Digital 2026",year:2026})});selectedEditionId="";apiMemoryCache.clear();await renderAdmin();}
+   try{const created=await api("/api/admin/editions",{method:"POST",body:JSON.stringify({teamName:"Onboarding Digital",title:"Navidad Onboarding Digital 2026",year:2026})});selectedEditionId=created.edition.id;apiMemoryCache.clear();await renderAdmin();}
    catch(error){const result=$("#admin-result");if(result)result.innerHTML='<p class="admin-invite-error">'+esc(error.message)+'</p>';button.disabled=false;button.textContent="＋ Crear intercambio Onboarding Digital";}
   });
   $("#new-invite")?.addEventListener("click",async ev=>{
