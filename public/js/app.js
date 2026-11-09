@@ -93,36 +93,60 @@ function renderMemberApp(){
 
 async function createSpiritPodiumImage(ranking,challenge){
  const groups=[...new Set((ranking||[]).filter(p=>Number(p.rank)<=3).map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
- const width=1080,rowH=142,top=390,height=Math.max(1350,top+groups.length*rowH+230);
+ const width=1080,top=520,rowH=174,footerSpace=470,height=Math.max(1580,top+groups.length*rowH+footerSpace);
  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
  const ctx=canvas.getContext("2d");
- const bg=ctx.createLinearGradient(0,0,width,height);bg.addColorStop(0,"#0c3027");bg.addColorStop(.55,"#174b39");bg.addColorStop(1,"#081f1a");ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
- // Luces y detalles navideños
- for(let i=0;i<34;i++){const x=(i*173+61)%width,y=(i*239+47)%height;ctx.beginPath();ctx.arc(x,y,3+(i%4),0,Math.PI*2);ctx.fillStyle=i%2?"rgba(232,197,116,.42)":"rgba(255,255,255,.22)";ctx.fill();}
- ctx.strokeStyle="rgba(224,190,111,.75)";ctx.lineWidth=3;ctx.strokeRect(34,34,width-68,height-68);
- ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 30px Arial";ctx.fillText("NAVIDAD CLIENTE 360 · 2026",width/2,112);
- ctx.fillStyle="#fff8e8";ctx.font="900 76px Georgia";ctx.fillText("EL PODIO",width/2,218);
- ctx.fillStyle="#e8c675";ctx.font="600 27px Arial";ctx.fillText("ESPÍRITU NAVIDEÑO",width/2,270);
- ctx.fillStyle="#f7eedb";ctx.font="700 31px Arial";
- ctx.fillText("RANKING GENERAL ACUMULADO",width/2,326);
- ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="500 23px Arial";
- ctx.fillText("PUNTOS SUMADOS EN TODOS LOS RETOS",width/2,365);
- const medal={1:"🥇",2:"🥈",3:"🥉"};
+ const bg=ctx.createLinearGradient(0,0,width,height);bg.addColorStop(0,"#092b25");bg.addColorStop(.48,"#164638");bg.addColorStop(1,"#071e1a");ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
+ const glow=ctx.createRadialGradient(width/2,260,30,width/2,260,650);glow.addColorStop(0,"rgba(232,194,111,.19)");glow.addColorStop(1,"rgba(232,194,111,0)");ctx.fillStyle=glow;ctx.fillRect(0,0,width,760);
+ const rounded=(x,y,w,h,r,fill,stroke)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}};
+ const star=(x,y,r,color)=>{ctx.save();ctx.translate(x,y);ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?r*.42:r;ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.restore();};
+ const snow=(x,y,r,a)=>{ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.strokeStyle="rgba(255,250,235,.58)";ctx.lineWidth=3;ctx.lineCap="round";for(let k=0;k<6;k++){ctx.rotate(Math.PI/3);ctx.beginPath();ctx.moveTo(0,-r);ctx.lineTo(0,r);ctx.moveTo(0,-r*.58);ctx.lineTo(-r*.2,-r*.8);ctx.moveTo(0,-r*.58);ctx.lineTo(r*.2,-r*.8);ctx.stroke();}ctx.restore();};
+ const tree=(x,y,scale=1)=>{ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.fillStyle="#7b4b32";ctx.fillRect(-8,90,16,35);for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(0,-55+k*42);ctx.lineTo(-46+k*10,35+k*38);ctx.lineTo(46-k*10,35+k*38);ctx.closePath();ctx.fillStyle=k===0?"#287052":k===1?"#1e6249":"#174b3a";ctx.fill();}ctx.fillStyle="#e8c675";star(0,-63,13,"#e8c675");for(let k=0;k<5;k++){ctx.beginPath();ctx.arc((k%2?1:-1)*(13+(k%3)*9),-4+k*21,4,0,Math.PI*2);ctx.fillStyle=k%2?"#c94f48":"#e8c675";ctx.fill();}ctx.restore();};
+ const gift=(x,y,scale=1)=>{ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.fillStyle="#a83d3b";ctx.fillRect(-30,-24,60,48);ctx.fillStyle="#e8c675";ctx.fillRect(-5,-24,10,48);ctx.fillRect(-30,-5,60,10);ctx.strokeStyle="#e8c675";ctx.lineWidth=6;ctx.beginPath();ctx.ellipse(-9,-30,12,8,-.5,0,Math.PI*2);ctx.ellipse(9,-30,12,8,.5,0,Math.PI*2);ctx.stroke();ctx.restore();};
+ // Doble marco editorial y esquinas ornamentales.
+ rounded(25,25,width-50,height-50,34,null,"rgba(232,198,117,.85)");
+ rounded(39,39,width-78,height-78,27,null,"rgba(255,248,232,.18)");
+ tree(92,150,.72);tree(width-92,150,.72);gift(104, height-125,.78);gift(width-104,height-125,.78);
+ for(let n=0;n<28;n++){const x=(n*197+71)%width,y=(n*283+117)%height;ctx.beginPath();ctx.arc(x,y,2+(n%3),0,Math.PI*2);ctx.fillStyle=n%2?"rgba(232,198,117,.55)":"rgba(255,255,255,.35)";ctx.fill();}
+ [[160,320,22,.2],[920,355,18,.6],[140,780,17,.4],[945,900,22,.1],[180,height-360,19,.8],[900,height-390,17,.3]].forEach(v=>snow(...v));
+ // Guirnalda superior con luces.
+ ctx.beginPath();ctx.moveTo(145,88);ctx.bezierCurveTo(330,160,750,160,935,88);ctx.strokeStyle="rgba(232,198,117,.75)";ctx.lineWidth=5;ctx.stroke();
+ for(let n=0;n<13;n++){const x=155+n*64,y=94+Math.sin(n/12*Math.PI)*64;ctx.beginPath();ctx.moveTo(x,y-8);ctx.lineTo(x,y+2);ctx.strokeStyle="rgba(255,248,232,.5)";ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x,y+10,7,0,Math.PI*2);ctx.fillStyle=["#d85b50","#e8c675","#7bb58b"][n%3];ctx.fill();}
+ ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 27px Arial";ctx.fillText("NAVIDAD CLIENTE 360  ·  2026",width/2,220);
+ ctx.fillStyle="#fff8e8";ctx.font="900 94px Georgia";ctx.fillText("EL PODIO",width/2,330);
+ ctx.fillStyle="#e8c675";ctx.font="700 31px Arial";ctx.fillText("ESPÍRITU NAVIDEÑO",width/2,390);
+ // Separador con estrella central.
+ ctx.strokeStyle="rgba(232,198,117,.7)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(250,425);ctx.lineTo(830,425);ctx.stroke();star(width/2,425,15,"#e8c675");
+ ctx.fillStyle="#fff8e8";ctx.font="700 30px Arial";ctx.fillText("RANKING GENERAL ACUMULADO",width/2,474);
+ ctx.fillStyle="rgba(255,248,232,.72)";ctx.font="500 21px Arial";ctx.fillText("PUNTOS SUMADOS EN TODOS LOS RETOS",width/2,507);
+ const palette={1:{main:"#e8c675",dark:"#9b702a",light:"#fff0bd"},2:{main:"#d9e0e1",dark:"#78878a",light:"#f4f7f5"},3:{main:"#cd8a5d",dark:"#824a32",light:"#f4c09a"}};
  groups.forEach((group,i)=>{
-  const y0=top+i*rowH,people=group.people;
-  ctx.fillStyle="rgba(255,248,232,.10)";ctx.beginPath();ctx.roundRect(82,y0,width-164,116,20);ctx.fill();
-  ctx.textAlign="left";ctx.font="700 43px Arial";ctx.fillStyle="#f4d68c";ctx.fillText(medal[group.rank]||"🏅",112,y0+65);
-  ctx.fillStyle="#e8c675";ctx.font="700 20px Arial";ctx.fillText(people.length>1?"EMPATE EN EL "+(group.rank===1?"PRIMER":group.rank===2?"SEGUNDO":"TERCER")+" LUGAR":(group.rank===1?"PRIMER":group.rank===2?"SEGUNDO":"TERCER")+" LUGAR",205,y0+34);
-  ctx.fillStyle="#fff8e8";ctx.font="700 29px Arial";
-  const names=people.map(p=>String(p.display_name||"Participante")+(group.rank===1&&Number(p.first_place_streak)>1?" 🔥":"")).join(" y ");
-  let display=names;while(ctx.measureText(display).width>660&&display.length>12)display=display.slice(0,-3)+"…";
-  ctx.fillText(display,205,y0+77);
-  ctx.textAlign="right";ctx.fillStyle="#e8c675";ctx.font="800 29px Arial";ctx.fillText(Number(people[0].points||0)+" PTS",width-118,y0+77);
+  const y=top+i*rowH,people=group.people,colors=palette[group.rank]||palette[1];
+  const card=ctx.createLinearGradient(90,y,990,y+132);card.addColorStop(0,"rgba(255,248,232,.14)");card.addColorStop(1,"rgba(255,248,232,.055)");
+  rounded(78,y,width-156,142,24,card,"rgba(232,198,117,.3)");
+  rounded(94,y+15,9,112,5,colors.main,null);
+  // Medallón ilustrado, con cinta y número.
+  ctx.save();ctx.translate(165,y+70);ctx.fillStyle=colors.dark;ctx.beginPath();ctx.moveTo(-20,25);ctx.lineTo(-12,68);ctx.lineTo(0,54);ctx.lineTo(12,68);ctx.lineTo(20,25);ctx.closePath();ctx.fill();
+  const medalGrad=ctx.createRadialGradient(-8,-10,2,0,0,43);medalGrad.addColorStop(0,colors.light);medalGrad.addColorStop(1,colors.main);
+  ctx.beginPath();ctx.arc(0,0,39,0,Math.PI*2);ctx.fillStyle=medalGrad;ctx.fill();ctx.strokeStyle=colors.dark;ctx.lineWidth=4;ctx.stroke();
+  ctx.fillStyle=colors.dark;ctx.font="900 38px Georgia";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(group.rank),0,1);ctx.restore();
+  ctx.textBaseline="alphabetic";ctx.textAlign="left";ctx.fillStyle=colors.main;ctx.font="800 19px Arial";
+  const place=group.rank===1?"PRIMER":group.rank===2?"SEGUNDO":"TERCER";
+  ctx.fillText(people.length>1?"EMPATE EN EL "+place+" LUGAR":place+" LUGAR",235,y+42);
+  const names=people.map(p=>String(p.display_name||"Participante")+(group.rank===1&&Number(p.first_place_streak)>1?"  🔥 "+Number(p.first_place_streak):"")).join("  ·  ");
+  ctx.fillStyle="#fff8e8";ctx.font="700 27px Arial";
+  let display=names;while(ctx.measureText(display).width>590&&display.length>12)display=display.slice(0,-4)+"…";
+  ctx.fillText(display,235,y+88);
+  if(people.length>1){ctx.fillStyle="rgba(255,248,232,.65)";ctx.font="500 16px Arial";ctx.fillText(people.length+" PARTICIPANTES COMPARTEN ESTE PUESTO",235,y+116);}
+  ctx.textAlign="right";ctx.fillStyle=colors.main;ctx.font="900 31px Arial";ctx.fillText(Number(people[0].points||0)+" PTS",width-118,y+88);
  });
- const footerY=top+groups.length*rowH+78;
- ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 30px Arial";ctx.fillText("GRACIAS POR COMPARTIR LA MAGIA",width/2,footerY);
- // Firmas de certificación: trazo manuscrito, línea y datos de los responsables.
- const signatureY=footerY+116,signatureWidth=390,gap=70,leftX=(width-(signatureWidth*2+gap))/2;
+ const footerY=top+groups.length*rowH+65;
+ // Pequeño separador navideño y mensaje solicitado.
+ ctx.strokeStyle="rgba(232,198,117,.55)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(230,footerY-28);ctx.lineTo(850,footerY-28);ctx.stroke();star(width/2,footerY-28,12,"#e8c675");
+ ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="800 29px Arial";ctx.fillText("GRACIAS POR COMPARTIR LA MAGIA",width/2,footerY+28);
+ ctx.fillStyle="rgba(255,248,232,.72)";ctx.font="italic 21px Georgia";ctx.fillText("Que la alegría de compartir nos siga uniendo",width/2,footerY+67);
+ // Firmas conservadas, con presentación limpia y equilibrada.
+ const signatureY=footerY+160,signatureWidth=390,gap=70,leftX=(width-(signatureWidth*2+gap))/2;
  const signatures=[
   {x:leftX,signature:"Marcos Torres",name:"Marcos Torres",role:"CL Backend Java",tilt:-2},
   {x:leftX+signatureWidth+gap,signature:"Rozvi Paredes",name:"Rozvi Paredes",role:"PO Squad Cliente 360 Pyme",tilt:1}
@@ -130,13 +154,12 @@ async function createSpiritPodiumImage(ranking,challenge){
  signatures.forEach(item=>{
   const center=item.x+signatureWidth/2;
   ctx.save();ctx.translate(center,signatureY);ctx.rotate(item.tilt*Math.PI/180);
-  ctx.textAlign="center";ctx.fillStyle="#fff8e8";ctx.font="italic 52px 'Segoe Script','Brush Script MT','Comic Sans MS',cursive";
-  ctx.fillText(item.signature,0,0,signatureWidth-16);ctx.restore();
-  ctx.strokeStyle="rgba(232,198,117,.9)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(item.x+18,signatureY+22);ctx.lineTo(item.x+signatureWidth-18,signatureY+22);ctx.stroke();
-  ctx.textAlign="center";ctx.fillStyle="#fff8e8";ctx.font="700 24px Arial";ctx.fillText(item.name,center,signatureY+58);
-  ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="20px Arial";ctx.fillText(item.role,center,signatureY+91,signatureWidth);
+  ctx.textAlign="center";ctx.fillStyle="#fff8e8";ctx.font="italic 49px 'Segoe Script','Brush Script MT','Comic Sans MS',cursive";ctx.fillText(item.signature,0,0,signatureWidth-16);ctx.restore();
+  ctx.strokeStyle="rgba(232,198,117,.85)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(item.x+18,signatureY+22);ctx.lineTo(item.x+signatureWidth-18,signatureY+22);ctx.stroke();
+  ctx.textAlign="center";ctx.fillStyle="#fff8e8";ctx.font="700 23px Arial";ctx.fillText(item.name,center,signatureY+58);
+  ctx.fillStyle="rgba(255,248,232,.72)";ctx.font="19px Arial";ctx.fillText(item.role,center,signatureY+91,signatureWidth);
  });
- ctx.fillStyle="#e8c675";ctx.font="700 22px Arial";ctx.textAlign="center";ctx.fillText("NAVIDAD CLIENTE 360",width/2,height-56);
+ ctx.fillStyle="rgba(232,198,117,.9)";ctx.font="700 19px Arial";ctx.textAlign="center";ctx.fillText("NAVIDAD CLIENTE 360  ·  2026",width/2,height-64);
  return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("No se pudo generar la imagen del podio.")),"image/png"));
 }
 async function shareSpiritPodium(ranking,challenge){
