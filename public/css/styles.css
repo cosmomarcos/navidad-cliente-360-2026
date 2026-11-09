@@ -598,3 +598,7 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .admin-activity-person i{width:9px;height:9px;border-radius:50%;background:#c4bcae}
 .admin-activity-person i.is-online{background:#269b62;box-shadow:0 0 0 3px #269b6222}
 @media(max-width:520px){.admin-settings-nav{grid-template-columns:repeat(5,minmax(0,1fr))}.admin-activity-heading{align-items:flex-start;flex-direction:column}.admin-activity-grid{gap:7px}.admin-activity-metric{padding:12px}.admin-activity-metric strong{font-size:26px}}
+
+
+/* v1.9.0 · Selector de intercambios de Navidad Pyme */
+.admin-edition-label{display:block;margin:14px 0 6px;font-size:11px;font-weight:800;color:#19372d}.admin-edition-select{width:100%;min-height:46px;padding:12px;border:1px solid #d8cfbb;border-radius:10px;background:#fffdf7;color:#19372d;font-weight:700}.admin-team-actions,.admin-invite-actions{display:flex;gap:10px;flex-wrap:wrap}.admin-team-actions .admin-action,.admin-invite-actions .admin-action{width:100%}.invite-copy-button{display:block;width:100%;margin:10px 0;padding:12px;border:1px solid #b99b5c;border-radius:10px;background:#fffaf0;color:#174536;font-weight:800;cursor:pointer}
