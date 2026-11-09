@@ -36,14 +36,34 @@ async function ensurePushSchema(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   });
 }
-function dataUrlResponse(value, fallbackType = "application/octet-stream") {
-  const match = String(value || "").match(/^data:([^,]*);base64,([A-Za-z0-9+/=\s]+)$/);
+function dataUrlResponse(value, fallbackType = "application/octet-stream", request = null) {
+  const match = String(value || "").match(/^data:([^,]*);base64,([A-Za-z0-9+/=\\s]+)$/);
   if (!match) return json({ error: "Archivo no disponible." }, 404);
   const contentType = (match[1].split(";")[0] || fallbackType).trim();
-  const binary = atob(match[2].replace(/\s/g, ""));
+  const binary = atob(match[2].replace(/\\s/g, ""));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new Response(bytes, { headers: { "content-type": contentType, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" } });
+  const headers = { "content-type": contentType, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff", "accept-ranges": "bytes" };
+  const range = request?.headers.get("range");
+  if (range) {
+    const rangeMatch = range.match(/^bytes=(\\d*)-(\\d*)$/);
+    if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2])) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${bytes.length}` } });
+    let start, end;
+    if (!rangeMatch[1]) {
+      const suffix = Number(rangeMatch[2]);
+      if (!suffix) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${bytes.length}` } });
+      start = Math.max(0, bytes.length - suffix); end = bytes.length - 1;
+    } else {
+      start = Number(rangeMatch[1]); end = rangeMatch[2] ? Math.min(Number(rangeMatch[2]), bytes.length - 1) : bytes.length - 1;
+    }
+    if (start >= bytes.length || end < start) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${bytes.length}` } });
+    const chunk = bytes.slice(start, end + 1);
+    headers["content-range"] = `bytes ${start}-${end}/${bytes.length}`;
+    headers["content-length"] = String(chunk.length);
+    return new Response(chunk, { status: 206, headers });
+  }
+  headers["content-length"] = String(bytes.length);
+  return new Response(bytes, { headers });
 }
 function base64url(bytes) { let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function sha256(value) { const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, "0")).join(""); }
@@ -309,7 +329,7 @@ async function handleApi(request, env, url) {
     if(request.method==="GET"&&spiritMediaMatch){
       const media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
       if(!media)return json({error:"No encontramos el archivo de esta publicación."},404);
-      return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg");
+      return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg",request);
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/unread") {
       const read = await env.DB.prepare("SELECT last_seen_at FROM spirit_submission_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
