@@ -635,8 +635,6 @@ if("serviceWorker"in navigator){
  navigator.serviceWorker.addEventListener("controllerchange",()=>{
   if(refreshing)return;
   refreshing=true;
-  if(sessionStorage.getItem("cliente360-sw-refresh")==="1")return;
-  sessionStorage.setItem("cliente360-sw-refresh","1");
   location.reload();
  });
  window.addEventListener("load",async()=>{
