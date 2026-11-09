@@ -14,13 +14,13 @@ database_id = "28b8265a-5f5b-4302-bc6d-0645c14d3fc0"
 migrations_dir = "migrations"
 
 [vars]
-APP_NAME = "Navidad Cliente 360 2026"
+APP_NAME = "Navidad Pyme 2026"
 VAPID_PUBLIC_KEY = "BK82-ax3h3ZJxS9D6Xe-dy-AV2prRTFNIdqFDoOJstbLnFm5Rr-NkhqpsP1EwMi6fKkYCkcueZgUxM6RDJpfUOs"
 EDITION_YEAR = "2026"
 
 # Isolated resources for Cloudflare preview builds.
 [previews.vars]
-APP_NAME = "Navidad Cliente 360 2026 - Preview"
+APP_NAME = "Navidad Pyme 2026 - Preview"
 VAPID_PUBLIC_KEY = "BK82-ax3h3ZJxS9D6Xe-dy-AV2prRTFNIdqFDoOJstbLnFm5Rr-NkhqpsP1EwMi6fKkYCkcueZgUxM6RDJpfUOs"
 EDITION_YEAR = "2026"
 
