@@ -262,8 +262,15 @@ async function notifyWishOwner(env, editionId, authorUserId, wishTitle, subject)
   await sendPushToUser(env, assignment.giver_user_id, { title: "💝 ¡Tu amigo secreto agregó un deseo!", body: name + " agregó o actualizó: " + String(wishTitle || "un deseo").slice(0,80), tag: "wish-update-" + editionId + "-" + authorUserId, url: "/?tab=wishes" }, subject);
 }
 
+
+async function getAdminEdition(env, url) {
+  const requestedId = url.searchParams.get("editionId");
+  if (requestedId) return env.DB.prepare("SELECT * FROM editions WHERE id=?").bind(requestedId).first();
+  return env.DB.prepare("SELECT * FROM editions ORDER BY year DESC, created_at DESC LIMIT 1").first();
+}
+
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.8.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.9.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -309,7 +316,7 @@ async function handleApi(request, env, url) {
     const user = await currentUser(request, env);
     if (!user) return json({ authenticated: false });
     await ensureParticipantProfilesSchema(env);
-    const membership = await env.DB.prepare("SELECT em.id, em.edition_id, em.status, e.title, e.year, e.event_date, e.budget_amount, e.currency FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(user.id).first();
+    const membership = await env.DB.prepare("SELECT em.id, em.edition_id, em.status, e.title, e.year, e.event_date, e.budget_amount, e.currency FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
     const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
     return json({ authenticated: true, user, isPrimaryAdmin: await isPrimaryAdmin(user, env), membership: membership || null, participantProfile: profile || null });
   }
@@ -456,8 +463,29 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if (request.method === "GET" && url.pathname === "/api/admin/editions") {
+      const result = await env.DB.prepare("SELECT e.id, e.title, e.year, e.budget_amount, e.currency, e.event_date, e.status, w.name AS team_name, (SELECT COUNT(*) FROM edition_members em WHERE em.edition_id=e.id AND em.status='confirmed') AS participants FROM editions e JOIN workspace w ON w.id=e.workspace_id ORDER BY e.created_at ASC").all();
+      return json({ editions: result.results || [] });
+    }
+    if (request.method === "POST" && url.pathname === "/api/admin/editions") {
+      const body = await request.json();
+      const teamName = String(body.teamName || "").trim();
+      if (!["Cliente 360", "Onboarding Digital"].includes(teamName)) return json({ error: "Equipo no válido." }, 400);
+      const existing = await env.DB.prepare("SELECT e.id FROM editions e JOIN workspace w ON w.id=e.workspace_id WHERE w.name=? AND e.year=?").bind(teamName, Number(body.year || 2026)).first();
+      if (existing) return json({ error: "Este equipo ya tiene un intercambio configurado." }, 409);
+      const year = Number(body.year || 2026), budget = body.budgetAmount === "" || body.budgetAmount == null ? null : Number(body.budgetAmount);
+      if (!Number.isInteger(year) || year < 2026 || (budget !== null && (!Number.isFinite(budget) || budget < 0))) return json({ error: "Año o presupuesto inválido." }, 400);
+      const workspaceId = crypto.randomUUID(), editionId = crypto.randomUUID(), membershipId = crypto.randomUUID();
+      const title = String(body.title || ("Navidad " + teamName + " " + year)).slice(0, 100);
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO workspace (id,name,owner_user_id) VALUES (?,?,?)").bind(workspaceId,teamName,user.id),
+        env.DB.prepare("INSERT INTO memberships (id,workspace_id,user_id,role) VALUES (?,?,?,'owner')").bind(membershipId,workspaceId,user.id),
+        env.DB.prepare("INSERT INTO editions (id,workspace_id,title,year,budget_amount,event_date,status) VALUES (?,?,?,?,?,?,'registration')").bind(editionId,workspaceId,title,year,budget,body.eventDate || null)
+      ]);
+      return json({ ok: true, edition: { id: editionId, title, year, teamName } }, 201);
+    }
     if (request.method === "GET" && url.pathname === "/api/admin/activity") {
-      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition) return json({ activeNow: 0, activeToday: 0, activeWeek: 0, participants: 0, recent: [] });
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS app_activity (edition_id TEXT NOT NULL, user_id TEXT NOT NULL, last_seen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
       const [activeNow,activeToday,activeWeek,participants,recent] = await Promise.all([
@@ -611,7 +639,7 @@ async function handleApi(request, env, url) {
     }
 
     if (request.method === "GET" && url.pathname === "/api/admin/status") {
-      const workspace = await env.DB.prepare("SELECT id, name FROM workspace LIMIT 1").first();
+      const workspace = await env.DB.prepare("SELECT w.id, w.name FROM workspace w JOIN editions e ON e.workspace_id=w.id WHERE e.id=?").bind(edition?.id || "").first();
       const edition = workspace ? await env.DB.prepare("SELECT id, title, year, budget_amount, event_date, status FROM editions WHERE workspace_id = ? ORDER BY year DESC LIMIT 1").bind(workspace.id).first() : null;
       const members = edition ? await env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id = ? AND status = 'confirmed'").bind(edition.id).first() : { total: 0 };
       return json({ isPrimaryAdmin: true, email: user.email, initialized: !!edition, edition, participants: members.total || 0 });
@@ -677,6 +705,8 @@ async function handleApi(request, env, url) {
       return json({ ok: true, edition: { id: editionId, title, year }, invitationUrl: `${url.origin}/?invite=${token}` });
     }
     if (request.method === "POST" && url.pathname === "/api/admin/invitations") {
+      const body = await request.json();
+      const edition = body.editionId ? await env.DB.prepare("SELECT id, title, year FROM editions WHERE id=?").bind(body.editionId).first() : await getAdminEdition(env, url);
       const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
       if (!edition) return json({ error: "Primero crea la edición." }, 409);
       const token = base64url(crypto.getRandomValues(new Uint8Array(24))), hash = await sha256(token);
