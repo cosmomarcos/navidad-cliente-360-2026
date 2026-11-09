@@ -65,6 +65,8 @@ async function ensureSpiritSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_votes (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_points_ranking ON spirit_points(edition_id,user_id)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_leader_streaks (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, current_streak INTEGER NOT NULL DEFAULT 0, last_first_date TEXT, PRIMARY KEY(edition_id,user_id))").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_results (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, processed_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submission_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
 }
 async function finalizeExpiredSpiritChallenges(env, editionId) {
@@ -73,6 +75,40 @@ async function finalizeExpiredSpiritChallenges(env, editionId) {
     const winners = await env.DB.prepare("SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.id HAVING COUNT(v.id)>0 AND COUNT(v.id)=(SELECT MAX(vote_count) FROM (SELECT COUNT(v2.id) AS vote_count FROM spirit_submissions s2 LEFT JOIN spirit_votes v2 ON v2.submission_id=s2.id WHERE s2.challenge_id=? GROUP BY s2.id))").bind(challenge.id,challenge.id).all();
     for (const winner of winners.results || []) {
       await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,10,"Publicación más votada del día").run();
+    }
+  }
+}
+
+
+function spiritLimaDay(value) {
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(value);
+}
+async function processSpiritChallengeClosures(env) {
+  await ensureSpiritSchema(env);
+  const now=new Date().toISOString().slice(0,19).replace("T"," ");
+  const due=await env.DB.prepare("SELECT c.id,c.edition_id,c.title,c.ends_at FROM spirit_challenges c LEFT JOIN spirit_challenge_results r ON r.challenge_id=c.id WHERE c.ends_at<=? AND r.challenge_id IS NULL ORDER BY c.ends_at").bind(now).all();
+  for(const challenge of due.results||[]) {
+    await finalizeExpiredSpiritChallenges(env,challenge.edition_id);
+    const podium=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=? AND sp.user_id=u.id),0) AS points FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE LIMIT 3").bind(challenge.edition_id,challenge.edition_id).all();
+    const winners=podium.results||[],first=winners[0],day=spiritLimaDay(new Date(challenge.ends_at.replace(" ","T")+"Z"));
+    const members=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(challenge.edition_id).all();
+    for(const member of members.results||[]) {
+      if(first&&member.user_id===first.user_id) {
+        const prev=await env.DB.prepare("SELECT current_streak,last_first_date FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,first.user_id).first();
+        const yesterday=new Date(day+"T12:00:00Z");yesterday.setUTCDate(yesterday.getUTCDate()-1);
+        const streak=prev?.last_first_date===spiritLimaDay(yesterday)?Number(prev.current_streak)+1:1;
+        await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,?,?) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=excluded.current_streak,last_first_date=excluded.last_first_date").bind(challenge.edition_id,first.user_id,streak,day).run();
+      } else {
+        await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,0,NULL) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=0,last_first_date=NULL").bind(challenge.edition_id,member.user_id).run();
+      }
+    }
+    await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenge_results (challenge_id,edition_id) VALUES (?,?)").bind(challenge.id,challenge.edition_id).run();
+    for(let i=0;i<winners.length;i++) {
+      const person=winners[i],place=i+1;
+      const streak=place===1?(await env.DB.prepare("SELECT current_streak FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,person.user_id).first())?.current_streak||1:0;
+      const title=place===1?"🏆 ¡Felicitaciones, primer lugar!":place===2?"🥈 ¡Felicitaciones, segundo lugar!":"🥉 ¡Felicitaciones, tercer lugar!";
+      const body=place===1?"Vas ocupando el primer lugar"+(streak>1?" por "+streak+" días consecutivos. ¡Sigue así! 🔥":" ¡Sigue así!"):"Terminaste en el puesto "+place+" del reto "+challenge.title+". ¡Gracias por participar!";
+      await sendPushToUser(env,person.user_id,{title,body,tag:"spirit-result-"+challenge.id+"-"+person.user_id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"mailto:admin@example.com");
     }
   }
 }
