@@ -437,10 +437,34 @@ async function handleApi(request, env, url) {
     return json({error:"Ruta de Espíritu Navideño no encontrada."},404);
   }
 
+  if (url.pathname === "/api/activity/heartbeat" && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Inicia sesión primero." }, 401);
+    const membership = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    if (!membership) return json({ ok: true, tracked: false });
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS app_activity (edition_id TEXT NOT NULL, user_id TEXT NOT NULL, last_seen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
+    await env.DB.prepare("INSERT INTO app_activity (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(membership.edition_id,user.id).run();
+    return json({ ok: true, tracked: true });
+  }
+
   if (url.pathname.startsWith("/api/admin/")) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
+
+    if (request.method === "GET" && url.pathname === "/api/admin/activity") {
+      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      if (!edition) return json({ activeNow: 0, activeToday: 0, activeWeek: 0, participants: 0, recent: [] });
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS app_activity (edition_id TEXT NOT NULL, user_id TEXT NOT NULL, last_seen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
+      const [activeNow,activeToday,activeWeek,participants,recent] = await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS total FROM app_activity WHERE edition_id=? AND last_seen_at>=datetime('now','-5 minutes')").bind(edition.id).first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM app_activity WHERE edition_id=? AND date(last_seen_at)=date('now')").bind(edition.id).first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM app_activity WHERE edition_id=? AND last_seen_at>=datetime('now','-7 days')").bind(edition.id).first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).first(),
+        env.DB.prepare("SELECT a.last_seen_at,u.avatar_url,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,CASE WHEN a.last_seen_at>=datetime('now','-5 minutes') THEN 1 ELSE 0 END AS is_active FROM app_activity a JOIN users u ON u.id=a.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? ORDER BY a.last_seen_at DESC LIMIT 20").bind(edition.id).all()
+      ]);
+      return json({ activeNow: activeNow?.total||0, activeToday: activeToday?.total||0, activeWeek: activeWeek?.total||0, participants: participants?.total||0, recent: (recent.results||[]).map(row=>({...row,last_seen_label:row.last_seen_at})) });
+    }
 
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
       await ensureSpiritSchema(env);
