@@ -269,8 +269,13 @@ async function getAdminEdition(env, url) {
   return env.DB.prepare("SELECT * FROM editions ORDER BY year DESC, created_at DESC LIMIT 1").first();
 }
 
-async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.9.0" });
+async function getParticipantEdition(env,user,url){
+ const requestedId=url.searchParams.get("editionId");
+ if(requestedId)return env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed'").bind(user.id,requestedId).first();
+ return env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
+}
+\nasync function handleApi(request, env, url) {
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.10.0" });
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -285,7 +290,7 @@ async function handleApi(request, env, url) {
       const body = await request.json(), endpoint = String(body.endpoint || "");
       const p256dh = String(body.keys?.p256dh || ""), auth = String(body.keys?.auth || "");
       if (!endpoint.startsWith("https://") || endpoint.length > 2048 || !p256dh || !auth || p256dh.length > 256 || auth.length > 128) return json({ error: "La suscripción de notificaciones no es válida." }, 400);
-      const membership = await env.DB.prepare("SELECT id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+      const membership=await getParticipantEdition(env,user,url);
       if (!membership) return json({ error: "Necesitas una participación activa para activar notificaciones." }, 403);
       await env.DB.prepare("INSERT INTO push_subscriptions (id,user_id,endpoint,p256dh,auth) VALUES (?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,updated_at=datetime('now')").bind(crypto.randomUUID(),user.id,endpoint,p256dh,auth).run();
       return json({ ok: true });
@@ -316,14 +321,16 @@ async function handleApi(request, env, url) {
     const user = await currentUser(request, env);
     if (!user) return json({ authenticated: false });
     await ensureParticipantProfilesSchema(env);
-    const membership = await env.DB.prepare("SELECT em.id, em.edition_id, em.status, e.title, e.year, e.event_date, e.budget_amount, e.currency FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
+    const membershipsResult=await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at ASC").bind(user.id).all();
+    const memberships=membershipsResult.results||[],requestedId=url.searchParams.get("editionId");
+    const membership=(requestedId?memberships.find(x=>x.edition_id===requestedId):null)||memberships[memberships.length-1]||null;
     const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
-    return json({ authenticated: true, user, isPrimaryAdmin: await isPrimaryAdmin(user, env), membership: membership || null, participantProfile: profile || null });
+    return json({ authenticated:true,user,isPrimaryAdmin:await isPrimaryAdmin(user,env),membership,memberships,participantProfile:profile||null });
   }
   if (request.method === "GET" && url.pathname === "/api/participants") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const membership = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    const membership=await getParticipantEdition(env,user,url);
     if (!membership) return json({ error: "Necesitas una participación activa para consultar la lista." }, 403);
     await ensureParticipantProfilesSchema(env);
     const result = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name, u.avatar_url FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY em.joined_at ASC").bind(membership.edition_id).all();
@@ -333,7 +340,7 @@ async function handleApi(request, env, url) {
   if (url.pathname.startsWith("/api/spirit/")) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const member = await env.DB.prepare("SELECT em.edition_id FROM edition_members em WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
+    const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     await ensureSpiritSchema(env);
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
@@ -451,7 +458,7 @@ async function handleApi(request, env, url) {
   if (url.pathname === "/api/activity/heartbeat" && request.method === "POST") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const membership = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    const membership=await getParticipantEdition(env,user,url);
     if (!membership) return json({ ok: true, tracked: false });
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS app_activity (edition_id TEXT NOT NULL, user_id TEXT NOT NULL, last_seen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
     await env.DB.prepare("INSERT INTO app_activity (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(membership.edition_id,user.id).run();
@@ -530,7 +537,7 @@ async function handleApi(request, env, url) {
     }
 
     if (request.method === "POST" && url.pathname === "/api/admin/spirit/reset-my-points") {
-      const member=await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+      const member=await getParticipantEdition(env,user,url);
       if(!member)return json({error:"No tienes una edición activa."},403);
       await ensureSpiritSchema(env);
       const result=await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).run();
@@ -721,7 +728,7 @@ async function handleApi(request, env, url) {
   if (url.pathname.startsWith("/api/community")) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const member = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a la comunidad." }, 403);
     await ensureCommunitySchema(env);
     if (request.method === "GET" && url.pathname === "/api/community/unread") {
@@ -762,7 +769,7 @@ async function handleApi(request, env, url) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     await ensureWishesSchema(env);
-    const membership = await env.DB.prepare("SELECT edition_id FROM edition_members WHERE user_id=? AND status='confirmed' ORDER BY joined_at DESC LIMIT 1").bind(user.id).first();
+    const membership=await getParticipantEdition(env,user,url);
     if (!membership) return json({ error: "Necesitas una participación activa para gestionar tus deseos." }, 403);
     if (request.method === "GET" && url.pathname === "/api/wishes/unread") {
       const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
@@ -847,7 +854,7 @@ async function handleApi(request, env, url) {
     const participant = await currentUser(request, env);
     if (!participant) return json({ error: "Inicia sesión primero." }, 401);
     await ensureDrawSchema(env);
-    const membership = await env.DB.prepare("SELECT em.status, em.edition_id, e.status AS edition_status, e.title FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY em.joined_at DESC LIMIT 1").bind(participant.id).first();
+    const membership=await getParticipantEdition(env,participant,url);
     if (!membership || membership.status !== "confirmed") return json({ state: "not_participating" });
     const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
     if (!state || state.state !== "drawn") return json({ state: state?.state || "registration", title: membership.title });
@@ -860,7 +867,7 @@ async function handleApi(request, env, url) {
     const participant = await currentUser(request, env);
     if (!participant) return json({ error: "Inicia sesión primero." }, 401);
     await ensureDrawSchema(env);
-    const membership = await env.DB.prepare("SELECT em.status, em.edition_id FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY em.joined_at DESC LIMIT 1").bind(participant.id).first();
+    const membership=await getParticipantEdition(env,participant,url);
     if (!membership || membership.status !== "confirmed") return json({ error: "No tienes una participación activa." }, 403);
     const assignment = await env.DB.prepare("SELECT 1 AS assigned FROM draw_assignments WHERE edition_id=? AND giver_user_id=?").bind(membership.edition_id,participant.id).first();
     if (!assignment) return json({ error: "Tu asignación todavía no está disponible." }, 409);
@@ -871,7 +878,7 @@ async function handleApi(request, env, url) {
   if (request.method === "POST" && url.pathname === "/api/participation/withdraw") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
-    const edition = await env.DB.prepare("SELECT e.id, e.status FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
+    const editionMember=await getParticipantEdition(env,user,url);\n    const edition=editionMember?await env.DB.prepare("SELECT id,status FROM editions WHERE id=?").bind(editionMember.edition_id).first():null;
     if (!edition) return json({ error: "No hay una edición activa." }, 404);
     if (edition.status === "drawn" || edition.status === "completed") return json({ error: "El sorteo ya se realizó o la edición terminó. Contacta al organizador." }, 409);
     const result = await env.DB.prepare("DELETE FROM edition_members WHERE edition_id=? AND user_id=?").bind(edition.id, user.id).run();
