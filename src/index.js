@@ -594,7 +594,7 @@ async function handleApi(request, env, url) {
       const eventDate = body.eventDate ? String(body.eventDate) : null;
       const budget = body.budgetAmount === "" || body.budgetAmount == null ? null : Number(body.budgetAmount);
       if (title.length < 3 || title.length > 100) return json({ error: "El nombre debe tener entre 3 y 100 caracteres." }, 400);
-      if (eventDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)) return json({ error: "La fecha del intercambio no es válida." }, 400);
+            if (eventDate && (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !Number.isFinite(Date.parse(eventDate+"T00:00:00Z")) || new Date(eventDate+"T00:00:00Z").toISOString().slice(0,10)!==eventDate)) return json({ error: "La fecha del intercambio no es válida. Selecciona una fecha válida." }, 400);
       if (budget !== null && (!Number.isFinite(budget) || budget < 0 || budget > 1000000)) return json({ error: "El presupuesto debe ser un monto válido." }, 400);
       await env.DB.prepare("UPDATE editions SET title=?, event_date=?, budget_amount=? WHERE id=?").bind(title, eventDate, budget, edition.id).run();
       return json({ ok: true });
