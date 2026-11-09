@@ -1,6 +1,8 @@
 // Administración de exclusiones del sorteo. La lista de participantes se consulta desde Inicio.
 const participantApi = async (path, options = {}) => {
-  const response = await fetch(path, { credentials: "same-origin", ...options, headers: { "content-type": "application/json", ...(options.headers || {}) } });
+  const selected = document.querySelector("#admin-edition-select")?.value || "";
+  const scopedPath = path.startsWith("/api/admin/") && selected ? path + (path.includes("?") ? "&" : "?") + "editionId=" + encodeURIComponent(selected) : path;
+  const response = await fetch(scopedPath, { credentials: "same-origin", ...options, headers: { "content-type": "application/json", ...(options.headers || {}) } });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "No se pudo completar la operación.");
   return data;
