@@ -85,34 +85,50 @@ function spiritLimaDay(value) {
 }
 async function processSpiritChallengeClosures(env) {
   await ensureSpiritSchema(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_open_notifications (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, notified_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   const now=new Date().toISOString().slice(0,19).replace("T"," ");
   const due=await env.DB.prepare("SELECT c.id,c.edition_id,c.title,c.ends_at FROM spirit_challenges c LEFT JOIN spirit_challenge_results r ON r.challenge_id=c.id WHERE c.ends_at<=? AND r.challenge_id IS NULL ORDER BY c.ends_at").bind(now).all();
   for(const challenge of due.results||[]) {
     await finalizeExpiredSpiritChallenges(env,challenge.edition_id);
-    const podium=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=? AND sp.user_id=u.id),0) AS points FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE LIMIT 3").bind(challenge.edition_id,challenge.edition_id).all();
-    const winners=podium.results||[],first=winners[0],day=spiritLimaDay(new Date(challenge.ends_at.replace(" ","T")+"Z"));
+    const all=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=? AND sp.user_id=u.id),0) AS points FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(challenge.edition_id,challenge.edition_id).all();
+    let prevPoints=null,prevRank=0;
+    const ranked=(all.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=prevPoints===score?prevRank:index+1;prevPoints=score;prevRank=rank;return {...person,rank};});
+    const winners=ranked.filter(person=>person.rank<=3);
+    const firstIds=new Set(winners.filter(person=>person.rank===1).map(person=>person.user_id));
+    const day=spiritLimaDay(new Date(challenge.ends_at.replace(" ","T")+"Z"));
     const members=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(challenge.edition_id).all();
     for(const member of members.results||[]) {
-      if(first&&member.user_id===first.user_id) {
-        const prev=await env.DB.prepare("SELECT current_streak,last_first_date FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,first.user_id).first();
+      if(firstIds.has(member.user_id)) {
+        const prev=await env.DB.prepare("SELECT current_streak,last_first_date FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,member.user_id).first();
         const yesterday=new Date(day+"T12:00:00Z");yesterday.setUTCDate(yesterday.getUTCDate()-1);
         const streak=prev?.last_first_date===spiritLimaDay(yesterday)?Number(prev.current_streak)+1:1;
-        await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,?,?) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=excluded.current_streak,last_first_date=excluded.last_first_date").bind(challenge.edition_id,first.user_id,streak,day).run();
+        await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,?,?) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=excluded.current_streak,last_first_date=excluded.last_first_date").bind(challenge.edition_id,member.user_id,streak,day).run();
       } else {
         await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,0,NULL) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=0,last_first_date=NULL").bind(challenge.edition_id,member.user_id).run();
       }
     }
     await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenge_results (challenge_id,edition_id) VALUES (?,?)").bind(challenge.id,challenge.edition_id).run();
-    for(let i=0;i<winners.length;i++) {
-      const person=winners[i],place=i+1;
+    for(const person of winners) {
+      const place=person.rank;
+      const others=winners.filter(item=>item.rank===place).length-1;
       const streak=place===1?(await env.DB.prepare("SELECT current_streak FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,person.user_id).first())?.current_streak||1:0;
-      const title=place===1?"🏆 ¡Felicitaciones, primer lugar!":place===2?"🥈 ¡Felicitaciones, segundo lugar!":"🥉 ¡Felicitaciones, tercer lugar!";
-      const body=place===1?"Vas ocupando el primer lugar"+(streak>1?" por "+streak+" días consecutivos. ¡Sigue así! 🔥":" ¡Sigue así!"):"Terminaste en el puesto "+place+" del reto "+challenge.title+". ¡Gracias por participar!";
+      const placeText=place===1?"primer":place===2?"segundo":"tercer";
+      const title=place===1?"🏆 ¡Primer lugar!":place===2?"🥈 ¡Segundo lugar!":"🥉 ¡Tercer lugar!";
+      let body="¡Felicitaciones! Estás ocupando el "+placeText+" puesto.";
+      if(others>0) body+=" Estás empatado"+(others===1?" con 1 participante más.":" con "+others+" participantes más.");
+      if(place===1&&streak>1) body+=" Racha de "+streak+" días consecutivos 🔥";
       await sendPushToUser(env,person.user_id,{title,body,tag:"spirit-result-"+challenge.id+"-"+person.user_id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"https://navidad-cliente-360-2026.torresmarcos16.workers.dev");
     }
   }
+  const opening=await env.DB.prepare("SELECT c.id,c.edition_id FROM spirit_challenges c LEFT JOIN spirit_challenge_open_notifications n ON n.challenge_id=c.id WHERE c.starts_at<=? AND c.ends_at>? AND n.challenge_id IS NULL ORDER BY c.starts_at").bind(now,now).all();
+  for(const challenge of opening.results||[]) {
+    const recipients=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(challenge.edition_id).all();
+    for(const recipient of recipients.results||[]) {
+      await sendPushToUser(env,recipient.user_id,{title:"🎄 ¡NUEVO RETO ACTIVO!",body:"¡Ve y demuestra tu espíritu navideño! 🎁",tag:"spirit-open-"+challenge.id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"https://navidad-cliente-360-2026.torresmarcos16.workers.dev");
+    }
+    await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenge_open_notifications (challenge_id,edition_id) VALUES (?,?)").bind(challenge.id,challenge.edition_id).run();
+  }
 }
-
 function buildSecretAssignments(members, exclusions) {
   const blocked = new Set(exclusions.flatMap(x => [x.user_a_id + ":" + x.user_b_id, x.user_b_id + ":" + x.user_a_id]));
   const recipients = shuffled(members);
