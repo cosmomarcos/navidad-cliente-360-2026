@@ -487,7 +487,7 @@ async function handleApi(request, env, url) {
       if(type==="trivia"&&(!String(config.question||"").trim()||!Array.isArray(config.options)||config.options.length<2||!config.options.includes(config.correctAnswer)))return json({error:"Configura una pregunta, sus opciones y la respuesta correcta."},400);
       const scheduledDate=String(body.scheduledDate||"");
       if(!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate))return json({error:"Selecciona la fecha en que debe abrirse el reto."},400);
-      const start=new Date(scheduledDate+"T14:00:00.000Z"),end=new Date(start.getTime()+13*60*60*1000);
+      const start=new Date(scheduledDate+"T14:00:00.000Z"),end=new Date(start.getTime()+14*60*60*1000);
       if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now())return json({error:"Elige una fecha futura. Los retos abren a las 9:00 a. m. hora Perú."},400);
       const startSql=start.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," ");
       const overlap=await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND starts_at<? AND ends_at>? LIMIT 1").bind(edition.id,endSql,startSql).first();
