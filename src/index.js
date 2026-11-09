@@ -47,18 +47,18 @@ function dataUrlResponse(value, fallbackType = "application/octet-stream", reque
   const range = request?.headers.get("range");
   if (range) {
     const rangeMatch = range.match(/^bytes=(\d*)-(\d*)$/);
-    if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2])) return new Response(null, { status: 416, headers: { ...headers, "content-range": \`bytes */\${bytes.length}\` } });
+    if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2])) return new Response(null, { status: 416, headers: { ...headers, "content-range": "bytes */" + bytes.length } });
     let start, end;
     if (!rangeMatch[1]) {
       const suffix = Number(rangeMatch[2]);
-      if (!suffix) return new Response(null, { status: 416, headers: { ...headers, "content-range": \`bytes */\${bytes.length}\` } });
+      if (!suffix) return new Response(null, { status: 416, headers: { ...headers, "content-range": "bytes */" + bytes.length } });
       start = Math.max(0, bytes.length - suffix); end = bytes.length - 1;
     } else {
       start = Number(rangeMatch[1]); end = rangeMatch[2] ? Math.min(Number(rangeMatch[2]), bytes.length - 1) : bytes.length - 1;
     }
-    if (start >= bytes.length || end < start) return new Response(null, { status: 416, headers: { ...headers, "content-range": \`bytes */\${bytes.length}\` } });
+    if (start >= bytes.length || end < start) return new Response(null, { status: 416, headers: { ...headers, "content-range": "bytes */" + bytes.length } });
     const chunk = bytes.slice(start, end + 1);
-    headers["content-range"] = \`bytes \${start}-\${end}/\${bytes.length}\`;
+    headers["content-range"] = "bytes " + start + "-" + end + "/" + bytes.length;
     headers["content-length"] = String(chunk.length);
     return new Response(chunk, { status: 206, headers });
   }
