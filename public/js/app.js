@@ -124,10 +124,24 @@ async function createSpiritPodiumImage(ranking,challenge){
   ctx.fillText(display,205,y0+77);
   ctx.textAlign="right";ctx.fillStyle="#e8c675";ctx.font="800 29px Arial";ctx.fillText(Number(people[0].points||0)+" PTS",width-118,y0+77);
  });
- const footerY=top+groups.length*rowH+88;
- ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 28px Arial";ctx.fillText("¡GRACIAS POR COMPARTIR LA MAGIA!",width/2,footerY);
- ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="24px Arial";ctx.fillText("La alegría de participar nos hace ganar a todos 🎄",width/2,footerY+48);
- ctx.fillStyle="#e8c675";ctx.font="700 22px Arial";ctx.fillText("NAVIDAD CLIENTE 360",width/2,height-86);
+ const footerY=top+groups.length*rowH+78;
+ ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 30px Arial";ctx.fillText("GRACIAS POR COMPARTIR LA MAGIA",width/2,footerY);
+ // Firmas de certificación: trazo manuscrito, línea y datos de los responsables.
+ const signatureY=footerY+116,signatureWidth=390,gap=70,leftX=(width-(signatureWidth*2+gap))/2;
+ const signatures=[
+  {x:leftX,signature:"Marcos Torres",name:"Marcos Torres",role:"CL Backend Java",tilt:-2},
+  {x:leftX+signatureWidth+gap,signature:"Rozvi Paredes",name:"Rozvi Paredes",role:"PO Squad Cliente 360 Pyme",tilt:1}
+ ];
+ signatures.forEach(item=>{
+  const center=item.x+signatureWidth/2;
+  ctx.save();ctx.translate(center,signatureY);ctx.rotate(item.tilt*Math.PI/180);
+  ctx.textAlign="center";ctx.fillStyle="#fff8e8";ctx.font="italic 52px 'Segoe Script','Brush Script MT','Comic Sans MS',cursive";
+  ctx.fillText(item.signature,0,0,signatureWidth-16);ctx.restore();
+  ctx.strokeStyle="rgba(232,198,117,.9)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(item.x+18,signatureY+22);ctx.lineTo(item.x+signatureWidth-18,signatureY+22);ctx.stroke();
+  ctx.textAlign="center";ctx.fillStyle="#fff8e8";ctx.font="700 24px Arial";ctx.fillText(item.name,center,signatureY+58);
+  ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="20px Arial";ctx.fillText(item.role,center,signatureY+91,signatureWidth);
+ });
+ ctx.fillStyle="#e8c675";ctx.font="700 22px Arial";ctx.textAlign="center";ctx.fillText("NAVIDAD CLIENTE 360",width/2,height-56);
  return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("No se pudo generar la imagen del podio.")),"image/png"));
 }
 async function shareSpiritPodium(ranking,challenge){
