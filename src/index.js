@@ -322,11 +322,26 @@ async function handleApi(request, env, url) {
     const user = await currentUser(request, env);
     if (!user) return json({ authenticated: false });
     await ensureParticipantProfilesSchema(env);
+    const admin=await isPrimaryAdmin(user,env);
+    const requestedId=url.searchParams.get("editionId");
+    if(admin){
+      const targetEdition=requestedId
+        ? await env.DB.prepare("SELECT id FROM editions WHERE id=?").bind(requestedId).first()
+        : await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC,created_at DESC LIMIT 1").first();
+      if(targetEdition){
+        const existing=await env.DB.prepare("SELECT id,status FROM edition_members WHERE edition_id=? AND user_id=?").bind(targetEdition.id,user.id).first();
+        if(existing){
+          if(existing.status!=="confirmed")await env.DB.prepare("UPDATE edition_members SET status='confirmed',joined_at=datetime('now') WHERE id=?").bind(existing.id).run();
+        }else{
+          await env.DB.prepare("INSERT INTO edition_members (id,edition_id,user_id,status) VALUES (?,?,?,'confirmed')").bind(crypto.randomUUID(),targetEdition.id,user.id).run();
+        }
+      }
+    }
     const membershipsResult=await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at ASC").bind(user.id).all();
-    const memberships=membershipsResult.results||[],requestedId=url.searchParams.get("editionId");
+    const memberships=membershipsResult.results||[];
     const membership=requestedId?memberships.find(x=>x.edition_id===requestedId)||null:memberships[memberships.length-1]||null;
     const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
-    return json({ authenticated:true,user,isPrimaryAdmin:await isPrimaryAdmin(user,env),membership,memberships,participantProfile:profile||null });
+    return json({ authenticated:true,user,isPrimaryAdmin:admin,membership,memberships,participantProfile:profile||null });
   }
   if (request.method === "GET" && url.pathname === "/api/participants") {
     const user = await currentUser(request, env);
