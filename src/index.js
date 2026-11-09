@@ -279,7 +279,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.12.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.12.1" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -505,8 +505,9 @@ async function handleApi(request, env, url) {
     if (request.method === "PATCH" && url.pathname === "/api/admin/edition/home") {
       const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
       if(edition.status!=="registration")return json({error:"La información se bloquea después del sorteo."},409);
-      const body=await request.json(),keys=["placeName","address","schedule","breakfast","grillFee","extraInfo","mapUrl","shareMessage","welcomeText"],config={};
+      const body=await request.json(),keys=["placeName","address","schedule","breakfast","grillFee","extraInfo","mapUrl","shareMessage","welcomeText"],flags=["showDate","showPlace","showAddress","showSchedule","showBreakfast","showGrillFee","showExtraInfo","showMap"],config={};
       for(const key of keys)config[key]=String(body[key]||"").trim().slice(0,key==="extraInfo"||key==="shareMessage"?1500:300);
+      for(const key of flags)config[key]=body[key]!==false;
       await ensureEditionHomeSettingsSchema(env);
       await env.DB.prepare("INSERT INTO edition_home_settings (edition_id,config_json) VALUES (?,?) ON CONFLICT(edition_id) DO UPDATE SET config_json=excluded.config_json,updated_at=datetime('now')").bind(edition.id,JSON.stringify(config)).run();
       return json({ok:true,config});
