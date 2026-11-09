@@ -18,12 +18,7 @@ const api=async(path,options={})=>{
  if(cacheable)apiMemoryCache.set(path,{data:d,time:Date.now()});
  return d;
 };
-function prefetchMemberTabs(){
- const paths=["/api/secret/me","/api/community/clues","/api/wishes"];
- if(currentUser?.isPrimaryAdmin)paths.push("/api/admin/status","/api/admin/draw/status");
- const warm=()=>Promise.allSettled(paths.map(path=>api(path)));
- if("requestIdleCallback"in window)window.requestIdleCallback(warm,{timeout:1200});else setTimeout(warm,250);
-}
+function prefetchMemberTabs(){ /* Las pestañas se consultan bajo demanda al abrirse. */ }
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let snowFrame=0,snowflakes=[],snowCanvas=null,snowCtx=null,snowEnabled=false,snowWidth=0,snowHeight=0,snowLast=0;
 function setSnowfall(enabled){
@@ -35,14 +30,14 @@ function setSnowfall(enabled){
 }
 function resizeSnow(){
  if(!snowCanvas||!snowCtx)return;
- const dpr=Math.min(window.devicePixelRatio||1,1.5);snowWidth=window.innerWidth;snowHeight=window.innerHeight;
+ const dpr=Math.min(window.devicePixelRatio||1,1.25);snowWidth=window.innerWidth;snowHeight=window.innerHeight;
  snowCanvas.width=Math.round(snowWidth*dpr);snowCanvas.height=Math.round(snowHeight*dpr);snowCtx.setTransform(dpr,0,0,dpr,0,0);
- const count=Math.min(115,Math.max(55,Math.round(snowWidth*snowHeight/8500)));
+ const count=Math.min(42,Math.max(22,Math.round(snowWidth*snowHeight/22000)));
  snowflakes=Array.from({length:count},()=>({x:Math.random()*snowWidth,y:Math.random()*snowHeight,r:1.6+Math.random()*3,v:.75+Math.random()*1.4,drift:-.35+Math.random()*.7,phase:Math.random()*Math.PI*2,alpha:.62+Math.random()*.35}));
 }
 function drawSnow(time){
  if(!snowEnabled||!snowCtx)return;snowFrame=requestAnimationFrame(drawSnow);
- if(time-snowLast<28)return;snowLast=time;snowCtx.clearRect(0,0,snowWidth,snowHeight);
+ if(time-snowLast<42)return;snowLast=time;snowCtx.clearRect(0,0,snowWidth,snowHeight);
  for(const f of snowflakes){f.y+=f.v;f.x+=f.drift+Math.sin(time*.0007+f.phase)*.28;if(f.y>snowHeight+5){f.y=-5;f.x=Math.random()*snowWidth;}if(f.x<-5)f.x=snowWidth+5;if(f.x>snowWidth+5)f.x=-5;snowCtx.beginPath();snowCtx.arc(f.x,f.y,f.r,0,Math.PI*2);snowCtx.fillStyle="rgba(255,255,255,"+f.alpha+")";snowCtx.fill();}
 }
 window.addEventListener("resize",()=>{if(snowEnabled)resizeSnow()},{passive:true});
@@ -69,7 +64,7 @@ function formatExchangeDate(date){
  return formatted.charAt(0).toLocaleUpperCase("es-PE")+formatted.slice(1);
 }
 function renderMemberApp(){
- setSnowfall(true);
+ setSnowfall(false);
  setClass("#join-card","hidden",true);setClass("#admin-panel","hidden",true);
  let app=$("#member-app");app.classList.remove("hidden");
  const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";
@@ -85,7 +80,7 @@ function renderMemberApp(){
  prefetchMemberTabs();
  if(communityPollTimer)clearInterval(communityPollTimer);
  updateTabUnreadBadges();
- communityPollTimer=setInterval(updateTabUnreadBadges,45000);
+ communityPollTimer=setInterval(updateTabUnreadBadges,90000);
  app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{setSnowfall(btn.dataset.tab==="home");app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileSettings();return;}if(btn.dataset.tab==="admin-settings"){showAdminSettings();return;}if(btn.dataset.tab==="secret"){renderSecretTab();return;}if(btn.dataset.tab==="wishes"){renderWishesTab();return;}if(btn.dataset.tab==="community"){renderCommunityTab();return;}if(btn.dataset.tab==="spirit"){renderSpiritTab();return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Mensajes",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<div class="member-section-heading"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>${labels[btn.dataset.tab]}</h2></div><article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
  const requestedTab=new URLSearchParams(location.search).get("tab");
  if(requestedTab==="community"){
@@ -244,11 +239,26 @@ async function loadProfileParticipants(){
 async function showAdminSettings(){
  const home=$("#member-app .member-home");if(!currentUser?.isPrimaryAdmin||!home)return;
  home.innerHTML='<div class="admin-settings-view"><div class="settings-header"><span>⚙️</span><div><h2>Administración</h2><p>Accede directamente a cada área, sin recorrer una pantalla interminable.</p></div></div><nav class="admin-settings-nav" aria-label="Secciones de administración"><button type="button" class="active" data-admin-section="general">⚙️ General</button><button type="button" data-admin-section="spirit">🎄 Espíritu</button><button type="button" data-admin-section="draw">🎁 Sorteo</button><button type="button" data-admin-section="tools">👥 Participantes</button></nav><section class="admin-settings-section" id="admin-section-general"><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p></section><section class="admin-settings-section hidden" id="admin-section-spirit"><div id="spirit-admin-controls"></div></section><section class="admin-settings-section hidden" id="admin-section-draw"><div id="draw-admin-controls"></div></section><section class="admin-settings-section hidden" id="admin-section-tools"><div class="admin-tools-section"><div id="admin-tools-slot"></div></div></section></div>';
- home.querySelectorAll("[data-admin-section]").forEach(btn=>btn.addEventListener("click",()=>{home.querySelectorAll("[data-admin-section]").forEach(x=>x.classList.toggle("active",x===btn));home.querySelectorAll(".admin-settings-section").forEach(x=>x.classList.toggle("hidden",x.id!=="admin-section-"+btn.dataset.adminSection));}));
- const panel=$("#admin-panel")||document.createElement("section");panel.id="admin-panel";panel.className="admin-panel";$("#admin-tools-slot").append(panel);panel.classList.remove("hidden");await renderAdmin();
- try{await loadAdminDrawControls();}catch(error){$("#draw-admin-controls").innerHTML='<div class="status error">'+esc(error.message)+'</div>';}
- try{const data=await api("/api/admin/status"),e=data.edition||{},form=$("#edition-settings-form");form.elements.title.value=e.title||"";form.elements.eventDate.value=e.event_date||"";form.elements.budgetAmount.value=e.budget_amount??"";if(e.status!=="registration"){form.querySelector("button").disabled=true;form.querySelectorAll("input").forEach(x=>x.disabled=true);$("#edition-settings-feedback").textContent="Los ajustes están bloqueados porque el sorteo ya fue realizado o la edición terminó.";$("#edition-settings-feedback").classList.remove("hidden");}form.addEventListener("submit",async ev=>{ev.preventDefault();const values=Object.fromEntries(new FormData(form)),fb=$("#edition-settings-feedback");try{await api("/api/admin/edition",{method:"PATCH",body:JSON.stringify(values)});currentUser=await api("/api/me");updateMemberCountdown(currentUser.membership?.event_date);fb.textContent="Los ajustes del intercambio se guardaron correctamente.";fb.classList.remove("hidden","error");}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});}catch(err){const fb=$("#edition-settings-feedback");fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}
- try{await loadSpiritAdmin();}catch(error){$("#spirit-admin-controls").innerHTML='<div class="status error">'+esc(error.message)+'</div>';}
+ const loadSection=async key=>{
+  const target=home.querySelector("#admin-section-"+key);if(!target||target.dataset.loaded==="1"||target.dataset.loading==="1")return;
+  target.dataset.loading="1";
+  try{
+   if(key==="tools"){
+    const panel=$("#admin-panel")||document.createElement("section");panel.id="admin-panel";panel.className="admin-panel";$("#admin-tools-slot").append(panel);panel.classList.remove("hidden");await renderAdmin();
+   }else if(key==="draw")await loadAdminDrawControls();
+   else if(key==="spirit")await loadSpiritAdmin();
+   else if(key==="general"){
+    const data=await api("/api/admin/status"),e=data.edition||{},form=$("#edition-settings-form");
+    form.elements.title.value=e.title||"";form.elements.eventDate.value=e.event_date||"";form.elements.budgetAmount.value=e.budget_amount??"";
+    if(e.status!=="registration"){form.querySelector("button").disabled=true;form.querySelectorAll("input").forEach(x=>x.disabled=true);$("#edition-settings-feedback").textContent="Los ajustes están bloqueados porque el sorteo ya fue realizado o la edición terminó.";$("#edition-settings-feedback").classList.remove("hidden");}
+    form.addEventListener("submit",async ev=>{ev.preventDefault();const values=Object.fromEntries(new FormData(form)),fb=$("#edition-settings-feedback");try{await api("/api/admin/edition",{method:"PATCH",body:JSON.stringify(values)});currentUser=await api("/api/me");updateMemberCountdown(currentUser.membership?.event_date);fb.textContent="Los ajustes del intercambio se guardaron correctamente.";fb.classList.remove("hidden","error");}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+   }
+   target.dataset.loaded="1";
+  }catch(error){target.innerHTML='<div class="status error">'+esc(error.message)+'</div>';delete target.dataset.loading;return;}
+  delete target.dataset.loading;
+ };
+ home.querySelectorAll("[data-admin-section]").forEach(btn=>btn.addEventListener("click",async()=>{home.querySelectorAll("[data-admin-section]").forEach(x=>x.classList.toggle("active",x===btn));home.querySelectorAll(".admin-settings-section").forEach(x=>x.classList.toggle("hidden",x.id!=="admin-section-"+btn.dataset.adminSection));await loadSection(btn.dataset.adminSection);}));
+ await loadSection("general");
 }
 async function loadDrawRevelationTracker(){
  const host=$("#draw-revelation-tracker");if(!host)return;
@@ -316,8 +326,9 @@ function setUnreadBadge(id,count,label){const badge=$("#"+id);if(!badge)return;c
 async function updateTabUnreadBadges(){
  if(!currentUser?.authenticated)return;
  const checks=[["community-unread-badge","/api/community/unread","mensajes"],["wishes-unread-badge","/api/wishes/unread","deseos"],["spirit-unread-badge","/api/spirit/unread","participaciones"]];
- await Promise.allSettled(checks.map(async([id,path,label])=>{try{const data=await api(path,{noMemoryCache:true});setUnreadBadge(id,data.unread,label);}catch{setUnreadBadge(id,0,label);}}));
- try{const secret=await api("/api/secret/me",{noMemoryCache:true});setUnreadBadge("secret-unread-badge",secret.state==="drawn"&&!secret.hasRevealed?1:0,"asignación pendiente de revelar");}catch{setUnreadBadge("secret-unread-badge",0,"asignación pendiente de revelar");}
+ const requests=checks.map(async([id,path,label])=>{try{const data=await api(path,{noMemoryCache:true});setUnreadBadge(id,data.unread,label);}catch{setUnreadBadge(id,0,label);}});
+ requests.push((async()=>{try{const secret=await api("/api/secret/me",{noMemoryCache:true});setUnreadBadge("secret-unread-badge",secret.state==="drawn"&&!secret.hasRevealed?1:0,"asignación pendiente de revelar");}catch{setUnreadBadge("secret-unread-badge",0,"asignación pendiente de revelar");}})());
+ await Promise.allSettled(requests);
 }
 function urlBase64ToUint8Array(value){
  const padding="=".repeat((4-value.length%4)%4),base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
