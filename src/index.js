@@ -114,8 +114,7 @@ async function processSpiritChallengeClosures(env) {
       const streak=place===1?(await env.DB.prepare("SELECT current_streak FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,person.user_id).first())?.current_streak||1:0;
       const placeText=place===1?"primer":place===2?"segundo":"tercer";
       const title=place===1?"🏆 ¡Primer lugar!":place===2?"🥈 ¡Segundo lugar!":"🥉 ¡Tercer lugar!";
-      let body="¡Felicitaciones! Estás ocupando el "+placeText+" puesto.";
-      if(others>0) body+=" Estás empatado"+(others===1?" con 1 participante más.":" con "+others+" participantes más.");
+      let body=others>0?"¡Felicitaciones! Compartes el "+placeText+" lugar con "+(others===1?"1 participante más.":others+" participantes más."):"¡Felicitaciones! Ocupas el "+placeText+" lugar.";
       if(place===1&&streak>1) body+=" Racha de "+streak+" días consecutivos 🔥";
       await sendPushToUser(env,person.user_id,{title,body,tag:"spirit-result-"+challenge.id+"-"+person.user_id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"https://navidad-cliente-360-2026.torresmarcos16.workers.dev");
     }
