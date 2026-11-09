@@ -37,28 +37,28 @@ async function ensurePushSchema(env) {
   });
 }
 function dataUrlResponse(value, fallbackType = "application/octet-stream", request = null) {
-  const match = String(value || "").match(/^data:([^,]*);base64,([A-Za-z0-9+/=\\s]+)$/);
+  const match = String(value || "").match(/^data:([^,]*);base64,([A-Za-z0-9+/=\s]+)$/);
   if (!match) return json({ error: "Archivo no disponible." }, 404);
   const contentType = (match[1].split(";")[0] || fallbackType).trim();
-  const binary = atob(match[2].replace(/\\s/g, ""));
+  const binary = atob(match[2].replace(/\s/g, ""));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const headers = { "content-type": contentType, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff", "accept-ranges": "bytes" };
   const range = request?.headers.get("range");
   if (range) {
-    const rangeMatch = range.match(/^bytes=(\\d*)-(\\d*)$/);
-    if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2])) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${bytes.length}` } });
+    const rangeMatch = range.match(/^bytes=(\d*)-(\d*)$/);
+    if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2])) return new Response(null, { status: 416, headers: { ...headers, "content-range": \`bytes */\${bytes.length}\` } });
     let start, end;
     if (!rangeMatch[1]) {
       const suffix = Number(rangeMatch[2]);
-      if (!suffix) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${bytes.length}` } });
+      if (!suffix) return new Response(null, { status: 416, headers: { ...headers, "content-range": \`bytes */\${bytes.length}\` } });
       start = Math.max(0, bytes.length - suffix); end = bytes.length - 1;
     } else {
       start = Number(rangeMatch[1]); end = rangeMatch[2] ? Math.min(Number(rangeMatch[2]), bytes.length - 1) : bytes.length - 1;
     }
-    if (start >= bytes.length || end < start) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${bytes.length}` } });
+    if (start >= bytes.length || end < start) return new Response(null, { status: 416, headers: { ...headers, "content-range": \`bytes */\${bytes.length}\` } });
     const chunk = bytes.slice(start, end + 1);
-    headers["content-range"] = `bytes ${start}-${end}/${bytes.length}`;
+    headers["content-range"] = \`bytes \${start}-\${end}/\${bytes.length}\`;
     headers["content-length"] = String(chunk.length);
     return new Response(chunk, { status: 206, headers });
   }
