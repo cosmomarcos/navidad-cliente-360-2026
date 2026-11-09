@@ -19,6 +19,21 @@ async function ensureWishesSchema(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wish_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
   });
 }
+async function ensureCommunitySchema(env) {
+  return ensureSchemaOnce("community", async () => {
+    await ensureCommunitySchema(env);
+  });
+}
+async function ensureParticipantProfilesSchema(env) {
+  return ensureSchemaOnce("participant-profiles", async () => {
+    await ensureParticipantProfilesSchema(env);
+  });
+}
+async function ensurePushSchema(env) {
+  return ensureSchemaOnce("push-subscriptions", async () => {
+    await ensurePushSchema(env);
+  });
+}
 function dataUrlResponse(value, fallbackType = "application/octet-stream") {
   const match = String(value || "").match(/^data:([^,]*);base64,([A-Za-z0-9+/=\s]+)$/);
   if (!match) return json({ error: "Archivo no disponible." }, 404);
@@ -267,7 +282,7 @@ async function handleApi(request, env, url) {
   if (request.method === "GET" && url.pathname === "/api/me") {
     const user = await currentUser(request, env);
     if (!user) return json({ authenticated: false });
-    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profiles (user_id TEXT PRIMARY KEY REFERENCES users(id), first_name TEXT NOT NULL, last_name TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))" ).run();
+    await ensureParticipantProfilesSchema(env);
     const membership = await env.DB.prepare("SELECT em.id, em.edition_id, em.status, e.title, e.year, e.event_date, e.budget_amount, e.currency FROM edition_members em JOIN editions e ON e.id=em.edition_id WHERE em.user_id=? ORDER BY e.year DESC LIMIT 1").bind(user.id).first();
     const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
     return json({ authenticated: true, user, isPrimaryAdmin: await isPrimaryAdmin(user, env), membership: membership || null, participantProfile: profile || null });
