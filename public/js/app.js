@@ -98,7 +98,7 @@ function renderMemberApp(){
 
 async function createSpiritPodiumImage(ranking,challenge){
  const groups=[...new Set((ranking||[]).filter(p=>Number(p.rank)<=3).map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
- const width=1080,rowH=142,top=360,height=Math.max(1350,top+groups.length*rowH+230);
+ const width=1080,rowH=142,top=390,height=Math.max(1350,top+groups.length*rowH+230);
  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
  const ctx=canvas.getContext("2d");
  const bg=ctx.createLinearGradient(0,0,width,height);bg.addColorStop(0,"#0c3027");bg.addColorStop(.55,"#174b39");bg.addColorStop(1,"#081f1a");ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
@@ -108,11 +108,10 @@ async function createSpiritPodiumImage(ranking,challenge){
  ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 30px Arial";ctx.fillText("NAVIDAD CLIENTE 360 · 2026",width/2,112);
  ctx.fillStyle="#fff8e8";ctx.font="900 76px Georgia";ctx.fillText("EL PODIO",width/2,218);
  ctx.fillStyle="#e8c675";ctx.font="600 27px Arial";ctx.fillText("ESPÍRITU NAVIDEÑO",width/2,270);
- const title=String(challenge?.title||"Campeones de la Navidad").trim();
- ctx.fillStyle="#f7eedb";ctx.font="600 30px Arial";
- const max=900;let line="";let y=320;
- for(const word of title.split(/\s+/)){const test=line?line+" "+word:word;if(ctx.measureText(test).width>max&&line){ctx.fillText(line,width/2,y);line=word;y+=38;}else line=test;}
- if(line)ctx.fillText(line,width/2,y);
+ ctx.fillStyle="#f7eedb";ctx.font="700 31px Arial";
+ ctx.fillText("RANKING GENERAL ACUMULADO",width/2,326);
+ ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="500 23px Arial";
+ ctx.fillText("PUNTOS SUMADOS EN TODOS LOS RETOS",width/2,365);
  const medal={1:"🥇",2:"🥈",3:"🥉"};
  groups.forEach((group,i)=>{
   const y0=top+i*rowH,people=group.people;
