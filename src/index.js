@@ -272,16 +272,19 @@ async function handleApi(request, env, url) {
       return json({ unread: count?.total || 0 });
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
-      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed,COALESCE((SELECT current_streak FROM spirit_leader_streaks st WHERE st.edition_id=em.edition_id AND st.user_id=em.user_id),0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,completed DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
-      const rows=ranking.results||[];
-      const mine=rows.findIndex(x=>x.user_id===user.id);
+      const ranking = await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE((SELECT SUM(sp.points) FROM spirit_points sp WHERE sp.edition_id=em.edition_id AND sp.user_id=em.user_id),0) AS points,(SELECT COUNT(*) FROM spirit_submissions s WHERE s.edition_id=em.edition_id AND s.user_id=em.user_id) AS completed,COALESCE((SELECT current_streak FROM spirit_leader_streaks st WHERE st.edition_id=em.edition_id AND st.user_id=em.user_id),0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id).all();
+      let previousPoints=null,previousRank=0;
+      const allRows=(ranking.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:index+1;previousPoints=score;previousRank=rank;return {...person,rank};});
+      const rows=allRows.filter(person=>person.rank<=3).map(person=>({...person,tieCount:allRows.filter(other=>other.rank===person.rank).length}));
+      const mine=allRows.findIndex(x=>x.user_id===user.id);
+      const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
       if(challenge){
         const feed=await env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.image_data,s.media_data,s.media_type,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,EXISTS(SELECT 1 FROM spirit_votes v WHERE v.submission_id=s.id AND v.voter_user_id=?) AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE s.challenge_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id,challenge.id).all();
         submissions=(feed.results||[]).map(item=>({...item,eligibleForVoting:challenge.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
       }
       await env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
-      return json({challenge:challenge||null,submissions,ranking:rows.slice(0,3),myPoints:mine>=0?rows[mine].points:0,myRank:mine>=0?mine+1:null,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
+      return json({challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     if (request.method === "POST" && url.pathname === "/api/spirit/submissions") {
       if(!challenge)return json({error:"No hay un reto activo en este momento."},409);
