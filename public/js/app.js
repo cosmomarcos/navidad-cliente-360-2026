@@ -76,6 +76,7 @@ function renderMemberApp(){
  const budgetLabel=budgetAmount==null?"Por definir":new Intl.NumberFormat("es-PE",{style:"currency",currency:budgetCurrency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(budgetAmount));
  const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><div class="exchange-minimum-list"><div><span>Amigo Secreto</span><strong>Mínimo S/ 100</strong></div><div><span>Dirty Santa</span><strong>Mínimo S/ 20</strong></div></div></div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📅</span><div><b>Fecha: ${esc(exchangeDateLabel)}</b></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🍖</span><div><b>Cuota para la parrilla</b><p>Por definir</p></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><a class="exchange-whatsapp-share" href="https://wa.me/?text=${encodeURIComponent(exchangeShareText)}" target="_blank" rel="noopener noreferrer" aria-label="Compartir información del intercambio por WhatsApp"><span aria-hidden="true">◉</span> Compartir información por WhatsApp</a></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
  app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes <span class="nav-unread-badge" id="community-unread-badge" hidden></span></button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
+ startActivityHeartbeat();
  updateMemberCountdown(currentUser.membership?.event_date);
 
  prefetchMemberTabs();
@@ -261,12 +262,14 @@ async function loadProfileParticipants(){
 }
 async function showAdminSettings(){
  const home=$("#member-app .member-home");if(!currentUser?.isPrimaryAdmin||!home)return;
- home.innerHTML='<div class="admin-settings-view"><div class="settings-header"><span>⚙️</span><div><h2>Administración</h2><p>Accede directamente a cada área, sin recorrer una pantalla interminable.</p></div></div><nav class="admin-settings-nav" aria-label="Secciones de administración"><button type="button" class="active" data-admin-section="general">⚙️ General</button><button type="button" data-admin-section="spirit">🎄 Espíritu</button><button type="button" data-admin-section="draw">🎁 Sorteo</button><button type="button" data-admin-section="tools">👥 Participantes</button></nav><section class="admin-settings-section" id="admin-section-general"><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p></section><section class="admin-settings-section hidden" id="admin-section-spirit"><div id="spirit-admin-controls"></div></section><section class="admin-settings-section hidden" id="admin-section-draw"><div id="draw-admin-controls"></div></section><section class="admin-settings-section hidden" id="admin-section-tools"><div class="admin-tools-section"><div id="admin-tools-slot"></div></div></section></div>';
+ home.innerHTML='<div class="admin-settings-view"><div class="settings-header"><span>⚙️</span><div><h2>Administración</h2><p>Accede directamente a cada área, sin recorrer una pantalla interminable.</p></div></div><nav class="admin-settings-nav" aria-label="Secciones de administración"><button type="button" class="active" data-admin-section="general">⚙️ General</button><button type="button" data-admin-section="activity">📊 Actividad</button><button type="button" data-admin-section="spirit">🎄 Espíritu</button><button type="button" data-admin-section="draw">🎁 Sorteo</button><button type="button" data-admin-section="tools">👥 Participantes</button></nav><section class="admin-settings-section" id="admin-section-general"><div id="edition-settings-feedback" class="status hidden"></div><form id="edition-settings-form" class="edition-settings-form"><label>Nombre del intercambio<input name="title" maxlength="100" required></label><label>Fecha del intercambio<input name="eventDate" type="date"></label><label>Presupuesto por persona (S/) <input name="budgetAmount" type="number" min="0" step="0.01" placeholder="Ej. 80"></label><button class="primary-button" type="submit">Guardar ajustes</button></form><p class="settings-note">Los ajustes se pueden modificar mientras el sorteo no se haya realizado.</p></section><section class="admin-settings-section hidden" id="admin-section-activity"><div id="admin-activity-panel"><p class="muted">Consultando actividad…</p></div></section><section class="admin-settings-section hidden" id="admin-section-spirit"><div id="spirit-admin-controls"></div></section><section class="admin-settings-section hidden" id="admin-section-draw"><div id="draw-admin-controls"></div></section><section class="admin-settings-section hidden" id="admin-section-tools"><div class="admin-tools-section"><div id="admin-tools-slot"></div></div></section></div>';
  const loadSection=async key=>{
   const target=home.querySelector("#admin-section-"+key);if(!target||target.dataset.loaded==="1"||target.dataset.loading==="1")return;
   target.dataset.loading="1";
   try{
-   if(key==="tools"){
+   if(key==="activity"){
+    await loadAdminActivity();
+   }else if(key==="tools"){
     const panel=$("#admin-panel")||document.createElement("section");panel.id="admin-panel";panel.className="admin-panel";$("#admin-tools-slot").append(panel);panel.classList.remove("hidden");await renderAdmin();
    }else if(key==="draw")await loadAdminDrawControls();
    else if(key==="spirit")await loadSpiritAdmin();
@@ -283,6 +286,32 @@ async function showAdminSettings(){
  home.querySelectorAll("[data-admin-section]").forEach(btn=>btn.addEventListener("click",async()=>{home.querySelectorAll("[data-admin-section]").forEach(x=>x.classList.toggle("active",x===btn));home.querySelectorAll(".admin-settings-section").forEach(x=>x.classList.toggle("hidden",x.id!=="admin-section-"+btn.dataset.adminSection));await loadSection(btn.dataset.adminSection);}));
  await loadSection("general");
 }
+let activityRefreshTimer=null;
+async function loadAdminActivity(){
+ const host=$("#admin-activity-panel");if(!host||!currentUser?.isPrimaryAdmin)return;
+ const refresh=async()=>{
+  try{
+   const data=await api("/api/admin/activity",{noMemoryCache:true});
+   const metric=(label,value,detail)=>'<article class="admin-activity-metric"><small>'+label+'</small><strong>'+Number(value||0)+'</strong><span>'+detail+'</span></article>';
+   host.innerHTML='<div class="admin-activity-heading"><div><h3>Actividad de participantes</h3><p>Usuarios que han usado la aplicación recientemente.</p></div><button type="button" class="admin-action" id="admin-activity-refresh">↻ Actualizar</button></div><div class="admin-activity-grid">'+metric("Activos ahora",data.activeNow,"Actividad en los últimos 5 minutos")+metric("Activos hoy",data.activeToday,"Usuarios únicos")+metric("Activos esta semana",data.activeWeek,"Usuarios únicos")+metric("Participantes",data.participants,"Inscripciones confirmadas")+'</div><div class="admin-activity-list"><h4>Conectados recientemente</h4>'+(data.recent?.length?data.recent.map(p=>'<div class="admin-activity-person"><span class="admin-activity-avatar">'+(p.avatar_url&&/^https:\\/\\//i.test(p.avatar_url)?'<img src="'+esc(avatarUrl(p.avatar_url,64))+'" alt="">':'🎄')+'</span><span><b>'+esc(p.display_name)+'</b><small>'+ (p.is_active?'Activo ahora':'Última actividad: '+esc(p.last_seen_label||"Recientemente"))+'</small></span><i class="'+(p.is_active?'is-online':'')+'"></i></div>').join(""):'<p class="muted">Todavía no hay actividad registrada.</p>')+'</div><p class="settings-note">La actividad se actualiza automáticamente cada minuto. Se considera activo a quien haya interactuado durante los últimos 5 minutos.</p>';
+   $("#admin-activity-refresh")?.addEventListener("click",refresh);
+  }catch(error){host.innerHTML='<p class="status error">'+esc(error.message)+'</p>';}
+ };
+ await refresh();
+ if(activityRefreshTimer)clearInterval(activityRefreshTimer);
+ activityRefreshTimer=setInterval(()=>{if($("#admin-section-activity")&&!$("#admin-section-activity").classList.contains("hidden"))refresh();},30000);
+}
+async function sendActivityHeartbeat(){
+ if(!signedIn||document.visibilityState==="hidden")return;
+ try{await api("/api/activity/heartbeat",{method:"POST",body:JSON.stringify({})});}catch{}
+}
+let activityHeartbeatTimer=null;
+function startActivityHeartbeat(){
+ if(activityHeartbeatTimer)clearInterval(activityHeartbeatTimer);
+ sendActivityHeartbeat();
+ activityHeartbeatTimer=setInterval(sendActivityHeartbeat,60000);
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sendActivityHeartbeat();});
 async function loadDrawRevelationTracker(){
  const host=$("#draw-revelation-tracker");if(!host)return;
  try{
