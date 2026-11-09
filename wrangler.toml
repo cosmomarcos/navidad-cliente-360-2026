@@ -28,3 +28,6 @@ EDITION_YEAR = "2026"
 binding = "DB"
 database_name = "navidad-cliente-360-preview"
 database_id = "9377aecc-706c-4632-b679-39a88db40e1f"
+
+[triggers]
+crons = ["0 3 * * *", "0 14 * * *"]
