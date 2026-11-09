@@ -1,4 +1,4 @@
-const CACHE = "cliente360-shell-v1.2.9";
+const CACHE = "navidad-pyme-shell-v1.9.0";
 const SHELL = ["/", "/css/styles.css", "/js/app.js", "/js/participants.js", "/manifest.webmanifest", "/icons/icon.svg"];
 self.addEventListener("install", event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
@@ -7,7 +7,7 @@ self.addEventListener("install", event => event.waitUntil((async () => {
 })()));
 self.addEventListener("activate", event => event.waitUntil((async () => {
   const keys = await caches.keys();
-  await Promise.all(keys.filter(key => key.startsWith("cliente360-shell-") && key !== CACHE).map(key => caches.delete(key)));
+  await Promise.all(keys.filter(key => key.startsWith("navidad-pyme-shell-") && key !== CACHE).map(key => caches.delete(key)));
   await self.clients.claim();
 })()));
 self.addEventListener("fetch", event => {
