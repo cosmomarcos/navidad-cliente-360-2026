@@ -96,6 +96,53 @@ function renderMemberApp(){
  }
 }
 
+async function createSpiritPodiumImage(ranking,challenge){
+ const rows=(ranking||[]).filter(p=>Number(p.rank)<=3),scale=1;
+ const width=1080,rowH=112,top=360,height=Math.max(1350,top+rows.length*rowH+230);
+ const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+ const ctx=canvas.getContext("2d");
+ const bg=ctx.createLinearGradient(0,0,width,height);bg.addColorStop(0,"#0c3027");bg.addColorStop(.55,"#174b39");bg.addColorStop(1,"#081f1a");ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
+ // Luces y detalles navideños
+ for(let i=0;i<34;i++){const x=(i*173+61)%width,y=(i*239+47)%height;ctx.beginPath();ctx.arc(x,y,3+(i%4),0,Math.PI*2);ctx.fillStyle=i%2?"rgba(232,197,116,.42)":"rgba(255,255,255,.22)";ctx.fill();}
+ ctx.strokeStyle="rgba(224,190,111,.75)";ctx.lineWidth=3;ctx.strokeRect(34,34,width-68,height-68);
+ ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 30px Arial";ctx.fillText("NAVIDAD CLIENTE 360 · 2026",width/2,112);
+ ctx.fillStyle="#fff8e8";ctx.font="900 76px Georgia";ctx.fillText("EL PODIO",width/2,218);
+ ctx.fillStyle="#e8c675";ctx.font="600 27px Arial";ctx.fillText("ESPÍRITU NAVIDEÑO",width/2,270);
+ const title=String(challenge?.title||"Campeones de la Navidad").trim();
+ ctx.fillStyle="#f7eedb";ctx.font="600 30px Arial";
+ const max=900;let line="";let y=320;
+ for(const word of title.split(/\s+/)){const test=line?line+" "+word:word;if(ctx.measureText(test).width>max&&line){ctx.fillText(line,width/2,y);line=word;y+=38;}else line=test;}
+ if(line)ctx.fillText(line,width/2,y);
+ const medal={1:"🥇",2:"🥈",3:"🥉"};
+ rows.forEach((p,i)=>{
+  const y0=top+i*rowH;
+  ctx.fillStyle="rgba(255,248,232,.10)";ctx.beginPath();ctx.roundRect(82,y0,width-164,86,20);ctx.fill();
+  ctx.textAlign="left";ctx.font="700 43px Arial";ctx.fillStyle="#f4d68c";ctx.fillText(medal[Number(p.rank)]||"🏅",112,y0+57);
+  ctx.fillStyle="#fff8e8";ctx.font="700 31px Arial";
+  let name=String(p.display_name||"Participante");while(ctx.measureText(name).width>560&&name.length>8)name=name.slice(0,-2)+"…";
+  ctx.fillText(name,205,y0+52);
+  ctx.textAlign="right";ctx.fillStyle="#e8c675";ctx.font="800 29px Arial";ctx.fillText(Number(p.points||0)+" PTS",width-118,y0+52);
+  if(Number(p.tieCount)>1){ctx.textAlign="left";ctx.fillStyle="#d7c9a8";ctx.font="italic 18px Arial";ctx.fillText("Empatados en el puesto #"+p.rank,205,y0+76);}
+ });
+ const footerY=top+rows.length*rowH+88;
+ ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 28px Arial";ctx.fillText("¡GRACIAS POR COMPARTIR LA MAGIA!",width/2,footerY);
+ ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="24px Arial";ctx.fillText("La alegría de participar nos hace ganar a todos 🎄",width/2,footerY+48);
+ ctx.fillStyle="#e8c675";ctx.font="700 22px Arial";ctx.fillText("NAVIDAD CLIENTE 360",width/2,height-86);
+ return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("No se pudo generar la imagen del podio.")),"image/png"));
+}
+async function shareSpiritPodium(ranking,challenge){
+ const button=$("#spirit-share-podium");if(button){button.disabled=true;button.textContent="Preparando imagen…";}
+ try{
+  const blob=await createSpiritPodiumImage(ranking,challenge),file=new File([blob],"podio-espiritu-navideno.png",{type:"image/png"});
+  if(navigator.canShare?.({files:[file]})&&navigator.share){await navigator.share({files:[file],title:"Podio · Espíritu Navideño",text:"🏆 ¡Así va nuestro podio navideño! 🎄"});}
+  else{
+   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="podio-espiritu-navideno.png";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+   const message=encodeURIComponent("🏆 ¡Así va nuestro podio de Espíritu Navideño! 🎄");window.open("https://wa.me/?text="+message,"_blank","noopener");
+  }
+ }catch(error){if(error.name!=="AbortError")alert(error.message||"No se pudo compartir el podio.");}
+ finally{if(button){button.disabled=false;button.innerHTML="📲 Compartir podio como imagen";}}
+}
+
 let spiritRecorder=null,spiritAudioChunks=[];
 async function blobToDataUrl(blob){return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error("No se pudo procesar el audio."));r.readAsDataURL(blob);});}
 async function renderSpiritTab(){
@@ -109,11 +156,12 @@ async function renderSpiritTab(){
   let field=type==="photo"?'<label class="spirit-file-label">📷 Sube tu foto<input name="media" type="file" accept="image/jpeg,image/png,image/webp" required></label><label>Comentario (opcional)<textarea name="caption" maxlength="500"></textarea></label>':type==="voice"?'<div class="spirit-voice-recorder"><button type="button" class="admin-action" data-spirit-record>🎙️ Iniciar grabación</button><span id="spirit-record-status">Máximo 30 segundos</span><audio id="spirit-audio-preview" controls class="hidden"></audio></div><label>Comentario (opcional)<textarea name="caption" maxlength="300"></textarea></label>':type==="trivia"?'<fieldset class="spirit-trivia-options"><legend>'+esc(cfg.question||"Elige la respuesta correcta")+'</legend>'+(cfg.options||[]).map(o=>'<label><input type="radio" name="answer" value="'+esc(o)+'" required><span>'+esc(o)+'</span></label>').join("")+'</fieldset>':'<label>Tu participación<textarea name="caption" maxlength="500" minlength="2" required placeholder="Cuéntanos o comparte tu momento navideño…"></textarea></label>';
   const formMarkup=challenge?(data.mySubmission?'<div class="spirit-submitted">🎉 ¡Ya participaste en este reto! Tu publicación está en el carrusel de la comunidad.</div>':'<form id="spirit-submission-form" class="spirit-submit-form">'+field+'<button class="primary-button" type="submit">Enviar mi participación <span>→</span></button><div id="spirit-feedback" class="spirit-feedback" role="status"></div></form>'):"";
   const feed=submissions.length?'<div class="spirit-carousel" aria-label="Participaciones de la comunidad"><div class="spirit-carousel-track">'+submissions.map(p=>'<article class="spirit-post"><div class="spirit-post-head"><span class="spirit-post-avatar">'+(p.avatar_url&&/^https:\/\//i.test(p.avatar_url)?'<img src="'+esc(p.avatar_url)+'" alt="">':'🎄')+'</span><div><b>'+esc(p.display_name)+'</b><small>'+new Date(String(p.created_at).replace(" ","T")+"Z").toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short"})+'</small></div></div><p>'+esc(p.caption)+'</p>'+((p.media_type||"").startsWith("audio/")&&p.media_data?'<audio class="spirit-post-audio" controls preload="none" src="'+p.media_data+'"></audio>':p.media_data&&String(p.media_type||"").startsWith("image/")?'<img class="spirit-post-image" src="'+p.media_data+'" alt="Foto compartida">':p.image_data?'<img class="spirit-post-image" src="'+p.image_data+'" alt="Foto compartida">':"")+'<div class="spirit-post-actions"><span>❤️ '+Number(p.votes)+' Me gusta · +'+Math.min(Number(p.votes),10)+' pts</span>'+(p.user_id===currentUser.user.id?'<button type="button" class="spirit-delete-button" data-spirit-delete="'+esc(p.id)+'">Eliminar mi participación</button>':p.eligibleForVoting===false?'<small class="spirit-trivia-wrong">Respuesta incorrecta</small>':'<button type="button" '+(p.voted?'data-spirit-unvote="'+esc(p.id)+'"':'data-spirit-vote="'+esc(p.id)+'"')+'>'+(p.voted?"Quitar Me gusta ✓":"Me gusta ❤️")+'</button>')+'</div></article>').join("")+'</div></div>':'<p class="spirit-muted">Todavía no hay publicaciones. ¡Anímate a inaugurar el reto!</p>';
-  host.innerHTML='<section class="spirit-score-card"><div><small>TU PUNTUACIÓN</small><strong>'+Number(data.myPoints||0)+' pts</strong><span>'+(data.myRank?'Puesto #'+data.myRank:'Aún sin posición')+'</span></div><span class="spirit-score-icon">🏆</span></section>'+challengeMarkup+formMarkup+'<section class="spirit-section"><div class="spirit-section-title"><h3>✨ Comunidad navideña</h3><small>'+submissions.length+' participaciones · desliza para verlas</small></div>'+feed+'</section><section class="spirit-section"><div class="spirit-section-title"><h3>🏆 Podio</h3><small>Los 3 primeros</small></div><div class="spirit-ranking">'+rankMarkup+'</div></section>';
+  host.innerHTML='<section class="spirit-score-card"><div><small>TU PUNTUACIÓN</small><strong>'+Number(data.myPoints||0)+' pts</strong><span>'+(data.myRank?'Puesto #'+data.myRank:'Aún sin posición')+'</span></div><span class="spirit-score-icon">🏆</span></section>'+challengeMarkup+formMarkup+'<section class="spirit-section"><div class="spirit-section-title"><h3>✨ Comunidad navideña</h3><small>'+submissions.length+' participaciones · desliza para verlas</small></div>'+feed+'</section><section class="spirit-section"><div class="spirit-section-title"><h3>🏆 Podio</h3><small>Los 3 primeros</small></div><div class="spirit-ranking">'+rankMarkup+'</div><button type="button" id="spirit-share-podium" class="spirit-share-podium">📲 Compartir podio como imagen</button></section>';
   if(!home.dataset.spiritHandlers){
    home.dataset.spiritHandlers="1";
    home.addEventListener("submit",async ev=>{if(ev.target.id!=="spirit-submission-form")return;ev.preventDefault();const form=ev.target,button=form.querySelector('button[type="submit"]'),fb=$("#spirit-feedback");button.disabled=true;button.textContent="Enviando…";try{let caption=String(form.elements.caption?.value||"").trim(),mediaData="",mediaType="";if(type==="photo"){const file=form.elements.media.files[0];if(!file)throw Error("Selecciona una foto.");mediaData=await compressWishImage(file);mediaType="image/jpeg";}if(type==="voice"){if(!window.__spiritAudioBlob)throw Error("Primero graba tu mensaje de voz.");mediaData=await blobToDataUrl(window.__spiritAudioBlob);mediaType=(window.__spiritAudioBlob.type||"audio/webm").split(";")[0].toLowerCase()||"audio/webm";}if(type==="trivia")caption=String(new FormData(form).get("answer")||"");const result=await api("/api/spirit/submissions",{method:"POST",body:JSON.stringify({caption,mediaData,mediaType})});await renderSpiritTab();const score=$("#spirit-content .spirit-score-card");if(score)score.insertAdjacentHTML("afterend",'<p class="spirit-success">'+(type==="trivia"?(result.correct?"¡Respuesta correcta! ":"Respuesta registrada. Sigue participando. "):"¡Participación enviada! ")+"Los puntos llegarán con los Me gusta que recibas. ❤️</p>");}catch(error){fb.textContent=error.message;button.disabled=false;button.textContent="Enviar mi participación →";}});
    home.addEventListener("click",async ev=>{
+    const sharePodium=ev.target.closest("#spirit-share-podium");if(sharePodium){await shareSpiritPodium(ranking,challenge);return;}
     const record=ev.target.closest("[data-spirit-record]");if(record){const status=$("#spirit-record-status"),preview=$("#spirit-audio-preview");try{if(!spiritRecorder||spiritRecorder.state==="inactive"){if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error("Tu navegador no permite grabar audio.");const stream=await navigator.mediaDevices.getUserMedia({audio:true});spiritAudioChunks=[];spiritRecorder=new MediaRecorder(stream);spiritRecorder.ondataavailable=e=>{if(e.data.size)spiritAudioChunks.push(e.data);};spiritRecorder.onstop=()=>{window.__spiritAudioBlob=new Blob(spiritAudioChunks,{type:spiritRecorder.mimeType||"audio/webm"});preview.src=URL.createObjectURL(window.__spiritAudioBlob);preview.classList.remove("hidden");stream.getTracks().forEach(t=>t.stop());status.textContent="Audio listo para enviar.";record.textContent="🎙️ Grabar nuevamente";};spiritRecorder.start();record.textContent="⏹ Detener grabación";status.textContent="Grabando… máximo 30 segundos.";window.__spiritVoiceLimit=setTimeout(()=>{if(spiritRecorder?.state==="recording")spiritRecorder.stop();},30000);}else if(spiritRecorder.state==="recording"){clearTimeout(window.__spiritVoiceLimit);spiritRecorder.stop();}}catch(error){status.textContent=error.message;}return;}
     const del=ev.target.closest("[data-spirit-delete]");if(del){if(!confirm("¿Eliminar tu participación y los puntos asociados?"))return;del.disabled=true;del.textContent="Eliminando…";try{await api("/api/spirit/submissions/"+encodeURIComponent(del.dataset.spiritDelete),{method:"DELETE"});await renderSpiritTab();}catch(error){del.disabled=false;del.textContent=error.message;}return;}
     const unvote=ev.target.closest("[data-spirit-unvote]");if(unvote){unvote.disabled=true;try{await api("/api/spirit/submissions/"+encodeURIComponent(unvote.dataset.spiritUnvote)+"/vote",{method:"DELETE"});await renderSpiritTab();}catch(error){unvote.disabled=false;unvote.textContent=error.message;}return;}const vote=ev.target.closest("[data-spirit-vote]");if(!vote)return;vote.disabled=true;vote.textContent="Enviando…";try{await api("/api/spirit/submissions/"+encodeURIComponent(vote.dataset.spiritVote)+"/vote",{method:"POST",body:JSON.stringify({})});await renderSpiritTab();}catch(error){vote.disabled=false;vote.textContent=error.message;}
