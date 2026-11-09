@@ -97,8 +97,8 @@ function renderMemberApp(){
 }
 
 async function createSpiritPodiumImage(ranking,challenge){
- const rows=(ranking||[]).filter(p=>Number(p.rank)<=3),scale=1;
- const width=1080,rowH=112,top=360,height=Math.max(1350,top+rows.length*rowH+230);
+ const groups=[...new Set((ranking||[]).filter(p=>Number(p.rank)<=3).map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
+ const width=1080,rowH=142,top=360,height=Math.max(1350,top+groups.length*rowH+230);
  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
  const ctx=canvas.getContext("2d");
  const bg=ctx.createLinearGradient(0,0,width,height);bg.addColorStop(0,"#0c3027");bg.addColorStop(.55,"#174b39");bg.addColorStop(1,"#081f1a");ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
@@ -114,17 +114,18 @@ async function createSpiritPodiumImage(ranking,challenge){
  for(const word of title.split(/\s+/)){const test=line?line+" "+word:word;if(ctx.measureText(test).width>max&&line){ctx.fillText(line,width/2,y);line=word;y+=38;}else line=test;}
  if(line)ctx.fillText(line,width/2,y);
  const medal={1:"🥇",2:"🥈",3:"🥉"};
- rows.forEach((p,i)=>{
-  const y0=top+i*rowH;
-  ctx.fillStyle="rgba(255,248,232,.10)";ctx.beginPath();ctx.roundRect(82,y0,width-164,86,20);ctx.fill();
-  ctx.textAlign="left";ctx.font="700 43px Arial";ctx.fillStyle="#f4d68c";ctx.fillText(medal[Number(p.rank)]||"🏅",112,y0+57);
-  ctx.fillStyle="#fff8e8";ctx.font="700 31px Arial";
-  let name=String(p.display_name||"Participante");while(ctx.measureText(name).width>560&&name.length>8)name=name.slice(0,-2)+"…";
-  ctx.fillText(name,205,y0+52);
-  ctx.textAlign="right";ctx.fillStyle="#e8c675";ctx.font="800 29px Arial";ctx.fillText(Number(p.points||0)+" PTS",width-118,y0+52);
-  if(Number(p.tieCount)>1){ctx.textAlign="left";ctx.fillStyle="#d7c9a8";ctx.font="italic 18px Arial";ctx.fillText("Empatados en el puesto #"+p.rank,205,y0+76);}
+ groups.forEach((group,i)=>{
+  const y0=top+i*rowH,people=group.people;
+  ctx.fillStyle="rgba(255,248,232,.10)";ctx.beginPath();ctx.roundRect(82,y0,width-164,116,20);ctx.fill();
+  ctx.textAlign="left";ctx.font="700 43px Arial";ctx.fillStyle="#f4d68c";ctx.fillText(medal[group.rank]||"🏅",112,y0+65);
+  ctx.fillStyle="#e8c675";ctx.font="700 20px Arial";ctx.fillText(people.length>1?"EMPATE EN EL "+(group.rank===1?"PRIMER":group.rank===2?"SEGUNDO":"TERCER")+" LUGAR":(group.rank===1?"PRIMER":group.rank===2?"SEGUNDO":"TERCER")+" LUGAR",205,y0+34);
+  ctx.fillStyle="#fff8e8";ctx.font="700 29px Arial";
+  const names=people.map(p=>String(p.display_name||"Participante")+(group.rank===1&&Number(p.first_place_streak)>1?" 🔥":"")).join(" y ");
+  let display=names;while(ctx.measureText(display).width>660&&display.length>12)display=display.slice(0,-3)+"…";
+  ctx.fillText(display,205,y0+77);
+  ctx.textAlign="right";ctx.fillStyle="#e8c675";ctx.font="800 29px Arial";ctx.fillText(Number(people[0].points||0)+" PTS",width-118,y0+77);
  });
- const footerY=top+rows.length*rowH+88;
+ const footerY=top+groups.length*rowH+88;
  ctx.textAlign="center";ctx.fillStyle="#e8c675";ctx.font="700 28px Arial";ctx.fillText("¡GRACIAS POR COMPARTIR LA MAGIA!",width/2,footerY);
  ctx.fillStyle="rgba(255,248,232,.78)";ctx.font="24px Arial";ctx.fillText("La alegría de participar nos hace ganar a todos 🎄",width/2,footerY+48);
  ctx.fillStyle="#e8c675";ctx.font="700 22px Arial";ctx.fillText("NAVIDAD CLIENTE 360",width/2,height-86);
@@ -150,7 +151,8 @@ async function renderSpiritTab(){
  home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD CLIENTE 360 · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
   const data=await api("/api/spirit/board",{noMemoryCache:true}),host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
-  const rankMarkup=ranking.length?ranking.map((p,i)=>'<article class="spirit-rank-row '+(p.user_id===currentUser.user.id?"is-me":"")+'"><span class="spirit-medal">'+(medals[Number(p.rank||i+1)-1]||"🏅")+'</span><span class="spirit-rank-name">'+esc(p.display_name)+(Number(p.rank)===1&&Number(p.first_place_streak)>1?" 🔥 <small>"+Number(p.first_place_streak)+" días</small>":"")+(Number(p.tieCount)>1?'<small>Empatado en el puesto #'+Number(p.rank)+'</small>':"")+(p.user_id===currentUser.user.id?'<small>¡Tú!</small>':"")+'</span><span class="spirit-rank-points">'+Number(p.points||0)+' pts</span></article>').join(""):'<p class="spirit-muted">Aún no hay puntos registrados. ¡Sé el primero en participar!</p>';
+  const rankGroups=[...new Set(ranking.map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
+  const rankMarkup=rankGroups.length?rankGroups.map(group=>{const names=group.people.map(p=>'<span class="spirit-rank-person">'+esc(p.display_name)+(Number(p.rank)===1&&Number(p.first_place_streak)>1?' <b class="spirit-streak">🔥 '+Number(p.first_place_streak)+' días</b>':'')+(p.user_id===currentUser.user.id?' <small>¡Tú!</small>':'')+'</span>').join('<span class="spirit-tie-join"> y </span>');const label=group.people.length>1?'Empate en el '+(group.rank===1?'primer':group.rank===2?'segundo':'tercer')+' lugar':(group.rank===1?'Primer':group.rank===2?'Segundo':'Tercer')+' lugar';return '<article class="spirit-rank-row spirit-rank-group '+(group.people.some(p=>p.user_id===currentUser.user.id)?'is-me':'')+'"><span class="spirit-medal">'+(medals[group.rank-1]||'🏅')+'</span><span class="spirit-rank-name"><small class="spirit-rank-place">'+label+'</small><span class="spirit-rank-names">'+names+'</span></span><span class="spirit-rank-points">'+Number(group.people[0].points||0)+' pts</span></article>';}).join(""):'<p class="spirit-muted">Aún no hay puntos registrados. ¡Sé el primero en participar!</p>';
   const type=challenge?.challenge_type||"text",cfg=challenge?.config||{};
   const challengeMarkup=challenge?'<article class="spirit-challenge"><div class="spirit-challenge-top"><span>🎯 RETO ACTIVO</span><b>❤️ POR LIKES</b></div><h3>'+esc(challenge.title)+'</h3><p>'+esc(challenge.description)+'</p><small>Cada Me gusta de otro participante suma 1 punto (máximo 10 por publicación). La publicación más votada del día recibe 10 puntos extra; si hay empate, todos los primeros lugares reciben la bonificación.</small></article>':'<article class="spirit-challenge"><h3>¡Estamos preparando el próximo reto!</h3><p>El reto de hoy terminó a las 10:00 p. m. (hora Perú). Estamos en pausa hasta las 9:00 a. m., cuando se abrirá el siguiente reto. ¡Vuelve mañana para seguir sumando! 🎄</p></article>';
   let field=type==="photo"?'<label class="spirit-file-label">📷 Sube tu foto<input name="media" type="file" accept="image/jpeg,image/png,image/webp" required></label><label>Comentario (opcional)<textarea name="caption" maxlength="500"></textarea></label>':type==="voice"?'<div class="spirit-voice-recorder"><button type="button" class="admin-action" data-spirit-record>🎙️ Iniciar grabación</button><span id="spirit-record-status">Máximo 30 segundos</span><audio id="spirit-audio-preview" controls class="hidden"></audio></div><label>Comentario (opcional)<textarea name="caption" maxlength="300"></textarea></label>':type==="trivia"?'<fieldset class="spirit-trivia-options"><legend>'+esc(cfg.question||"Elige la respuesta correcta")+'</legend>'+(cfg.options||[]).map(o=>'<label><input type="radio" name="answer" value="'+esc(o)+'" required><span>'+esc(o)+'</span></label>').join("")+'</fieldset>':'<label>Tu participación<textarea name="caption" maxlength="500" minlength="2" required placeholder="Cuéntanos o comparte tu momento navideño…"></textarea></label>';
