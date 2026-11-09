@@ -500,7 +500,7 @@ async function handleApi(request, env, url) {
 
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
       await ensureSpiritSchema(env);
-      const edition=await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition=await getAdminEdition(env, url);
       if(!edition)return json({active:null});
       await env.DB.prepare("DELETE FROM spirit_challenges WHERE edition_id=? AND id LIKE 'seed-%' AND starts_at>datetime('now') AND NOT EXISTS (SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=spirit_challenges.id)").bind(edition.id).run();
       const active=await env.DB.prepare("SELECT id,title,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
@@ -539,7 +539,7 @@ async function handleApi(request, env, url) {
 
     if (request.method === "PATCH" && url.pathname === "/api/admin/edition") {
       const body = await request.json();
-      const edition = await env.DB.prepare("SELECT id, status FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition) return json({ error: "No hay una edición configurada." }, 404);
       if (edition.status !== "registration") return json({ error: "Los ajustes están bloqueados porque el sorteo ya fue realizado o la edición terminó." }, 409);
       const title = String(body.title || "").trim();
@@ -639,13 +639,12 @@ async function handleApi(request, env, url) {
     }
 
     if (request.method === "GET" && url.pathname === "/api/admin/status") {
-      const workspace = await env.DB.prepare("SELECT w.id, w.name FROM workspace w JOIN editions e ON e.workspace_id=w.id WHERE e.id=?").bind(edition?.id || "").first();
-      const edition = workspace ? await env.DB.prepare("SELECT id, title, year, budget_amount, event_date, status FROM editions WHERE workspace_id = ? ORDER BY year DESC LIMIT 1").bind(workspace.id).first() : null;
+      const edition = await getAdminEdition(env, url);
       const members = edition ? await env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id = ? AND status = 'confirmed'").bind(edition.id).first() : { total: 0 };
       return json({ isPrimaryAdmin: true, email: user.email, initialized: !!edition, edition, participants: members.total || 0 });
     }
     if (request.method === "GET" && url.pathname === "/api/admin/participants") {
-      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
+      const edition = await getAdminEdition(env, url);
       if (!edition) return json({ participants: [] });
       const result = await env.DB.prepare("SELECT em.user_id, COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), u.display_name) AS display_name, u.email, u.avatar_url, em.status, em.joined_at FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id WHERE em.edition_id=? AND em.status IN ('confirmed','inactive') ORDER BY CASE em.status WHEN 'confirmed' THEN 0 ELSE 1 END, em.joined_at ASC").bind(edition.id).all();
       return json({ participants: result.results || [] });
@@ -706,9 +705,8 @@ async function handleApi(request, env, url) {
     }
     if (request.method === "POST" && url.pathname === "/api/admin/invitations") {
       const body = await request.json();
-      const edition = body.editionId ? await env.DB.prepare("SELECT id, title, year FROM editions WHERE id=?").bind(body.editionId).first() : await getAdminEdition(env, url);
-      const edition = await env.DB.prepare("SELECT id FROM editions ORDER BY year DESC LIMIT 1").first();
-      if (!edition) return json({ error: "Primero crea la edición." }, 409);
+      const edition = body.editionId ? await env.DB.prepare("SELECT id FROM editions WHERE id=?").bind(body.editionId).first() : await getAdminEdition(env, url);
+      if (!edition) return json({ error: "Selecciona una edición válida." }, 409);
       const token = base64url(crypto.getRandomValues(new Uint8Array(24))), hash = await sha256(token);
       const invitationId = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
