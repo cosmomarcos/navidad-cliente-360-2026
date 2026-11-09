@@ -327,13 +327,16 @@ async function handleApi(request, env, url) {
       if(title.length<3||title.length>80||description.length<5||description.length>300)return json({error:"Completa un título y una descripción válidos."},400);
       if(!Number.isInteger(points)||points<1||points>100||!Number.isInteger(bonus)||bonus<1||bonus>50)return json({error:"Los puntos deben estar dentro de los límites permitidos."},400);
       if(type==="trivia"&&(!String(config.question||"").trim()||!Array.isArray(config.options)||config.options.length<2||!config.options.includes(config.correctAnswer)))return json({error:"Configura una pregunta, sus opciones y la respuesta correcta."},400);
-      const now=new Date().toISOString().slice(0,19).replace("T"," ");
-      const end=new Date(Date.now()+86400000).toISOString().slice(0,19).replace("T"," ");
-      await env.DB.prepare("UPDATE spirit_challenges SET ends_at=? WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now')").bind(now,edition.id).run();
-      await env.DB.prepare("DELETE FROM spirit_challenges WHERE edition_id=? AND id LIKE 'seed-%' AND starts_at>datetime('now') AND NOT EXISTS (SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=spirit_challenges.id)").bind(edition.id).run();
+      const scheduledDate=String(body.scheduledDate||"");
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate))return json({error:"Selecciona la fecha en que debe abrirse el reto."},400);
+      const start=new Date(scheduledDate+"T14:00:00.000Z"),end=new Date(start.getTime()+13*60*60*1000);
+      if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now())return json({error:"Elige una fecha futura. Los retos abren a las 9:00 a. m. hora Perú."},400);
+      const startSql=start.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," ");
+      const overlap=await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND starts_at<? AND ends_at>? LIMIT 1").bind(edition.id,endSql,startSql).first();
+      if(overlap)return json({error:"Ya existe un reto programado para ese día."},409);
       const id=crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,type,JSON.stringify(config),now,end,user.id).run();
-      return json({ok:true,id});
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,type,JSON.stringify(config),startSql,endSql,user.id).run();
+      return json({ok:true,id,startsAt:startSql,endsAt:endSql});
     }
 
     if (request.method === "POST" && url.pathname === "/api/admin/spirit/reset-my-points") {
