@@ -403,7 +403,7 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .spirit-trivia-options legend{padding:0 5px;font-size:13px;font-weight:800;color:#19372d}
 .spirit-trivia-options label{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;background:#fffaf0;font-size:12px}
 .spirit-trivia-options input{accent-color:#174536}
-.admin-settings-nav{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:14px 0;padding:8px;border:1px solid #d8cfbb;border-radius:14px;background:#f7f0df;box-shadow:0 5px 18px #19372d12}
+.admin-settings-nav{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:14px 0;padding:8px;border:1px solid #d8cfbb;border-radius:14px;background:#f7f0df;box-shadow:0 5px 18px #19372d12}
 .admin-settings-nav button{min-height:42px;padding:8px 5px;border:1px solid transparent;border-radius:9px;background:transparent;color:#53685b;font-size:11px;font-weight:800;cursor:pointer}
 .admin-settings-nav button.active{background:#174536;color:#fff8e8;box-shadow:0 3px 9px #17453633}
 .admin-settings-section{min-height:220px;animation:adminSectionIn .16s ease-out}
@@ -576,3 +576,25 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 /* v1.12.0 · Podio agrupado por puesto y empates */
 .spirit-rank-group{min-height:74px;align-items:center}.spirit-rank-group .spirit-rank-name{display:grid;gap:5px;min-width:0}.spirit-rank-place{display:block;color:#9a7a3e;font-size:9px;font-weight:900;letter-spacing:.65px;text-transform:uppercase}.spirit-rank-names{display:block;line-height:1.5;overflow-wrap:anywhere}.spirit-rank-person{display:inline}.spirit-tie-join{color:#987d45;font-size:11px;font-weight:800}.spirit-streak{white-space:nowrap;color:#c06b27;font-size:10px}
+
+
+/* Panel privado de actividad del administrador */
+.admin-activity-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 14px}
+.admin-activity-heading h3{margin:0;color:#19372d;font-size:17px}
+.admin-activity-heading p{margin:5px 0 0;color:#64766b;font-size:11px}
+.admin-activity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.admin-activity-metric{display:grid;gap:5px;padding:15px;border:1px solid #d8cfbb;border-radius:14px;background:#fffaf0;color:#19372d}
+.admin-activity-metric small{font-size:10px;font-weight:800;color:#64766b;text-transform:uppercase;letter-spacing:.04em}
+.admin-activity-metric strong{font-size:30px;line-height:1.1;color:#174536}
+.admin-activity-metric span{font-size:10px;color:#8b8d7e}
+.admin-activity-list{margin-top:18px;padding:15px;border:1px solid #d8cfbb;border-radius:14px;background:#fffaf0;color:#19372d}
+.admin-activity-list h4{margin:0 0 10px;font-size:13px}
+.admin-activity-person{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #eee6d6}
+.admin-activity-avatar{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:50%;background:#e9e2d2;overflow:hidden}
+.admin-activity-avatar img{width:100%;height:100%;object-fit:cover}
+.admin-activity-person>span:nth-child(2){display:grid;gap:3px;flex:1;min-width:0}
+.admin-activity-person b{font-size:11px;overflow-wrap:anywhere}
+.admin-activity-person small{font-size:10px;color:#64766b}
+.admin-activity-person i{width:9px;height:9px;border-radius:50%;background:#c4bcae}
+.admin-activity-person i.is-online{background:#269b62;box-shadow:0 0 0 3px #269b6222}
+@media(max-width:520px){.admin-settings-nav{grid-template-columns:repeat(5,minmax(0,1fr))}.admin-activity-heading{align-items:flex-start;flex-direction:column}.admin-activity-grid{gap:7px}.admin-activity-metric{padding:12px}.admin-activity-metric strong{font-size:26px}}
