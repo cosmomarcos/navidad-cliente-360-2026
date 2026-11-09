@@ -108,7 +108,7 @@ async function processSpiritChallengeClosures(env) {
       const streak=place===1?(await env.DB.prepare("SELECT current_streak FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,person.user_id).first())?.current_streak||1:0;
       const title=place===1?"🏆 ¡Felicitaciones, primer lugar!":place===2?"🥈 ¡Felicitaciones, segundo lugar!":"🥉 ¡Felicitaciones, tercer lugar!";
       const body=place===1?"Vas ocupando el primer lugar"+(streak>1?" por "+streak+" días consecutivos. ¡Sigue así! 🔥":" ¡Sigue así!"):"Terminaste en el puesto "+place+" del reto "+challenge.title+". ¡Gracias por participar!";
-      await sendPushToUser(env,person.user_id,{title,body,tag:"spirit-result-"+challenge.id+"-"+person.user_id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"mailto:admin@example.com");
+      await sendPushToUser(env,person.user_id,{title,body,tag:"spirit-result-"+challenge.id+"-"+person.user_id,url:"/?tab=spirit"},env.VAPID_SUBJECT||"https://navidad-cliente-360-2026.torresmarcos16.workers.dev");
     }
   }
 }
