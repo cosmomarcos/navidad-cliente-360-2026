@@ -602,3 +602,11 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 /* v1.9.0 · Selector de intercambios de Navidad Pyme */
 .admin-edition-label{display:block;margin:14px 0 6px;font-size:11px;font-weight:800;color:#19372d}.admin-edition-select{width:100%;min-height:46px;padding:12px;border:1px solid #d8cfbb;border-radius:10px;background:#fffdf7;color:#19372d;font-weight:700}.admin-team-actions,.admin-invite-actions{display:flex;gap:10px;flex-wrap:wrap}.admin-team-actions .admin-action,.admin-invite-actions .admin-action{width:100%}.invite-copy-button{display:block;width:100%;margin:10px 0;padding:12px;border:1px solid #b99b5c;border-radius:10px;background:#fffaf0;color:#174536;font-weight:800;cursor:pointer}
+
+/* v1.10.0 · Contexto global y estados vacíos por intercambio */
+.admin-edition-select{min-height:48px;border:1px solid #c9b98f;border-radius:14px;background:linear-gradient(135deg,#fffdf7,#f5eedf);box-shadow:0 5px 16px rgba(25,55,45,.08);font-size:13px}
+.admin-edition-label{margin-top:18px;letter-spacing:.08em;text-transform:uppercase;color:#8a7549}
+.edition-empty-state{display:grid;justify-items:center;gap:10px;margin:18px 0;padding:34px 22px;border:1px dashed #c9bea8;border-radius:20px;background:linear-gradient(145deg,#fffaf0,#f1eadb);color:#19372d;text-align:center}
+.edition-empty-state>span{display:grid;place-items:center;width:64px;height:64px;border-radius:22px;background:#e8dfca;font-size:30px}
+.edition-empty-state h2,.edition-empty-state h3{margin:0;font-family:'Playfair Display',serif;font-size:21px}
+.edition-empty-state p{max-width:360px;margin:0;color:#64766b;font-size:12px;line-height:1.65}

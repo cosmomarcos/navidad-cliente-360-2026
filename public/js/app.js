@@ -6,12 +6,12 @@ if(urlInvite)sessionStorage.setItem("navidad_invite_token",urlInvite);
 const token = urlInvite || sessionStorage.getItem("navidad_invite_token") || "";
 const isWhatsAppInApp = /WhatsApp/i.test(navigator.userAgent) && !!token;
 
-let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null, selectedEditionId="";
+let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null, selectedEditionId=new URLSearchParams(location.search).get("editionId")||localStorage.getItem("navidad_selected_edition")||"";
 const apiMemoryCache=new Map();
 const api=async(path,options={})=>{
  const method=(options.method||"GET").toUpperCase(),cacheable=method==="GET"&&!options.noMemoryCache;
  let requestPath=path;
- if(path.startsWith("/api/admin/") && !path.startsWith("/api/admin/editions") && selectedEditionId){const separator=path.includes("?")?"&":"?";requestPath=path+separator+"editionId="+encodeURIComponent(selectedEditionId);}
+ if(selectedEditionId && path.startsWith("/api/") && path!=="/api/config" && path!=="/api/health" && path!=="/api/admin/editions" && !/[?&]editionId=/.test(path)){const separator=path.includes("?")?"&":"?";requestPath=path+separator+"editionId="+encodeURIComponent(selectedEditionId);}
  if(method!=="GET")apiMemoryCache.clear();
  if(cacheable){const cached=apiMemoryCache.get(requestPath);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:8000))return cached.data;}
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),18000);
@@ -64,8 +64,9 @@ async function loadInvite(){if(!token)return;try{const r=await api("/api/invitat
 function showProfileForm(profile=null){
  setSnowfall(false);
  const card=$("#join-card");card.classList.remove("hidden");card.innerHTML=`<div class="card-heading"><div class="icon-bubble">👤</div><div><p class="kicker">TU PERFIL DE PARTICIPANTE</p><h2>¿Cómo te llamas?</h2></div></div><p class="muted">Escribe tus nombres y apellidos reales. Estos datos serán utilizados para identificarte durante el sorteo; no mostraremos tu correo como nombre.</p><form id="participant-profile-form" class="profile-form"><label>Nombres<input name="firstName" autocomplete="given-name" maxlength="80" required value="${esc(profile?.first_name||"")}"></label><label>Apellidos<input name="lastName" autocomplete="family-name" maxlength="100" required value="${esc(profile?.last_name||"")}"></label><button class="primary-button" type="submit">Guardar mi nombre <span>→</span></button></form><div id="profile-feedback" class="status hidden" role="status"></div>`;
- $("#participant-profile-form").addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget));const fb=$("#profile-feedback");try{await api("/api/profile/participant",{method:"POST",body:JSON.stringify(values)});currentUser=await api("/api/me");renderMemberApp();}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+ $("#participant-profile-form").addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget));const fb=$("#profile-feedback");try{await api("/api/profile/participant",{method:"POST",body:JSON.stringify(values)});currentUser=await api("/api/me"+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):""));renderMemberApp();}catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}});
 }
+function renderEmptyEditionTab(title,icon="🎄"){const section=$("#member-app .member-home");if(!section)return;section.innerHTML=`<div class="member-section-heading"><p class="kicker">ONBOARDING DIGITAL · NAVIDAD PYME</p><h2>${title}</h2></div><section class="edition-empty-state"><span>${icon}</span><h3>Próximamente</h3><p>Este espacio está listo. La información de este intercambio se agregará cuando esté definida.</p></section>`;}
 function formatExchangeDate(date){
  if(!date)return "Por definir";
  const parts=String(date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -79,12 +80,13 @@ function renderMemberApp(){
  setClass("#join-card","hidden",true);setClass("#admin-panel","hidden",true);
  let app=$("#member-app");app.classList.remove("hidden");
  const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";
+ const isOnboarding=currentUser.membership?.team_name==="Onboarding Digital";
  const budgetAmount=currentUser.membership?.budget_amount;
  const budgetCurrency=currentUser.membership?.currency||"PEN";
  const exchangeDateLabel=formatExchangeDate(currentUser.membership?.event_date);
  const exchangeShareText="🎄 *NAVIDAD PYME · 2026*\n\n📅 *Fecha:* "+exchangeDateLabel+"\n🎁 *Montos del intercambio:*\n• Amigo Secreto: mínimo S/ 100\n• Dirty Santa: mínimo S/ 20\n\n📍 *Lugar:* Casa de Marcos\nAv. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima\n🗺️ Google Maps: https://maps.app.goo.gl/rueCMQujUGvwxFoY9\n\n🥪 *Desayuno:* Chicharrón de El Chinito desde las 9:00 a. m.\n🍖 *Cuota para la parrilla:* Por definir.\n\n¡Nos vemos para compartir la magia de esta Navidad! 🎅";
  const budgetLabel=budgetAmount==null?"Por definir":new Intl.NumberFormat("es-PE",{style:"currency",currency:budgetCurrency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(budgetAmount));
- const homeMarkup=`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><div class="exchange-minimum-list"><div><span>Amigo Secreto</span><strong>Mínimo S/ 100</strong></div><div><span>Dirty Santa</span><strong>Mínimo S/ 20</strong></div></div></div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📅</span><div><b>Fecha: ${esc(exchangeDateLabel)}</b></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🍖</span><div><b>Cuota para la parrilla</b><p>Por definir</p></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><a class="exchange-whatsapp-share" href="https://wa.me/?text=${encodeURIComponent(exchangeShareText)}" target="_blank" rel="noopener noreferrer" aria-label="Compartir información del intercambio por WhatsApp"><span aria-hidden="true">◉</span> Compartir información por WhatsApp</a></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
+ const homeMarkup=isOnboarding?`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · ${esc(currentUser.membership?.year||2026)}</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Bienvenido al intercambio de Onboarding Digital.</p></section><section class="edition-empty-state"><span>🎁</span><h2>Tu intercambio está en preparación</h2><p>Pronto compartiremos aquí toda la información de la celebración.</p></section>`:`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><div class="exchange-minimum-list"><div><span>Amigo Secreto</span><strong>Mínimo S/ 100</strong></div><div><span>Dirty Santa</span><strong>Mínimo S/ 20</strong></div></div></div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📅</span><div><b>Fecha: ${esc(exchangeDateLabel)}</b></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🍖</span><div><b>Cuota para la parrilla</b><p>Por definir</p></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><a class="exchange-whatsapp-share" href="https://wa.me/?text=${encodeURIComponent(exchangeShareText)}" target="_blank" rel="noopener noreferrer" aria-label="Compartir información del intercambio por WhatsApp"><span aria-hidden="true">◉</span> Compartir información por WhatsApp</a></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
  app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes <span class="nav-unread-badge" id="community-unread-badge" hidden></span></button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
  startActivityHeartbeat();
  updateMemberCountdown(currentUser.membership?.event_date);
@@ -190,6 +192,7 @@ async function shareSpiritPodium(ranking,challenge){
 let spiritRecorder=null,spiritAudioChunks=[];
 async function blobToDataUrl(blob){return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error("No se pudo procesar el audio."));r.readAsDataURL(blob);});}
 async function renderSpiritTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Espíritu Navideño","🎄");return;}
  const home=$("#member-app .member-home");if(!home)return;
  home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD PYME · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
@@ -439,6 +442,7 @@ function formatCommunityTime(value){
 }
 
 async function renderCommunityTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Mensajes","✉️");return;}
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>Buzón secreto ✉️</h2><p>Deja un mensaje anónimo para tu amigo secreto y revisa las sorpresas que te envíe.</p></div><div class="tab-skeleton" aria-label="Preparando buzón"><span></span><span></span><span></span></div>';
  try{
@@ -458,6 +462,7 @@ async function renderCommunityTab(){
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Buzón secreto</h2></div><p class="status error">'+esc(e.message)+'</p>';}
 }
 async function renderWishesTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Lista de deseos","💝");return;}
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>Lista de deseos 💝</h2><p>Pequeñas ideas para inspirar el regalo perfecto.</p></div><div class="tab-skeleton" aria-label="Preparando deseos"><span></span><span></span><span></span></div>';
  try{
@@ -497,6 +502,7 @@ async function renderWishesTab(){
  }catch(e){section.innerHTML='<div class="member-section-heading"><h2>Lista de deseos</h2></div><p class="status error">'+esc(e.message)+'</p>';}
 }
 async function renderSecretTab(){
+ if(currentUser.membership?.team_name==="Onboarding Digital"){renderEmptyEditionTab("Mi amigo secreto","🎁");return;}
  const section=$("#member-app .member-home");if(!section)return;
  section.innerHTML='<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>Mi amigo secreto</h2></div><div class="tab-skeleton tab-skeleton-compact" aria-label="Consultando tu asignación"><span></span><span></span></div>';
  try{
@@ -563,7 +569,7 @@ async function renderAdmin(){
    <div id="admin-result" aria-live="polite"></div>
    <p class="invite-note">Cada equipo tiene su propia edición y enlace. Crear una invitación en un equipo no revoca la del otro.</p>
   </section>`;
-  $("#admin-edition-select")?.addEventListener("change",async ev=>{selectedEditionId=ev.target.value;apiMemoryCache.clear();await renderAdmin();});
+  $("#admin-edition-select")?.addEventListener("change",ev=>{selectedEditionId=ev.target.value;localStorage.setItem("navidad_selected_edition",selectedEditionId);const next=new URL(location.href);next.searchParams.set("editionId",selectedEditionId);location.assign(next.pathname+next.search+next.hash);});
   $("#create-onboarding-edition")?.addEventListener("click",async ev=>{
    const button=ev.currentTarget;button.disabled=true;button.textContent="Creando intercambio…";
    try{const created=await api("/api/admin/editions",{method:"POST",body:JSON.stringify({teamName:"Onboarding Digital",title:"Navidad Onboarding Digital 2026",year:2026})});selectedEditionId=created.edition.id;apiMemoryCache.clear();await renderAdmin();}
@@ -586,7 +592,8 @@ async function renderAdmin(){
 }
 async function checkSession(){
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);
- currentUser=await api("/api/me");signedIn=!!currentUser.authenticated;
+ currentUser=await api("/api/me"+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):""));signedIn=!!currentUser.authenticated;
+ if(currentUser.membership?.edition_id){selectedEditionId=currentUser.membership.edition_id;localStorage.setItem("navidad_selected_edition",selectedEditionId);}
  if(!signedIn){setLoginView();await initGoogle();return;}
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);setClass("#google-area","hidden",true);
  if(token&&currentUser.membership?.status!=="confirmed"){$("#join-card").classList.remove("hidden");$("#join-card").innerHTML=`<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">INVITACIÓN</p><h2>${esc(inviteEdition?.title||"Navidad Pyme")}</h2></div></div><p class="muted">${inviteValid?"Tu invitación está lista. Confirma tu participación para continuar.":"La invitación no es válida o venció."}</p><button id="confirm-join" class="primary-button" ${inviteValid?"":"disabled"}>Confirmar mi participación →</button><div id="join-feedback" class="status hidden"></div>`;
