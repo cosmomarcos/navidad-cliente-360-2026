@@ -12,6 +12,9 @@ function ensureSchemaOnce(key, initialize) {
   }
   return schemaInitPromises.get(key);
 }
+async function ensureEditionHomeSettingsSchema(env) {
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS edition_home_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, config_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
 async function ensureWishesSchema(env) {
   return ensureSchemaOnce("wishes", async () => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_wishes (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, note TEXT, url TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
@@ -276,7 +279,15 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.11.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.12.0" });
+  if (request.method === "GET" && url.pathname === "/api/edition/home") {
+    const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
+    const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
+    await ensureEditionHomeSettingsSchema(env); const row=await env.DB.prepare("SELECT config_json FROM edition_home_settings WHERE edition_id=?").bind(member.edition_id).first();
+    let config={}; try{config=JSON.parse(row?.config_json||"{}");}catch{}
+    return json({config,edition:{title:member.title,year:member.year,event_date:member.event_date,budget_amount:member.budget_amount,currency:member.currency,team_name:member.team_name}});
+  }
+
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -486,6 +497,20 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if (request.method === "GET" && url.pathname === "/api/admin/edition/home") {
+      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureEditionHomeSettingsSchema(env);const row=await env.DB.prepare("SELECT config_json FROM edition_home_settings WHERE edition_id=?").bind(edition.id).first();
+      let config={};try{config=JSON.parse(row?.config_json||"{}");}catch{}return json({config,edition});
+    }
+    if (request.method === "PATCH" && url.pathname === "/api/admin/edition/home") {
+      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      if(edition.status!=="registration")return json({error:"La información se bloquea después del sorteo."},409);
+      const body=await request.json(),keys=["placeName","address","schedule","breakfast","grillFee","extraInfo","mapUrl","shareMessage","welcomeText"],config={};
+      for(const key of keys)config[key]=String(body[key]||"").trim().slice(0,key==="extraInfo"||key==="shareMessage"?1500:300);
+      await ensureEditionHomeSettingsSchema(env);
+      await env.DB.prepare("INSERT INTO edition_home_settings (edition_id,config_json) VALUES (?,?) ON CONFLICT(edition_id) DO UPDATE SET config_json=excluded.config_json,updated_at=datetime('now')").bind(edition.id,JSON.stringify(config)).run();
+      return json({ok:true,config});
+    }
     if (request.method === "GET" && url.pathname === "/api/admin/editions") {
       const result = await env.DB.prepare("SELECT e.id, e.title, e.year, e.budget_amount, e.currency, e.event_date, e.status, w.name AS team_name, (SELECT COUNT(*) FROM edition_members em WHERE em.edition_id=e.id AND em.status='confirmed') AS participants FROM editions e JOIN workspace w ON w.id=e.workspace_id ORDER BY e.created_at ASC").all();
       return json({ editions: result.results || [] });
@@ -569,7 +594,7 @@ async function handleApi(request, env, url) {
       const eventDate = body.eventDate ? String(body.eventDate) : null;
       const budget = body.budgetAmount === "" || body.budgetAmount == null ? null : Number(body.budgetAmount);
       if (title.length < 3 || title.length > 100) return json({ error: "El nombre debe tener entre 3 y 100 caracteres." }, 400);
-      if (eventDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)) return json({ error: "La fecha del intercambio no es válida." }, 400);
+            if (eventDate && (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !Number.isFinite(Date.parse(eventDate+"T00:00:00Z")) || new Date(eventDate+"T00:00:00Z").toISOString().slice(0,10)!==eventDate)) return json({ error: "La fecha del intercambio no es válida. Selecciona una fecha válida." }, 400);
       if (budget !== null && (!Number.isFinite(budget) || budget < 0 || budget > 1000000)) return json({ error: "El presupuesto debe ser un monto válido." }, 400);
       await env.DB.prepare("UPDATE editions SET title=?, event_date=?, budget_amount=? WHERE id=?").bind(title, eventDate, budget, edition.id).run();
       return json({ ok: true });
