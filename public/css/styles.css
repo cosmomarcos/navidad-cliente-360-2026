@@ -692,3 +692,10 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .wish-image-unavailable{display:block;min-width:58px;min-height:58px;background:linear-gradient(135deg,#f3ead7,#e7ddc8);object-fit:contain;color:#64766b;font-size:10px}
 .wish-image-link:has(.wish-image-unavailable){display:grid;place-items:center}
 .wish-image-unavailable[aria-busy="true"]{opacity:.55}
+
+
+/* v1.12.6 · Imágenes de publicaciones: tarjetas sin espacios elásticos */
+.spirit-carousel-track{align-items:flex-start}
+.spirit-carousel .spirit-post{align-self:flex-start;height:fit-content}
+.spirit-carousel .spirit-post>p{flex:0 0 auto}
+.spirit-post-image{width:100%;height:auto;max-height:min(62svh,560px);object-fit:contain;object-position:center;background:#f1eadb}
