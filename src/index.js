@@ -571,6 +571,7 @@ async function handleApi(request, env, url) {
       const edition = await getAdminEdition(env, url);
       if (!edition) return json({ activeNow: 0, activeToday: 0, activeWeek: 0, participants: 0, recent: [] });
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS app_activity (edition_id TEXT NOT NULL, user_id TEXT NOT NULL, last_seen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
+      await Promise.all([ensureWishesSchema(env),ensureCommunitySchema(env)]);
       const [activeNow,activeToday,activeWeek,participants,recent] = await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS total FROM app_activity WHERE edition_id=? AND last_seen_at>=datetime('now','-5 minutes')").bind(edition.id).first(),
         env.DB.prepare("SELECT COUNT(*) AS total FROM app_activity WHERE edition_id=? AND date(last_seen_at)=date('now')").bind(edition.id).first(),
@@ -578,7 +579,8 @@ async function handleApi(request, env, url) {
         env.DB.prepare("SELECT COUNT(*) AS total FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).first(),
         env.DB.prepare("SELECT a.last_seen_at,u.avatar_url,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,CASE WHEN a.last_seen_at>=datetime('now','-5 minutes') THEN 1 ELSE 0 END AS is_active FROM app_activity a JOIN users u ON u.id=a.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE a.edition_id=? ORDER BY a.last_seen_at DESC LIMIT 20").bind(edition.id).all()
       ]);
-      return json({ activeNow: activeNow?.total||0, activeToday: activeToday?.total||0, activeWeek: activeWeek?.total||0, participants: participants?.total||0, recent: (recent.results||[]).map(row=>({...row,last_seen_label:row.last_seen_at})) });
+      const participation=await env.DB.prepare("SELECT em.user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(w.wish_count,0) AS wish_count,w.last_wish_at,COALESCE(c.message_count,0) AS message_count,c.last_message_at FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id LEFT JOIN (SELECT user_id,COUNT(*) AS wish_count,MAX(updated_at) AS last_wish_at FROM participant_wishes WHERE edition_id=? GROUP BY user_id) w ON w.user_id=em.user_id LEFT JOIN (SELECT giver_user_id,COUNT(*) AS message_count,MAX(created_at) AS last_message_at FROM anonymous_clues WHERE edition_id=? GROUP BY giver_user_id) c ON c.giver_user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY display_name COLLATE NOCASE").bind(edition.id,edition.id,edition.id).all();
+      return json({ activeNow: activeNow?.total||0, activeToday: activeToday?.total||0, activeWeek: activeWeek?.total||0, participants: participants?.total||0, recent: (recent.results||[]).map(row=>({...row,last_seen_label:row.last_seen_at})), participation: participation.results||[] });
     }
 
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
