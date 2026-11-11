@@ -699,3 +699,30 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .spirit-carousel .spirit-post{align-self:flex-start;height:fit-content}
 .spirit-carousel .spirit-post>p{flex:0 0 auto}
 .spirit-post-image{width:100%;height:auto;max-height:min(62svh,560px);object-fit:contain;object-position:center;background:#f1eadb}
+
+/* v1.13.0 · Conversación y compartir publicaciones de Espíritu */
+.spirit-post-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid #eee6d6}
+.spirit-post-tools button{display:flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:9px 10px;border:1px solid #d9cfbb;border-radius:11px;background:#fffaf0;color:#285443;font-size:11px;font-weight:800;cursor:pointer}
+.spirit-post-tools button span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#e8eddf;color:#174536;font-size:10px}
+.spirit-comments-panel{margin-top:10px;padding:12px;border:1px solid #e4dccb;border-radius:14px;background:#fbf8f0}
+.spirit-comments-panel[hidden]{display:none}
+.spirit-comments-list{display:grid;gap:10px;max-height:300px;overflow:auto}
+.spirit-comment{display:flex;align-items:flex-start;gap:9px;min-width:0}
+.spirit-comment-avatar{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;overflow:hidden;border-radius:50%;background:#e8e1d2;font-size:15px}
+.spirit-comment-avatar img{width:100%;height:100%;object-fit:cover}
+.spirit-comment>div{flex:1;min-width:0;padding:8px 10px;border-radius:11px;background:#fff}
+.spirit-comment-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.spirit-comment-meta b{color:#285443;font-size:10px}
+.spirit-comment-meta time{color:#8a8d7d;font-size:9px}
+.spirit-comment-meta button{margin-left:auto;border:0;background:transparent;color:#9c6255;font-size:18px;cursor:pointer}
+.spirit-comment>div>p{margin:5px 0 0;color:#3d5146;font-size:11px;line-height:1.55;overflow-wrap:anywhere;white-space:pre-wrap}
+.spirit-comments-loading,.spirit-comments-empty,.spirit-comments-error{margin:4px 0;color:#778174;font-size:10px;line-height:1.5}
+.spirit-comments-error{color:#a13b32}
+.spirit-comment-form{display:grid;gap:7px;margin-top:12px;padding-top:10px;border-top:1px solid #e8e0d0}
+.spirit-comment-form textarea{box-sizing:border-box;width:100%;min-height:62px;resize:vertical;padding:10px 11px;border:1px solid #d8cfbb;border-radius:10px;background:#fff;color:#19372d;font:500 12px/1.5 'DM Sans',sans-serif}
+.spirit-comment-form>div{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.spirit-comment-form small{color:#8a8d7d;font-size:9px}
+.spirit-comment-form button{min-height:36px;padding:8px 14px;border:0;border-radius:9px;background:#174536;color:#fff8e8;font-size:10px;font-weight:800;cursor:pointer}
+.spirit-comment-form button:disabled{opacity:.6}
+.spirit-comment-feedback{min-height:0;margin:0;color:#a13b32;font-size:10px}
+@media(max-width:380px){.spirit-post-tools{grid-template-columns:1fr}.spirit-comment-form>div{align-items:flex-start;flex-direction:column}.spirit-comment-form button{width:100%}}
