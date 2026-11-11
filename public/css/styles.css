@@ -729,3 +729,30 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 
 /* Seguimiento administrativo de deseos y mensajes */
 .admin-participation-summary{margin:0 0 10px;color:#64766b;font-size:11px;line-height:1.5}.admin-participation-list{display:grid;gap:0}.admin-participation-person{display:flex;align-items:center;gap:9px;padding:10px 0;border-top:1px solid #eee6d6;min-width:0}.admin-participation-name{display:grid;gap:4px;flex:1;min-width:0}.admin-participation-name b{font-size:11px;color:#19372d;overflow-wrap:anywhere}.admin-participation-name small,.admin-participation-messages small{font-size:9px;color:#64766b;line-height:1.4}.admin-participation-status{font-size:9px;font-weight:800;white-space:nowrap}.admin-participation-status.is-done{color:#24734a}.admin-participation-status.is-pending{color:#a15a34}.admin-participation-messages{display:grid;gap:3px;text-align:right;min-width:72px}.admin-participation-messages b{font-size:15px;color:#174536}@media(max-width:520px){.admin-participation-person{gap:7px}.admin-participation-person .admin-activity-avatar{width:30px;height:30px}.admin-participation-status{font-size:8px}.admin-participation-name small{font-size:8px}.admin-participation-messages{min-width:60px}}
+
+
+/* v1.13.3 · Actividad administrativa organizada por secciones */
+.admin-activity-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:18px 0 16px;padding:6px;border:1px solid #e4dccb;border-radius:15px;background:#f4efdf}
+.admin-activity-tabs button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:43px;padding:9px 8px;border:1px solid transparent;border-radius:10px;background:transparent;color:#64766b;font:700 11px/1.25 'DM Sans',sans-serif;cursor:pointer}
+.admin-activity-tabs button.active{border-color:#d8cfbb;background:#fffdf7;color:#174536;box-shadow:0 2px 7px rgba(25,55,45,.07)}
+.admin-activity-tabs button span{padding:3px 6px;border-radius:99px;background:#e8eddf;color:#285443;font-size:9px}
+.admin-activity-view.hidden{display:none}
+.admin-activity-view .admin-activity-grid{margin:0 0 14px}
+.admin-activity-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px}
+.admin-activity-section-heading h4{margin:0;color:#174536;font-size:14px}
+.admin-activity-section-heading p{margin:4px 0 0;color:#64766b;font-size:10px;line-height:1.5}
+.admin-activity-count{flex:0 0 auto;padding:7px 10px;border-radius:10px;background:#e8eddf;color:#174536;font-size:11px;font-weight:800}
+.admin-activity-list-inner{display:grid;gap:0}
+.admin-activity-person-copy{display:grid;gap:4px;flex:1;min-width:0}
+.admin-activity-person-copy b{color:#19372d;font-size:11px;overflow-wrap:anywhere}
+.admin-activity-person-copy small{color:#64766b;font-size:9px}
+.admin-activity-presence{padding:5px 8px;border-radius:99px;background:#f0ece3;color:#7c7668;font-size:9px;font-weight:800;white-space:nowrap}
+.admin-activity-presence.is-online{background:#e4f1e6;color:#24734a}
+.admin-online-label{color:#24734a;font-weight:800}
+.admin-activity-empty{margin:0;padding:18px 10px;text-align:center;color:#7b8578;font-size:11px}
+@media(max-width:480px){
+ .admin-activity-tabs{gap:4px;padding:4px}
+ .admin-activity-tabs button{min-height:42px;padding:7px 4px;gap:3px;font-size:9px}
+ .admin-activity-section-heading{align-items:flex-start}
+ .admin-activity-presence{font-size:8px;padding:5px 6px}
+}
