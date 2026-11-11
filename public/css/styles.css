@@ -778,3 +778,6 @@ body:has(#join-card:not(.hidden)) #hero,body:has(#join-card:not(.hidden)) #featu
 .spirit-idea-again{border:1px solid #d8cfbb;background:#fffaf0;color:#285443}
 .spirit-generator-hint{margin:10px 0 0;text-align:center;color:#829083;font-size:10px}
 @media(max-width:420px){.spirit-idea-generator{padding:14px}.spirit-generated-actions{grid-template-columns:1fr}.spirit-generated-idea h4{font-size:18px}}
+
+/* v1.13.5 · Visibilidad de racha desde el primer día registrado */
+.spirit-streak{display:inline-flex;align-items:center;gap:3px;margin-left:5px;padding:2px 7px;border:1px solid #f0d2a4;border-radius:99px;background:#fff1d9;color:#a65319;font-size:10px;font-weight:900;line-height:1.4;white-space:nowrap}
