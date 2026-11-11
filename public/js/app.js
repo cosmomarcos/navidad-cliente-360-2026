@@ -162,7 +162,7 @@ async function createSpiritPodiumImage(ranking,challenge){
   ctx.textBaseline="alphabetic";ctx.textAlign="left";ctx.fillStyle=colors.main;ctx.font="800 19px Arial";
   const place=group.rank===1?"PRIMER":group.rank===2?"SEGUNDO":"TERCER";
   ctx.fillText(people.length>1?"EMPATE EN EL "+place+" LUGAR":place+" LUGAR",235,y+42);
-  const names=people.map(p=>String(p.display_name||"Participante")+(group.rank===1&&Number(p.first_place_streak)>1?"  🔥 "+Number(p.first_place_streak):"")).join("  ·  ");
+  const names=people.map(p=>String(p.display_name||"Participante")+(group.rank===1&&Number(p.first_place_streak)>=2?"  🔥 "+Number(p.first_place_streak):"")).join("  ·  ");
   ctx.fillStyle="#fff8e8";ctx.font="700 27px Arial";
   let display=names;while(ctx.measureText(display).width>590&&display.length>12)display=display.slice(0,-4)+"…";
   ctx.fillText(display,235,y+88);
