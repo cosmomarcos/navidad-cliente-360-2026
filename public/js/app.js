@@ -211,6 +211,7 @@ async function refreshSpiritComments(postId){
  const list=panel.querySelector(".spirit-comments-list");list.innerHTML='<p class="spirit-comments-loading">Cargando comentarios…</p>';
  try{const data=await api("/api/spirit/submissions/"+encodeURIComponent(postId)+"/comments",{noMemoryCache:true});const comments=data.comments||[];list.innerHTML=comments.length?comments.map(c=>'<article class="spirit-comment"><span class="spirit-comment-avatar">'+(c.avatar_url&&/^https:\/\//i.test(c.avatar_url)?'<img src="'+esc(avatarUrl(c.avatar_url,48))+'" alt="">':'🎄')+'</span><div><div class="spirit-comment-meta"><b>'+esc(c.display_name)+'</b><time>'+new Date(String(c.created_at).replace(" ","T")+"Z").toLocaleString("es-PE",{dateStyle:"short",timeStyle:"short"})+'</time>'+(c.user_id===currentUser.user.id?'<button type="button" data-spirit-comment-delete="'+esc(c.id)+'" aria-label="Eliminar comentario">×</button>':'')+'</div><p>'+esc(c.comment)+'</p></div></article>').join(""):'<p class="spirit-comments-empty">Todavía no hay comentarios. ¡Sé el primero en conversar! 💬</p>';panel.dataset.loaded="1";}catch(error){list.innerHTML='<p class="spirit-comments-error">'+esc(error.message||"No se pudieron cargar los comentarios.")+'</p>';panel.dataset.loaded="";}
 }
+async function notifySpiritShare(postId){try{await api("/api/spirit/submissions/"+encodeURIComponent(postId)+"/share",{method:"POST",body:JSON.stringify({})});}catch(error){console.warn("No se pudo notificar que compartieron la publicación:",error);}}
 async function shareSpiritPost(post,challenge){
  const type=String(post.media_type||"").toLowerCase(),isAudio=type.startsWith("audio/"),isImage=post.has_media&&!isAudio;
  const kind=isAudio?"🎙️ Audio":isImage?"📷 Fotografía":"💬 Publicación";
@@ -221,11 +222,11 @@ async function shareSpiritPost(post,challenge){
    const response=await fetch(mediaUrl,{credentials:"same-origin"});if(!response.ok)throw Error("No se pudo preparar el archivo multimedia.");
    const blob=await response.blob(),extension=isAudio?(type.includes("ogg")?"ogg":type.includes("mp4")?"m4a":"webm"):"jpg",mime=blob.type||type||"application/octet-stream";
    const file=new File([blob],(isAudio?"audio-espiritu-":"foto-espiritu-")+post.id.slice(0,8)+"."+extension,{type:mime});
-   if(navigator.canShare({files:[file]})){await navigator.share({title:"Espíritu Navideño · "+(challenge?.title||""),text,files:[file]});return;}
+   if(navigator.canShare({files:[file]})){await navigator.share({title:"Espíritu Navideño · "+(challenge?.title||""),text,files:[file]});await notifySpiritShare(post.id);return;}
   }
   const whatsapp="https://wa.me/?text="+encodeURIComponent(text+(post.has_media?"\n📎 Para ver el contenido multimedia, abre Espíritu Navideño en la aplicación.":""));
-  window.open(whatsapp,"_blank","noopener,noreferrer");
- }catch(error){if(error?.name==="AbortError")return;const whatsapp="https://wa.me/?text="+encodeURIComponent(text+"\n📎 Abre la pestaña Espíritu en Navidad Pyme para ver el contenido.");window.open(whatsapp,"_blank","noopener,noreferrer");}
+  window.open(whatsapp,"_blank","noopener,noreferrer");await notifySpiritShare(post.id);
+ }catch(error){if(error?.name==="AbortError")return;const whatsapp="https://wa.me/?text="+encodeURIComponent(text+"\n📎 Abre la pestaña Espíritu en Navidad Pyme para ver el contenido.");window.open(whatsapp,"_blank","noopener,noreferrer");await notifySpiritShare(post.id);}
 }
 async function renderSpiritTab(){
  const home=$("#member-app .member-home");if(!home)return;
