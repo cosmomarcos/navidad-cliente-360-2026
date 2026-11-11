@@ -13,7 +13,7 @@ const api=async(path,options={})=>{
  const {timeoutMs=18000,...fetchOptions}=options;
  let requestPath=path;
  if(selectedEditionId && path.startsWith("/api/") && path!=="/api/config" && path!=="/api/health" && path!=="/api/admin/editions" && !/[?&]editionId=/.test(path)){const separator=path.includes("?")?"&":"?";requestPath=path+separator+"editionId="+encodeURIComponent(selectedEditionId);}
- if(method!=="GET")apiMemoryCache.clear();
+ if(method!=="GET"){apiMemoryCache.clear();if(path.startsWith("/api/spirit/")){try{sessionStorage.removeItem("spirit-board:"+selectedEditionId+":"+currentUser?.user?.id);}catch{}}}
  if(cacheable){const cached=apiMemoryCache.get(requestPath);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:(path==="/api/spirit/board"?12000:8000)))return cached.data;}
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
  let r,raw;
@@ -229,11 +229,16 @@ async function shareSpiritPost(post,challenge){
   window.open(whatsapp,"_blank","noopener,noreferrer");await notifySpiritShare(post.id);
  }catch(error){if(error?.name==="AbortError")return;const whatsapp="https://wa.me/?text="+encodeURIComponent(text+"\n📎 Abre la pestaña Espíritu en Navidad Pyme para ver el contenido.");window.open(whatsapp,"_blank","noopener,noreferrer");await notifySpiritShare(post.id);}
 }
-async function renderSpiritTab(){
+async function renderSpiritTab(dataOverride=null){
  const home=$("#member-app .member-home");if(!home)return;
  home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD PYME · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
-  const data=await api("/api/spirit/board",{timeoutMs:30000}),host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
+  const spiritCacheKey="spirit-board:"+selectedEditionId+":"+currentUser.user.id;
+  let cachedBoard=null;
+  if(!dataOverride){try{const saved=JSON.parse(sessionStorage.getItem(spiritCacheKey)||"null");if(saved&&Date.now()-saved.savedAt<21600000)cachedBoard=saved.data;}catch{}}
+  const data=dataOverride||cachedBoard||await api("/api/spirit/board",{timeoutMs:30000});
+  if(dataOverride||!cachedBoard){try{sessionStorage.setItem(spiritCacheKey,JSON.stringify({savedAt:Date.now(),data}));}catch{}}
+  const host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
   const rankGroups=[...new Set(ranking.map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
   const rankMarkup=rankGroups.length?rankGroups.map(group=>{const names=group.people.map(p=>'<span class="spirit-rank-person">'+esc(p.display_name)+(Number(p.rank)===1&&Number(p.first_place_streak)>=2?' <b class="spirit-streak" title="Racha de primeros lugares consecutivos">🔥 '+Number(p.first_place_streak)+' '+(Number(p.first_place_streak)===1?'día':'días')+'</b>':'')+(p.user_id===currentUser.user.id?' <small>¡Tú!</small>':'')+'</span>').join('<span class="spirit-tie-join"> y </span>');const label=group.people.length>1?'Empate en el '+(group.rank===1?'primer':group.rank===2?'segundo':'tercer')+' lugar':(group.rank===1?'Primer':group.rank===2?'Segundo':'Tercer')+' lugar';return '<article class="spirit-rank-row spirit-rank-group '+(group.people.some(p=>p.user_id===currentUser.user.id)?'is-me':'')+'"><span class="spirit-medal">'+(medals[group.rank-1]||'🏅')+'</span><span class="spirit-rank-name"><small class="spirit-rank-place">'+label+'</small><span class="spirit-rank-names">'+names+'</span></span><span class="spirit-rank-points">'+Number(group.people[0].points||0)+' pts</span></article>';}).join(""):'<p class="spirit-muted">Aún no hay puntos registrados. ¡Sé el primero en participar!</p>';
   const type=challenge?.challenge_type||"text",cfg=challenge?.config||{};
@@ -251,6 +256,12 @@ async function renderSpiritTab(){
     const commentDel=ev.target.closest("[data-spirit-comment-delete]");if(commentDel){const commentId=commentDel.dataset.spiritCommentDelete;commentDel.disabled=true;try{await api("/api/spirit/comments/"+encodeURIComponent(commentId),{method:"DELETE"});const panel=commentDel.closest(".spirit-comments-panel"),postId=panel?.dataset.spiritCommentsPanel;await refreshSpiritComments(postId);const countButton=home.querySelector('[data-spirit-comments="'+CSS.escape(postId)+'"] span');if(countButton)countButton.textContent=String(Math.max(0,Number(countButton.textContent||0)-1));}catch(error){commentDel.disabled=false;alert(error.message);}return;}const del=ev.target.closest("[data-spirit-delete]");if(del){if(!confirm("¿Eliminar tu participación y los puntos asociados?"))return;del.disabled=true;del.textContent="Eliminando…";try{await api("/api/spirit/submissions/"+encodeURIComponent(del.dataset.spiritDelete),{method:"DELETE"});await renderSpiritTab();}catch(error){del.disabled=false;del.textContent=error.message;}return;}
     const unvote=ev.target.closest("[data-spirit-unvote]");if(unvote){unvote.disabled=true;try{await api("/api/spirit/submissions/"+encodeURIComponent(unvote.dataset.spiritUnvote)+"/vote",{method:"DELETE"});await renderSpiritTab();}catch(error){unvote.disabled=false;unvote.textContent=error.message;}return;}const vote=ev.target.closest("[data-spirit-vote]");if(!vote)return;vote.disabled=true;vote.textContent="Enviando…";try{await api("/api/spirit/submissions/"+encodeURIComponent(vote.dataset.spiritVote)+"/vote",{method:"POST",body:JSON.stringify({})});await renderSpiritTab();}catch(error){vote.disabled=false;vote.textContent=error.message;}
    });
+  }
+  if(cachedBoard&&!dataOverride){
+   api("/api/spirit/board",{noMemoryCache:true,timeoutMs:30000}).then(fresh=>{
+    try{sessionStorage.setItem(spiritCacheKey,JSON.stringify({savedAt:Date.now(),data:fresh}));}catch{}
+    if(home.querySelector("#spirit-content"))renderSpiritTab(fresh);
+   }).catch(error=>console.warn("No se pudo actualizar Espíritu en segundo plano:",error));
   }
  }catch(error){const host=$("#spirit-content");if(host){host.innerHTML='<div class="status error" role="alert">'+esc(error.message||"No se pudo cargar Espíritu Navideño.")+'</div><button type="button" class="primary-button" id="spirit-retry-button">Reintentar carga</button>';host.querySelector("#spirit-retry-button")?.addEventListener("click",()=>renderSpiritTab());}}
 }
