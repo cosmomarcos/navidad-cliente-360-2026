@@ -176,7 +176,10 @@ async function processSpiritChallengeClosures(env, { runClosures = false, runOpe
       if(firstIds.has(member.user_id)) {
         const prev=await env.DB.prepare("SELECT current_streak,last_first_date FROM spirit_leader_streaks WHERE edition_id=? AND user_id=?").bind(challenge.edition_id,member.user_id).first();
         const yesterday=new Date(day+"T12:00:00Z");yesterday.setUTCDate(yesterday.getUTCDate()-1);
-        const streak=prev?.last_first_date===spiritLimaDay(yesterday)?Number(prev.current_streak)+1:1;
+        const yesterdayKey=spiritLimaDay(yesterday);
+        // Idempotencia: si Cloudflare reintenta o ejecuta dos veces el cierre del mismo día,
+        // conserva la racha ya calculada en lugar de reiniciarla a 1.
+        const streak=prev?.last_first_date===day?Number(prev.current_streak):prev?.last_first_date===yesterdayKey?Number(prev.current_streak)+1:1;
         await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,?,?) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=excluded.current_streak,last_first_date=excluded.last_first_date").bind(challenge.edition_id,member.user_id,streak,day).run();
       } else {
         await env.DB.prepare("INSERT INTO spirit_leader_streaks (edition_id,user_id,current_streak,last_first_date) VALUES (?,?,0,NULL) ON CONFLICT(edition_id,user_id) DO UPDATE SET current_streak=0,last_first_date=NULL").bind(challenge.edition_id,member.user_id).run();
