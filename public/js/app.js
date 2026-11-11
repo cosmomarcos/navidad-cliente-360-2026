@@ -213,21 +213,101 @@ async function refreshSpiritComments(postId){
  try{const data=await api("/api/spirit/submissions/"+encodeURIComponent(postId)+"/comments",{noMemoryCache:true});const comments=data.comments||[];list.innerHTML=comments.length?comments.map(c=>'<article class="spirit-comment"><span class="spirit-comment-avatar">'+(c.avatar_url&&/^https:\/\//i.test(c.avatar_url)?'<img src="'+esc(avatarUrl(c.avatar_url,48))+'" alt="">':'🎄')+'</span><div><div class="spirit-comment-meta"><b>'+esc(c.display_name)+'</b><time>'+new Date(String(c.created_at).replace(" ","T")+"Z").toLocaleString("es-PE",{dateStyle:"short",timeStyle:"short"})+'</time>'+(c.user_id===currentUser.user.id?'<button type="button" data-spirit-comment-delete="'+esc(c.id)+'" aria-label="Eliminar comentario">×</button>':'')+'</div><p>'+esc(c.comment)+'</p></div></article>').join(""):'<p class="spirit-comments-empty">Todavía no hay comentarios. ¡Sé el primero en conversar! 💬</p>';panel.dataset.loaded="1";}catch(error){list.innerHTML='<p class="spirit-comments-error">'+esc(error.message||"No se pudieron cargar los comentarios.")+'</p>';panel.dataset.loaded="";}
 }
 async function notifySpiritShare(postId){try{await api("/api/spirit/submissions/"+encodeURIComponent(postId)+"/share",{method:"POST",body:JSON.stringify({})});}catch(error){console.warn("No se pudo notificar que compartieron la publicación:",error);}}
-async function shareSpiritPost(post,challenge){
- const type=String(post.media_type||"").toLowerCase(),isAudio=type.startsWith("audio/"),isImage=post.has_media&&!isAudio;
- const kind=isAudio?"🎙️ Audio":isImage?"📷 Fotografía":"💬 Publicación";
- const text="🎄 *ESPÍRITU NAVIDEÑO · NAVIDAD PYME 2026*\n\n🎯 *Reto:* "+(challenge?.title||"Espíritu Navideño")+"\n👤 *Participante:* "+post.display_name+"\n"+kind+"\n\n"+(post.caption&&post.caption!=="Participación con foto"&&post.caption!=="Participación con voz"?"📝 *Descripción:*\n"+post.caption+"\n\n":"")+"✨ ¡Compartido desde nuestra comunidad navideña!";
- try{
-  if(post.has_media&&navigator.share&&navigator.canShare){
+async function createSpiritPostImage(post,challenge){
+ const width=1080,pad=76,cardX=66,cardW=width-132,innerX=cardX+54,innerW=cardW-108;
+ const caption=String(post.caption||"").trim()||"Una publicación llena de espíritu navideño.";
+ const type=String(post.media_type||"").toLowerCase(),isAudio=type.startsWith("audio/"),isPhoto=!!post.has_media&&!isAudio;
+ let mediaBitmap=null;
+ if(isPhoto){
+  try{
    const mediaUrl=(post.mediaUrl||"/api/spirit/media/"+encodeURIComponent(post.id))+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):"");
-   const response=await fetch(mediaUrl,{credentials:"same-origin"});if(!response.ok)throw Error("No se pudo preparar el archivo multimedia.");
-   const blob=await response.blob(),extension=isAudio?(type.includes("ogg")?"ogg":type.includes("mp4")?"m4a":"webm"):"jpg",mime=blob.type||type||"application/octet-stream";
-   const file=new File([blob],(isAudio?"audio-espiritu-":"foto-espiritu-")+post.id.slice(0,8)+"."+extension,{type:mime});
-   if(navigator.canShare({files:[file]})){await navigator.share({title:"Espíritu Navideño · "+(challenge?.title||""),text,files:[file]});await notifySpiritShare(post.id);return;}
+   const response=await fetch(mediaUrl,{credentials:"same-origin"});
+   if(response.ok){const blob=await response.blob();if(blob.type.startsWith("image/")&&window.createImageBitmap)mediaBitmap=await createImageBitmap(blob);}
+  }catch(error){console.warn("No se pudo incluir la foto en la tarjeta compartida:",error);}
+ }
+ const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+ if(!ctx)throw new Error("Este dispositivo no permite generar la imagen para compartir.");
+ const font="Arial, sans-serif";
+ const wrap=(value,maxWidth,fontSpec)=>{ctx.font=fontSpec;const words=String(value).split(/\s+/);const lines=[];let line="";for(const word of words){const test=line?line+" "+word:word;if(line&&ctx.measureText(test).width>maxWidth){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);return lines.length?lines:[""];};
+ const captionFont="500 38px "+font,captionLines=wrap(caption,innerW,captionFont);
+ const captionHeight=captionLines.length*55;
+ let photoH=0,photoW=0;
+ if(mediaBitmap){const scale=Math.min(innerW/mediaBitmap.width,610/mediaBitmap.height);photoW=Math.round(mediaBitmap.width*scale);photoH=Math.round(mediaBitmap.height*scale);}
+ const contentTop=365,headerH=160,captionTop=contentTop+headerH+50;
+ const mediaTop=captionTop+captionHeight+34;
+ const mediaBlockH=mediaBitmap?photoH+34:isAudio?150:0;
+ const dividerY=mediaTop+mediaBlockH+28;
+ const actionsY=dividerY+82,toolsY=actionsY+110,cardBottom=toolsY+94;
+ const height=cardBottom+100;
+ canvas.width=width;canvas.height=height;
+ const rounded=(x,y,w,h,r,fill,stroke,lineWidth=2)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lineWidth;ctx.stroke();}};
+ const drawText=(value,x,y,size,color,weight="500",align="left",family=font)=>{ctx.font=weight+" "+size+"px "+family;ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(String(value),x,y);};
+ const bg=ctx.createLinearGradient(0,0,width,height);bg.addColorStop(0,"#082a24");bg.addColorStop(.55,"#123f33");bg.addColorStop(1,"#071f1a");ctx.fillStyle=bg;ctx.fillRect(0,0,width,height);
+ const glow=ctx.createRadialGradient(width/2,120,30,width/2,120,700);glow.addColorStop(0,"rgba(232,198,117,.18)");glow.addColorStop(1,"rgba(232,198,117,0)");ctx.fillStyle=glow;ctx.fillRect(0,0,width,520);
+ rounded(24,24,width-48,height-48,42,null,"rgba(232,198,117,.7)",3);
+ for(let i=0;i<26;i++){const x=(i*173+83)%width,y=(i*251+97)%height;ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fillStyle=i%2?"rgba(255,248,232,.34)":"rgba(232,198,117,.52)";ctx.fill();}
+ drawText("NAVIDAD PYME  ·  2026",width/2,112,27,"#e8c675","700","center");
+ drawText("Comunidad",width/2,205,76,"#fff8e8","700","center","Georgia, serif");
+ drawText("navideña",width/2,285,76,"#fff8e8","700","center","Georgia, serif");
+ rounded(cardX,contentTop,cardW,cardBottom-contentTop,38,"#f6efdc","#d8cdb5",3);
+ rounded(cardX+18,contentTop+18,cardW-36,cardBottom-contentTop-36,30,"#fffaf0","#eee4d1",2);
+ const avatarX=innerX+45,avatarY=contentTop+78;
+ ctx.beginPath();ctx.arc(avatarX,avatarY,47,0,Math.PI*2);ctx.fillStyle="#075b4d";ctx.fill();
+ const initials=String(post.display_name||"P").trim().split(/\s+/).slice(0,2).map(s=>s[0]||"").join("").toLocaleUpperCase("es-PE").slice(0,2);
+ drawText(initials,avatarX,avatarY+16,43,"#fffaf0","700","center");
+ drawText(String(post.display_name||"Participante").slice(0,38),innerX+112,contentTop+70,38,"#174536","700");
+ const created=post.created_at?new Date(String(post.created_at).replace(" ","T")+"Z"):new Date();
+ const dateText=Number.isNaN(created.getTime())?"":created.toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short"});
+ drawText(dateText,innerX+112,contentTop+119,25,"#8b8b7e","500");
+ drawText(captionLines[0],innerX,captionTop+4,38,"#40574a","500");
+ for(let i=1;i<captionLines.length;i++)drawText(captionLines[i],innerX,captionTop+4+i*55,38,"#40574a","500");
+ if(mediaBitmap){
+  const px=innerX+(innerW-photoW)/2,py=mediaTop;
+  rounded(px-4,py-4,photoW+8,photoH+8,22,"#eee6d4","#e2d8c5",2);
+  ctx.save();ctx.beginPath();ctx.roundRect(px,py,photoW,photoH,18);ctx.clip();ctx.drawImage(mediaBitmap,px,py,photoW,photoH);ctx.restore();
+ }else if(isAudio){
+  rounded(innerX,mediaTop,innerW,116,24,"#f3ead8","#e1d5bd",2);
+  drawText("🎙️",innerX+54,mediaTop+76,56,"#174536","700");
+  drawText("Mensaje de voz navideño",innerX+125,mediaTop+69,29,"#174536","700");
+ }
+ ctx.strokeStyle="#e8dfcf";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(innerX,dividerY);ctx.lineTo(innerX+innerW,dividerY);ctx.stroke();
+ drawText("❤️ "+Number(post.votes||0)+" Me gusta",innerX,actionsY+8,29,"#8b7448","500");
+ rounded(innerX+innerW-250,actionsY-42,250,82,41,"#f5ead2","#d9c9a5",2);
+ drawText("Me gusta  ❤️",innerX+innerW-125,actionsY+9,28,"#714e26","700","center");
+ ctx.strokeStyle="#e8dfcf";ctx.beginPath();ctx.moveTo(innerX,toolsY-22);ctx.lineTo(innerX+innerW,toolsY-22);ctx.stroke();
+ const gap=24,toolW=(innerW-gap)/2;
+ rounded(innerX,toolsY,toolW,88,24,"#fffaf0","#d9cfbb",2);
+ rounded(innerX+toolW+gap,toolsY,toolW,88,24,"#fffaf0","#d9cfbb",2);
+ drawText("💬  Comentarios  ·  "+Number(post.comment_count||0),innerX+toolW/2,toolsY+55,25,"#285443","700","center");
+ drawText("📲  Compartir",innerX+toolW+gap+toolW/2,toolsY+55,25,"#285443","700","center");
+ drawText("ESPÍRITU NAVIDEÑO  ·  "+String(challenge?.title||"COMUNIDAD").toLocaleUpperCase("es-PE").slice(0,48),width/2,height-54,19,"#e8c675","700","center");
+ return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("No se pudo generar la imagen de la publicación.")),"image/png"));
+}
+async function shareSpiritPost(post,challenge){
+ const button=document.querySelector('[data-spirit-share="'+CSS.escape(post.id)+'"]');
+ if(button){button.disabled=true;button.textContent="Preparando imagen…";}
+ const text="🎄 Espíritu Navideño · Navidad Pyme 2026\n"+(challenge?.title?"🎯 Reto: "+challenge.title+"\n":"")+"👤 "+(post.display_name||"Participante")+"\n\n"+(post.caption||"¡Compartiendo la alegría de la Navidad!")+"\n\n✨ ¡Compartido desde nuestra comunidad navideña!";
+ try{
+  const blob=await createSpiritPostImage(post,challenge);
+  const file=new File([blob],"espiritu-navideno-"+String(post.id).slice(0,8)+".png",{type:"image/png"});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+   await navigator.share({title:"Comunidad navideña · Navidad Pyme 2026",text,files:[file]});
+   await notifySpiritShare(post.id);
+   return;
   }
-  const whatsapp="https://wa.me/?text="+encodeURIComponent(text+(post.has_media?"\n📎 Para ver el contenido multimedia, abre Espíritu Navideño en la aplicación.":""));
-  window.open(whatsapp,"_blank","noopener,noreferrer");await notifySpiritShare(post.id);
- }catch(error){if(error?.name==="AbortError")return;const whatsapp="https://wa.me/?text="+encodeURIComponent(text+"\n📎 Abre la pestaña Espíritu en Navidad Pyme para ver el contenido.");window.open(whatsapp,"_blank","noopener,noreferrer");await notifySpiritShare(post.id);}
+  const url=URL.createObjectURL(blob),download=document.createElement("a");
+  download.href=url;download.download=file.name;document.body.appendChild(download);download.click();download.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+  const whatsapp="https://wa.me/?text="+encodeURIComponent(text+"\n\n📎 La tarjeta se descargó como imagen. Adjunta el PNG en este chat de WhatsApp.");
+  window.open(whatsapp,"_blank","noopener,noreferrer");
+  await notifySpiritShare(post.id);
+ }catch(error){
+  if(error?.name==="AbortError")return;
+  console.error("No se pudo compartir la tarjeta de Espíritu:",error);
+  alert(error?.message||"No se pudo preparar la imagen para compartir.");
+ }finally{
+  if(button){button.disabled=false;button.innerHTML="📲 Compartir";}
+ }
 }
 async function renderSpiritTab(dataOverride=null){
  const home=$("#member-app .member-home");if(!home)return;
