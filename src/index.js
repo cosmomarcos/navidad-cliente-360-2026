@@ -423,8 +423,18 @@ async function handleApi(request, env, url) {
       const id=crypto.randomUUID();
       await env.DB.prepare("INSERT INTO spirit_comments (id,submission_id,edition_id,user_id,comment) VALUES (?,?,?,?,?)").bind(id,submission.id,member.edition_id,user.id,comment).run();
       const author=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
-      if(submission.user_id!==user.id)await sendPushToUser(env,submission.user_id,{title:"💬 Nuevo comentario en Espíritu",body:(author?.name||"Un participante")+" comentó tu publicación.",tag:"spirit-comment-"+id,url:"/?tab=spirit"},url.origin);
+      if(submission.user_id!==user.id)await sendPushToUser(env,submission.user_id,{title:"💬 Nuevo comentario en Espíritu",body:(author?.name||"Un participante")+" ha comentado tu publicación.",tag:"spirit-comment-"+id,url:"/?tab=spirit"},url.origin);
       return json({ok:true,id});
+    }
+    const shareMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/share$/);
+    if(request.method==="POST"&&shareMatch){
+      const submission=await env.DB.prepare("SELECT id,user_id FROM spirit_submissions WHERE id=? AND edition_id=?").bind(shareMatch[1],member.edition_id).first();
+      if(!submission)return json({error:"No encontramos esta publicación."},404);
+      if(submission.user_id!==user.id){
+        const sharer=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
+        await sendPushToUser(env,submission.user_id,{title:"📲 ¡Compartieron tu publicación!",body:(sharer?.name||"Un participante")+" ha compartido tu publicación.",tag:"spirit-share-"+crypto.randomUUID(),url:"/?tab=spirit"},url.origin);
+      }
+      return json({ok:true});
     }
     const commentDeleteMatch=url.pathname.match(/^\/api\/spirit\/comments\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&commentDeleteMatch){
