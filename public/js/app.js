@@ -10,14 +10,15 @@ let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, com
 const apiMemoryCache=new Map();
 const api=async(path,options={})=>{
  const method=(options.method||"GET").toUpperCase(),cacheable=method==="GET"&&!options.noMemoryCache;
+ const {timeoutMs=18000,...fetchOptions}=options;
  let requestPath=path;
  if(selectedEditionId && path.startsWith("/api/") && path!=="/api/config" && path!=="/api/health" && path!=="/api/admin/editions" && !/[?&]editionId=/.test(path)){const separator=path.includes("?")?"&":"?";requestPath=path+separator+"editionId="+encodeURIComponent(selectedEditionId);}
  if(method!=="GET")apiMemoryCache.clear();
  if(cacheable){const cached=apiMemoryCache.get(requestPath);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:8000))return cached.data;}
- const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),18000);
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
  let r,raw;
  try{
-  r=await fetch(requestPath,{credentials:"same-origin",cache:"no-store",...options,signal:controller.signal,headers:{"content-type":"application/json",...(options.headers||{})}});
+  r=await fetch(requestPath,{credentials:"same-origin",cache:"no-store",...fetchOptions,signal:controller.signal,headers:{"content-type":"application/json",...(options.headers||{})}});
   raw=await r.text();
  }catch(error){
   if(error.name==="AbortError")throw new Error("La solicitud tardó demasiado. Comprueba tu conexión e inténtalo nuevamente.");
@@ -232,7 +233,7 @@ async function renderSpiritTab(){
  const home=$("#member-app .member-home");if(!home)return;
  home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD PYME · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
-  const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error("Espíritu está tardando más de lo esperado. Revisa tu conexión e inténtalo nuevamente.")),17000);api("/api/spirit/board",{noMemoryCache:true}).then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});}),host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
+  const data=await api("/api/spirit/board",{noMemoryCache:true,timeoutMs:30000}),host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
   const rankGroups=[...new Set(ranking.map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
   const rankMarkup=rankGroups.length?rankGroups.map(group=>{const names=group.people.map(p=>'<span class="spirit-rank-person">'+esc(p.display_name)+(Number(p.rank)===1&&Number(p.first_place_streak)>=2?' <b class="spirit-streak" title="Racha de primeros lugares consecutivos">🔥 '+Number(p.first_place_streak)+' '+(Number(p.first_place_streak)===1?'día':'días')+'</b>':'')+(p.user_id===currentUser.user.id?' <small>¡Tú!</small>':'')+'</span>').join('<span class="spirit-tie-join"> y </span>');const label=group.people.length>1?'Empate en el '+(group.rank===1?'primer':group.rank===2?'segundo':'tercer')+' lugar':(group.rank===1?'Primer':group.rank===2?'Segundo':'Tercer')+' lugar';return '<article class="spirit-rank-row spirit-rank-group '+(group.people.some(p=>p.user_id===currentUser.user.id)?'is-me':'')+'"><span class="spirit-medal">'+(medals[group.rank-1]||'🏅')+'</span><span class="spirit-rank-name"><small class="spirit-rank-place">'+label+'</small><span class="spirit-rank-names">'+names+'</span></span><span class="spirit-rank-points">'+Number(group.people[0].points||0)+' pts</span></article>';}).join(""):'<p class="spirit-muted">Aún no hay puntos registrados. ¡Sé el primero en participar!</p>';
   const type=challenge?.challenge_type||"text",cfg=challenge?.config||{};
