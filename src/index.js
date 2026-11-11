@@ -568,8 +568,8 @@ async function handleApi(request, env, url) {
       if(type==="trivia"&&(!String(config.question||"").trim()||!Array.isArray(config.options)||config.options.length<2||!config.options.includes(config.correctAnswer)))return json({error:"Configura una pregunta, sus opciones y la respuesta correcta."},400);
       const scheduledDate=String(body.scheduledDate||"");
       if(!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate))return json({error:"Selecciona la fecha en que debe abrirse el reto."},400);
-      const start=new Date(scheduledDate+"T14:00:00.000Z"),end=new Date(start.getTime()+14*60*60*1000);
-      if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now())return json({error:"Elige una fecha futura. Los retos abren a las 9:00 a. m. hora Perú."},400);
+      const start=new Date(scheduledDate+"T23:00:00.000Z"),end=new Date(start.getTime()+6*60*60*1000);
+      if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now())return json({error:"Elige una fecha futura. Los retos abren a las 6:00 p. m. hora Perú."},400);
       const startSql=start.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," ");
       const overlap=await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND starts_at<? AND ends_at>? LIMIT 1").bind(edition.id,endSql,startSql).first();
       if(overlap)return json({error:"Ya existe un reto programado para ese día."},409);
@@ -972,7 +972,7 @@ async function handleApi(request, env, url) {
   return json({ error: "Ruta no encontrada." }, 404);
 }
 export default {
-  async scheduled(event, env, ctx) { const cron=event.cron; const runClosures=cron==="0 4 * * *"; const runOpenings=cron==="0 14 * * *"; if(!runClosures&&!runOpenings){console.warn("Unknown Spirit cron trigger",cron);return;} ctx.waitUntil(processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error)))); },
+  async scheduled(event, env, ctx) { const cron=event.cron; const runClosures=cron==="0 5 * * *"; const runOpenings=cron==="0 23 * * *"; if(!runClosures&&!runOpenings){console.warn("Unknown Spirit cron trigger",cron);return;} ctx.waitUntil(processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error)))); },
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
