@@ -142,7 +142,7 @@ function showProfileForm(profile=null){
    cropEditor.classList.add("hidden");
    if(cropObjectUrl){URL.revokeObjectURL(cropObjectUrl);cropObjectUrl=null;}cropImageSource=null;fileInput.value="";
   }catch(error){feedback.textContent=error.message;feedback.classList.remove("hidden");feedback.classList.add("error");}
-  finally{cropApply.disabled=false;cropApply.textContent="Aplicar encuadre";}
+  finally{cropApply.disabled=false;cropApply.textContent="Aplicar encuadre";save.disabled=!!cropImageSource;}
  });
  form.addEventListener("submit",async e=>{
   e.preventDefault();const values=Object.fromEntries(new FormData(form));delete values.avatarFile;
