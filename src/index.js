@@ -27,6 +27,8 @@ async function ensureCommunitySchema(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_clues_recipient ON anonymous_clues(edition_id, recipient_user_id, run_number, created_at)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clue_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_chat_messages (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, run_number INTEGER NOT NULL, sender_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_anonymous_chat_pair ON anonymous_chat_messages(edition_id,run_number,sender_user_id,recipient_user_id,created_at)").run();
   });
 }
 async function ensureParticipantProfilesSchema(env) {
@@ -312,7 +314,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.13.28" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.13.29" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -769,8 +771,10 @@ async function handleApi(request, env, url) {
         const body = await request.json();
         if (body.confirmation !== "VOLVER A SORTEAR") return json({ error: "Escribe VOLVER A SORTEAR para confirmar." }, 400);
         await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_clues (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, giver_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), run_number INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS anonymous_chat_messages (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, run_number INTEGER NOT NULL, sender_user_id TEXT NOT NULL REFERENCES users(id), recipient_user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
         await env.DB.batch([
           env.DB.prepare("DELETE FROM anonymous_clues WHERE edition_id=?").bind(edition.id),
+          env.DB.prepare("DELETE FROM anonymous_chat_messages WHERE edition_id=?").bind(edition.id),
           env.DB.prepare("DELETE FROM draw_assignments WHERE edition_id=?").bind(edition.id),
           env.DB.prepare("UPDATE draw_runs SET status='superseded' WHERE edition_id=? AND status='completed'").bind(edition.id),
           env.DB.prepare("INSERT INTO edition_draw_state (edition_id, state, ready_at, drawn_at, updated_at) VALUES (?, 'registration', NULL, NULL, datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET state='registration', ready_at=NULL, drawn_at=NULL, updated_at=datetime('now')").bind(edition.id),
@@ -874,6 +878,33 @@ async function handleApi(request, env, url) {
       const read = await env.DB.prepare("SELECT last_seen_at FROM anonymous_clue_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND recipient_user_id=? AND run_number=? AND created_at > ?").bind(member.edition_id,user.id,assignment.run_number,read?.last_seen_at || "1970-01-01 00:00:00").first();
       return json({ unread: count?.total || 0 });
+    }
+    if (request.method === "GET" && url.pathname === "/api/community/chats") {
+      const draw=await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
+      if(draw?.state!=="drawn")return json({state:draw?.state||"registration",outgoing:null,incoming:null});
+      const outgoing=await env.DB.prepare("SELECT recipient_user_id AS partner,run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=? ORDER BY run_number DESC LIMIT 1").bind(member.edition_id,user.id).first();
+      const incoming=await env.DB.prepare("SELECT giver_user_id AS partner,run_number FROM draw_assignments WHERE edition_id=? AND recipient_user_id=? ORDER BY run_number DESC LIMIT 1").bind(member.edition_id,user.id).first();
+      const loadThread=async(a)=>{if(!a)return null;const [modern,legacy]=await Promise.all([
+        env.DB.prepare("SELECT id,message,created_at,sender_user_id=? AS mine FROM anonymous_chat_messages WHERE edition_id=? AND run_number=? AND ((sender_user_id=? AND recipient_user_id=?) OR (sender_user_id=? AND recipient_user_id=?)) ORDER BY created_at ASC LIMIT 100").bind(user.id,member.edition_id,a.run_number,user.id,a.partner,a.partner,user.id).all(),
+        env.DB.prepare("SELECT id,message,created_at,giver_user_id=? AS mine FROM anonymous_clues WHERE edition_id=? AND run_number=? AND ((giver_user_id=? AND recipient_user_id=?) OR (giver_user_id=? AND recipient_user_id=?)) ORDER BY created_at ASC LIMIT 100").bind(user.id,member.edition_id,a.run_number,user.id,a.partner,a.partner,user.id).all()
+      ]);return [...(modern.results||[]),...(legacy.results||[]).map(x=>({...x,id:"legacy-"+x.id}))].sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))).slice(-100);};
+      const [outMessages,inMessages]=await Promise.all([loadThread(outgoing),loadThread(incoming)]);
+      return json({state:"drawn",outgoing:outgoing?{messages:outMessages||[]}:null,incoming:incoming?{messages:inMessages||[]}:null});
+    }
+    if (request.method === "POST" && url.pathname === "/api/community/chats") {
+      const body=await request.json(),message=String(body.message||"").trim(),thread=String(body.thread||"");
+      if(!message||message.length>500)return json({error:"El mensaje debe tener entre 1 y 500 caracteres."},400);
+      if(thread!=="outgoing"&&thread!=="incoming")return json({error:"Conversación no válida."},400);
+      const draw=await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
+      if(draw?.state!=="drawn")return json({error:"El chat estará disponible después del sorteo."},409);
+      const assignment=thread==="outgoing"
+        ? await env.DB.prepare("SELECT recipient_user_id AS partner,run_number FROM draw_assignments WHERE edition_id=? AND giver_user_id=? ORDER BY run_number DESC LIMIT 1").bind(member.edition_id,user.id).first()
+        : await env.DB.prepare("SELECT giver_user_id AS partner,run_number FROM draw_assignments WHERE edition_id=? AND recipient_user_id=? ORDER BY run_number DESC LIMIT 1").bind(member.edition_id,user.id).first();
+      if(!assignment)return json({error:"No encontramos la asignación de esta conversación."},409);
+      const id=crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO anonymous_chat_messages (id,edition_id,run_number,sender_user_id,recipient_user_id,message) VALUES (?,?,?,?,?,?)").bind(id,member.edition_id,assignment.run_number,user.id,assignment.partner,message).run();
+      await sendPushToUser(env,assignment.partner,{title:"💌 Nuevo mensaje de tu amigo secreto",body:message.slice(0,100),url:"/?tab=community",tag:"secret-chat-"+id},url.origin);
+      return json({ok:true,id});
     }
     if (request.method === "GET" && url.pathname === "/api/community/clues") {
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
@@ -1083,7 +1114,7 @@ async function handleApi(request, env, url) {
   return json({ error: "Ruta no encontrada." }, 404);
 }
 export default {
-  async scheduled(event, env, ctx) { const cron=event.cron; const runClosures=cron==="0 11 * * *"; const runOpenings=cron==="0 23 * * *"; if(!runClosures&&!runOpenings){console.warn("Unknown Spirit cron trigger",cron);return;} ctx.waitUntil(processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error)))); },
+  async scheduled(event, env, ctx) { const cron=event.cron; const runClosures=cron==="0 11 * * *"; const runOpenings=cron==="0 23 * * *"; if(!runClosures&&!runOpenings){console.warn("Unknown scheduled trigger",cron);return;} ctx.waitUntil(Promise.all([processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error))),env.DB.prepare("DELETE FROM anonymous_chat_messages WHERE created_at<datetime('now','-7 days')").run().catch(error=>console.error("Chat cleanup failed",error?.message||String(error))),env.DB.prepare("DELETE FROM anonymous_clues WHERE created_at<datetime('now','-7 days')").run().catch(error=>console.error("Old clue cleanup failed",error?.message||String(error)))])); },
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
