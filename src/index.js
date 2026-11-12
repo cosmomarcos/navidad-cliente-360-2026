@@ -34,6 +34,11 @@ async function ensureParticipantProfilesSchema(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profiles (user_id TEXT PRIMARY KEY REFERENCES users(id), first_name TEXT NOT NULL, last_name TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   });
 }
+async function ensureParticipantProfileImagesSchema(env) {
+  return ensureSchemaOnce("participant-profile-images", async () => {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS participant_profile_images (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, image_data TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  });
+}
 async function ensurePushSchema(env) {
   return ensureSchemaOnce("push-subscriptions", async () => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
@@ -328,7 +333,7 @@ async function handleApi(request, env, url) {
         await env.DB.prepare("INSERT INTO users (id, google_sub, email, display_name, avatar_url) VALUES (?, ?, ?, ?, ?)").bind(id, identity.sub, identity.email, identity.name, identity.picture).run();
         user = { id, email: identity.email, display_name: identity.name, avatar_url: identity.picture };
       } else {
-        await env.DB.prepare("UPDATE users SET email = ?, display_name = ?, avatar_url = ? WHERE id = ?").bind(identity.email, identity.name, identity.picture, user.id).run();
+        await env.DB.prepare("UPDATE users SET email = ?, display_name = ?, avatar_url = CASE WHEN avatar_url LIKE '/api/profile/avatar/%' THEN avatar_url ELSE ? END WHERE id = ?").bind(identity.email, identity.name, identity.picture, user.id).run();
       }
       return json({ ok: true, user: { id: user.id, email: user.email, name: user.display_name } }, 200, { "set-cookie": cookie(await createSession(user, env.SESSION_SECRET)) });
     } catch (error) { return json({ error: error.message || "Error de autenticación." }, 401); }
@@ -969,6 +974,14 @@ async function handleApi(request, env, url) {
   if (request.method === "POST" && url.pathname === "/api/participation/rejoin") {
     return json({ error: "Para volver a participar necesitas una nueva invitación del organizador." }, 409);
   }
+  const profileAvatarPrefix="/api/profile/avatar/";
+  const profileAvatarId=url.pathname.startsWith(profileAvatarPrefix)?url.pathname.slice(profileAvatarPrefix.length):"";
+  if(request.method==="GET"&&profileAvatarId&&/^[A-Za-z0-9-]+$/.test(profileAvatarId)){
+    const viewer=await currentUser(request,env);if(!viewer)return json({error:"Inicia sesión primero."},401);
+    await ensureParticipantProfileImagesSchema(env);
+    const image=await env.DB.prepare("SELECT image_data FROM participant_profile_images WHERE user_id=?").bind(profileAvatarId).first();
+    return image?.image_data?dataUrlResponse(image.image_data,"image/jpeg",request):json({error:"Foto de perfil no disponible."},404);
+  }
   if (request.method === "POST" && url.pathname === "/api/profile/participant") {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
@@ -976,9 +989,16 @@ async function handleApi(request, env, url) {
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Primero confirma tu participación." }, 403);
     const body = await request.json();
-    const firstName = String(body.firstName || "").trim().replace(/\\s+/g," ");
-    const lastName = String(body.lastName || "").trim().replace(/\\s+/g," ");
+    const firstName = String(body.firstName || "").trim().split(" ").filter(Boolean).join(" ");
+    const lastName = String(body.lastName || "").trim().split(" ").filter(Boolean).join(" ");
     if (firstName.length < 2 || lastName.length < 2 || firstName.length > 80 || lastName.length > 100) return json({ error: "Ingresa nombres y apellidos válidos." }, 400);
+    if(body.avatarData!==undefined){
+      const imageData=String(body.avatarData||"");
+      if(!new RegExp("^data:image/jpeg;base64,[A-Za-z0-9+/=]+$").test(imageData)||imageData.length>250000)return json({error:"La foto no es válida o supera el tamaño permitido. Selecciona otra imagen."},400);
+      await ensureParticipantProfileImagesSchema(env);
+      await env.DB.prepare("INSERT INTO participant_profile_images (user_id,image_data,updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(user_id) DO UPDATE SET image_data=excluded.image_data,updated_at=datetime('now')").bind(user.id,imageData).run();
+      await env.DB.prepare("UPDATE users SET avatar_url=? WHERE id=?").bind("/api/profile/avatar/"+user.id+"?v="+Date.now(),user.id).run();
+    }
     await env.DB.prepare("INSERT INTO participant_profiles (user_id, first_name, last_name, updated_at) VALUES (?, ?, ?, datetime('now')) ON CONFLICT(user_id) DO UPDATE SET first_name=excluded.first_name, last_name=excluded.last_name, updated_at=datetime('now')").bind(user.id, firstName, lastName).run();
     return json({ ok: true, profile: { firstName, lastName } });
   }
