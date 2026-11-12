@@ -760,9 +760,12 @@ async function enablePushNotifications(button){
 }
 
 function formatCommunityTime(value){
- const date=new Date(value);
+ // D1 guarda datetime('now') como UTC sin sufijo; interpretarlo explícitamente como UTC.
+ const raw=String(value??"").trim();
+ const normalized=/^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?$/.test(raw)?raw.replace(" ","T")+"Z":raw;
+ const date=new Date(normalized);
  if(Number.isNaN(date.getTime()))return "";
- return new Intl.DateTimeFormat("es-PE",{dateStyle:"medium",timeStyle:"short"}).format(date);
+ return new Intl.DateTimeFormat("es-PE",{dateStyle:"medium",timeStyle:"short",timeZone:"America/Lima"}).format(date);
 }
 
 async function renderCommunityTab(options={}){
