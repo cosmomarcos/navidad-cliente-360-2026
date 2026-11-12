@@ -135,7 +135,7 @@ async function ensureSpiritSchema(env) {
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_data TEXT").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_type TEXT").run(); } catch {}
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_challenges_active ON spirit_challenges(edition_id, starts_at, ends_at)").run();
-      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(challenge_id,user_id))").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_submissions_challenge ON spirit_submissions(challenge_id, created_at)").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_votes (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
@@ -145,13 +145,34 @@ async function ensureSpiritSchema(env) {
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submission_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_comments (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, comment TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_comments_submission ON spirit_comments(submission_id,created_at)").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+      const multiPostMigration=await env.DB.prepare("SELECT name FROM spirit_schema_migrations WHERE name='multiple_submissions_v1'").first();
+      if(!multiPostMigration){
+        await env.DB.batch([
+          env.DB.prepare("CREATE TABLE spirit_submissions_v2 (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), media_data TEXT, media_type TEXT)"),
+          env.DB.prepare("INSERT INTO spirit_submissions_v2 SELECT id,edition_id,challenge_id,user_id,caption,image_data,created_at,media_data,media_type FROM spirit_submissions"),
+          env.DB.prepare("CREATE TABLE spirit_votes_v2 (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions_v2(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))"),
+          env.DB.prepare("INSERT INTO spirit_votes_v2 SELECT id,submission_id,voter_user_id,created_at FROM spirit_votes"),
+          env.DB.prepare("CREATE TABLE spirit_comments_v2 (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions_v2(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, comment TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))"),
+          env.DB.prepare("INSERT INTO spirit_comments_v2 SELECT id,submission_id,edition_id,user_id,comment,created_at FROM spirit_comments"),
+          env.DB.prepare("DROP TABLE spirit_votes"),
+          env.DB.prepare("DROP TABLE spirit_comments"),
+          env.DB.prepare("DROP TABLE spirit_submissions"),
+          env.DB.prepare("ALTER TABLE spirit_submissions_v2 RENAME TO spirit_submissions"),
+          env.DB.prepare("ALTER TABLE spirit_votes_v2 RENAME TO spirit_votes"),
+          env.DB.prepare("ALTER TABLE spirit_comments_v2 RENAME TO spirit_comments"),
+          env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_submissions_challenge ON spirit_submissions(challenge_id,created_at)"),
+          env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_comments_submission ON spirit_comments(submission_id,created_at)"),
+          env.DB.prepare("INSERT INTO spirit_schema_migrations (name) VALUES ('multiple_submissions_v1')")
+        ]);
+      }
   });
 }
 
 async function finalizeExpiredSpiritChallenges(env, editionId) {
   const expired = await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND ends_at<=datetime('now')").bind(editionId).all();
   for (const challenge of expired.results || []) {
-    const winners = await env.DB.prepare("SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.id HAVING COUNT(v.id)>0 AND COUNT(v.id)=(SELECT MAX(vote_count) FROM (SELECT COUNT(v2.id) AS vote_count FROM spirit_submissions s2 LEFT JOIN spirit_votes v2 ON v2.submission_id=s2.id WHERE s2.challenge_id=? GROUP BY s2.id))").bind(challenge.id,challenge.id).all();
+    const winners = await env.DB.prepare("WITH participant_votes AS (SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.user_id), max_votes AS (SELECT MAX(votes) AS votes FROM participant_votes) SELECT pv.user_id,pv.votes FROM participant_votes pv,max_votes mv WHERE pv.votes>0 AND pv.votes=mv.votes").bind(challenge.id).all();
     for (const winner of winners.results || []) {
       await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,10,"Publicación más votada del día").run();
     }
@@ -289,7 +310,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.13.23" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.13.24" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -411,11 +432,11 @@ async function handleApi(request, env, url) {
       const mine=allRows.findIndex(x=>x.user_id===user.id);
       const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
-      const feedPromise=challenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN mine.id IS NULL THEN 0 ELSE 1 END AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id LEFT JOIN spirit_votes mine ON mine.submission_id=s.id AND mine.voter_user_id=? WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,challenge.id).all():Promise.resolve({results:[]});
+      const feedPromise=challenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted,(SELECT liked.id FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id ORDER BY mine.created_at LIMIT 1) AS my_vote_submission_id FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,user.id,challenge.id).all():Promise.resolve({results:[]});
       const readPromise=env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
       const [feed]=await Promise.all([feedPromise,readPromise]);
       submissions=(feed.results||[]).map(item=>({...item,mediaUrl:item.has_media?"/api/spirit/media/"+encodeURIComponent(item.id):null,eligibleForVoting:challenge?.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
-      return json({challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
+      return json({challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:submissions.filter(x=>x.user_id===user.id).length,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     const commentsMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/comments$/);
     if(commentsMatch&&(request.method==="GET"||request.method==="POST")){
@@ -462,8 +483,6 @@ async function handleApi(request, env, url) {
       const configRaw=await env.DB.prepare("SELECT config_json FROM spirit_challenges WHERE id=?").bind(challenge.id).first();
       let challengeConfig={};try{challengeConfig=JSON.parse(configRaw?.config_json||"{}");}catch{}
       const correct=challengeType!=="trivia"||String(caption)===String(challengeConfig.correctAnswer||"");
-      const prior=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first();
-      if(prior)return json({error:"Ya participaste en el reto de hoy. ¡Vuelve mañana!"},409);
       const id=crypto.randomUUID();
       await env.DB.batch([
         env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),null,mediaData||null,mediaType||null),
@@ -475,11 +494,14 @@ async function handleApi(request, env, url) {
     if(request.method==="DELETE"&&deleteMatch){
       const submission=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(deleteMatch[1],member.edition_id,user.id).first();
       if(!submission)return json({error:"No encontramos una participación tuya para eliminar."},404);
+      const submissionInfo=await env.DB.prepare("SELECT challenge_id,user_id FROM spirit_submissions WHERE id=?").bind(submission.id).first();
       await env.DB.batch([
         env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND ((source_id=? AND source_type IN (?,?)) OR (source_type=? AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)))").bind(member.edition_id,submission.id,"submission","community_bonus","like",submission.id),
-        env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(submission.id,member.edition_id,user.id)
+        env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(submission.id,member.edition_id,user.id),
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,submissionInfo.challenge_id,user.id),
+        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submissionInfo.challenge_id,user.id)
       ]);
-      return json({ok:true,message:"Tu participación y los puntos asociados fueron eliminados."});
+      return json({ok:true,message:"Tu participación fue eliminada y el puntaje se recalculó correctamente."});
     }
     const voteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/vote$/);
     if(request.method==="POST"&&voteMatch){
@@ -493,15 +515,14 @@ async function handleApi(request, env, url) {
         if(String(submission.caption)!==String(answer))return json({error:"Esta respuesta no fue correcta y no puede recibir votos."},409);
       }
       const voteId=crypto.randomUUID();
-      try{
-        await env.DB.batch([
-          env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) VALUES (?,?,?)").bind(voteId,submission.id,user.id),
-          env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(member.edition_id,submission.id),
-          env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE v.submission_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submission.id)
-        ]);
-      }catch{return json({error:"Ya diste Me gusta a esta publicación."},409);}
-      const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes WHERE submission_id=?").bind(submission.id).first();
-      const earned=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(member.edition_id,submission.id).first();
+      const inserted=await env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM spirit_votes v JOIN spirit_submissions liked ON liked.id=v.submission_id WHERE v.voter_user_id=? AND liked.challenge_id=? AND liked.user_id=?)").bind(voteId,submission.id,user.id,user.id,challenge.id,submission.user_id).run();
+      if(!(inserted.meta?.changes>0))return json({error:"Ya diste Me gusta a una publicación de este participante en el reto."},409);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,challenge.id,submission.user_id),
+        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(challenge.id,submission.user_id)
+      ]);
+      const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?").bind(challenge.id,submission.user_id).first();
+      const earned=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,challenge.id,submission.user_id).first();
       const voter=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
       await sendPushToUser(env,submission.user_id,{title:"❤️ ¡Nueva reacción en Espíritu!",body:(voter?.name||"Un participante")+" le dio me gusta a tu publicación.",tag:"spirit-like-"+submission.id,url:"/?tab=spirit"},url.origin);
       return json({ok:true,voted:true,votes:count?.total||0,pointsForPost:earned?.total||0});
@@ -512,12 +533,13 @@ async function handleApi(request, env, url) {
       if(!submission)return json({error:"No puedes retirar este Me gusta."},404);
       const vote=await env.DB.prepare("SELECT id FROM spirit_votes WHERE submission_id=? AND voter_user_id=?").bind(submission.id,user.id).first();
       if(!vote)return json({error:"Todavía no has dado Me gusta a esta publicación."},404);
+      const submissionInfo=await env.DB.prepare("SELECT challenge_id,user_id FROM spirit_submissions WHERE id=?").bind(submission.id).first();
       await env.DB.batch([
-        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(member.edition_id,submission.id),
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,submissionInfo.challenge_id,submissionInfo.user_id),
         env.DB.prepare("DELETE FROM spirit_votes WHERE id=?").bind(vote.id),
-        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE v.submission_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submission.id)
+        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submissionInfo.challenge_id,submissionInfo.user_id)
       ]);
-      const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes WHERE submission_id=?").bind(submission.id).first();
+      const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?").bind(submissionInfo.challenge_id,submissionInfo.user_id).first();
       return json({ok:true,voted:false,votes:count?.total||0});
     }
     return json({error:"Ruta de Espíritu Navideño no encontrada."},404);
