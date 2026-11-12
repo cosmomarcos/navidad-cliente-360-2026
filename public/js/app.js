@@ -24,7 +24,7 @@ const api=async(path,options={})=>{
  const {timeoutMs=18000,...fetchOptions}=options;
  let requestPath=path;
  if(selectedEditionId && path.startsWith("/api/") && path!=="/api/config" && path!=="/api/health" && path!=="/api/admin/editions" && !/[?&]editionId=/.test(path)){const separator=path.includes("?")?"&":"?";requestPath=path+separator+"editionId="+encodeURIComponent(selectedEditionId);}
- if(method!=="GET"){apiMemoryCache.clear();if(path.startsWith("/api/spirit/")){try{sessionStorage.removeItem("spirit-board:"+selectedEditionId+":"+currentUser?.user?.id);}catch{}}}
+ if(method!=="GET"){apiMemoryCache.clear();if(path.startsWith("/api/spirit/")){const key="spirit-board:"+selectedEditionId+":"+currentUser?.user?.id;try{sessionStorage.removeItem(key);localStorage.removeItem(key);}catch{}}}
  if(cacheable){const cached=apiMemoryCache.get(requestPath);if(cached&&Date.now()-cached.time<((path==="/api/community")?3500:(path==="/api/spirit/board"?12000:8000)))return cached.data;}
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
  let r,raw;
@@ -353,9 +353,9 @@ async function renderSpiritTab(dataOverride=null){
  try{
   const spiritCacheKey="spirit-board:"+selectedEditionId+":"+currentUser.user.id;
   let cachedBoard=null;
-  if(!dataOverride){try{const saved=JSON.parse(sessionStorage.getItem(spiritCacheKey)||"null");if(saved&&Date.now()-saved.savedAt<21600000)cachedBoard=saved.data;}catch{}}
-  const data=dataOverride||cachedBoard||await api("/api/spirit/board",{timeoutMs:30000});
-  if(dataOverride||!cachedBoard){try{sessionStorage.setItem(spiritCacheKey,JSON.stringify({savedAt:Date.now(),data}));}catch{}}
+  if(!dataOverride){try{const saved=JSON.parse(localStorage.getItem(spiritCacheKey)||sessionStorage.getItem(spiritCacheKey)||"null");if(saved&&Date.now()-saved.savedAt<86400000)cachedBoard=saved.data;}catch{}}
+  const data=dataOverride||cachedBoard||await api("/api/spirit/board",{timeoutMs:12000});
+  if(dataOverride||!cachedBoard){const snapshot=JSON.stringify({savedAt:Date.now(),data});try{localStorage.setItem(spiritCacheKey,snapshot);sessionStorage.setItem(spiritCacheKey,snapshot);}catch{}}
   const host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
   const rankGroups=[...new Set(ranking.map(p=>Number(p.rank)))].map(rank=>({rank,people:ranking.filter(p=>Number(p.rank)===rank)}));
   const rankMarkup=rankGroups.length?rankGroups.map(group=>{const names=group.people.map(p=>'<span class="spirit-rank-person">'+esc(p.display_name)+(Number(p.rank)===1&&Number(p.first_place_streak)>=2?' <b class="spirit-streak" title="Racha de primeros lugares consecutivos">🔥 '+Number(p.first_place_streak)+' '+(Number(p.first_place_streak)===1?'día':'días')+'</b>':'')+(p.user_id===currentUser.user.id?' <small>¡Tú!</small>':'')+'</span>').join('<span class="spirit-tie-join"> y </span>');const label=group.people.length>1?'Empate en el '+(group.rank===1?'primer':group.rank===2?'segundo':'tercer')+' lugar':(group.rank===1?'Primer':group.rank===2?'Segundo':'Tercer')+' lugar';return '<article class="spirit-rank-row spirit-rank-group '+(group.people.some(p=>p.user_id===currentUser.user.id)?'is-me':'')+'"><span class="spirit-medal">'+(medals[group.rank-1]||'🏅')+'</span><span class="spirit-rank-name"><small class="spirit-rank-place">'+label+'</small><span class="spirit-rank-names">'+names+'</span></span><span class="spirit-rank-points">'+Number(group.people[0].points||0)+' pts</span></article>';}).join(""):'<p class="spirit-muted">Aún no hay puntos registrados. ¡Sé el primero en participar!</p>';
@@ -376,12 +376,12 @@ async function renderSpiritTab(dataOverride=null){
    });
   }
   if(cachedBoard&&!dataOverride){
-   api("/api/spirit/board",{noMemoryCache:true,timeoutMs:30000}).then(fresh=>{
-    try{sessionStorage.setItem(spiritCacheKey,JSON.stringify({savedAt:Date.now(),data:fresh}));}catch{}
+   api("/api/spirit/board",{noMemoryCache:true,timeoutMs:12000}).then(fresh=>{
+    const snapshot=JSON.stringify({savedAt:Date.now(),data:fresh});try{localStorage.setItem(spiritCacheKey,snapshot);sessionStorage.setItem(spiritCacheKey,snapshot);}catch{}
     if(home.querySelector("#spirit-content"))renderSpiritTab(fresh);
-   }).catch(error=>console.warn("No se pudo actualizar Espíritu en segundo plano:",error));
+   }).catch(error=>console.warn("No se pudo actualizar Espíritu en segundo plano; se conserva el tablero guardado:",error));
   }
- }catch(error){const host=$("#spirit-content");if(host){host.innerHTML='<div class="status error" role="alert">'+esc(error.message||"No se pudo cargar Espíritu Navideño.")+'</div><button type="button" class="primary-button" id="spirit-retry-button">Reintentar carga</button>';host.querySelector("#spirit-retry-button")?.addEventListener("click",()=>renderSpiritTab());}}
+ }catch(error){const host=$("#spirit-content");if(host){host.innerHTML='<div class="status error" role="alert"><b>No pudimos cargar Espíritu Navideño.</b><p>'+esc(error.message||"Comprueba tu conexión.")+'</p><small>La pantalla volverá a intentarlo cuando regreses a esta pestaña.</small></div><button type="button" class="primary-button" id="spirit-retry-button">Intentar nuevamente</button>';host.querySelector("#spirit-retry-button")?.addEventListener("click",()=>renderSpiritTab());}}
 }
 async function loadSpiritAdmin(){
  const host=$("#spirit-admin-controls");if(!host||!currentUser?.isPrimaryAdmin)return;
