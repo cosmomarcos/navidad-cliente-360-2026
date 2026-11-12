@@ -763,7 +763,7 @@ function formatCommunityTime(value){
  // D1 datetime('now') devuelve UTC sin sufijo. Construirlo como UTC explícitamente;
  // no usar new Date("YYYY-MM-DD HH:mm:ss"), porque el navegador lo interpreta localmente.
  const raw=String(value??"").trim();
- const sqlUtc=raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?$/);
+ const sqlUtc=raw.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})[ T]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]+))?$/);
  let date;
  if(sqlUtc){
   const [,y,mo,d,h,mi,se,ms="0"]=sqlUtc;
