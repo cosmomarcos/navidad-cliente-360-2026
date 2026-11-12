@@ -760,12 +760,19 @@ async function enablePushNotifications(button){
 }
 
 function formatCommunityTime(value){
- // D1 guarda datetime('now') como UTC sin sufijo; interpretarlo explícitamente como UTC.
+ // D1 datetime('now') devuelve UTC sin sufijo. Construirlo como UTC explícitamente;
+ // no usar new Date("YYYY-MM-DD HH:mm:ss"), porque el navegador lo interpreta localmente.
  const raw=String(value??"").trim();
- const normalized=/^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?$/.test(raw)?raw.replace(" ","T")+"Z":raw;
- const date=new Date(normalized);
+ const sqlUtc=raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?$/);
+ let date;
+ if(sqlUtc){
+  const [,y,mo,d,h,mi,se,ms="0"]=sqlUtc;
+  date=new Date(Date.UTC(Number(y),Number(mo)-1,Number(d),Number(h),Number(mi),Number(se),Number((ms+"000").slice(0,3))));
+ }else{
+  date=new Date(raw);
+ }
  if(Number.isNaN(date.getTime()))return "";
- return new Intl.DateTimeFormat("es-PE",{dateStyle:"medium",timeStyle:"short",timeZone:"America/Lima"}).format(date);
+ return new Intl.DateTimeFormat("es-PE",{dateStyle:"medium",timeStyle:"short",timeZone:"America/Lima",hour12:true}).format(date);
 }
 
 async function renderCommunityTab(options={}){
