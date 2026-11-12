@@ -2,8 +2,19 @@ const $ = selector => document.querySelector(selector);
 const setClass = (selector, className, enabled) => { const el=$(selector); if(el) el.classList.toggle(className, !!enabled); return el; };
 const params = new URLSearchParams(location.search);
 const urlInvite = params.get("invite") || location.pathname.match(/\/unirse\/([^/]+)/)?.[1] || "";
-if(urlInvite)sessionStorage.setItem("navidad_invite_token",urlInvite);
-const token = urlInvite || sessionStorage.getItem("navidad_invite_token") || "";
+function extractInviteToken(value){
+ const raw=String(value||"").trim();if(!raw)return "";
+ try{const parsed=new URL(raw,location.origin);const fromQuery=new URLSearchParams(parsed.search).get("invite");if(fromQuery)return fromQuery;const fromPath=parsed.pathname.match(/\/unirse\/([^/]+)/);if(fromPath)return fromPath[1];}catch{}
+ return /^[A-Za-z0-9_-]{20,}$/.test(raw)?raw:"";
+}
+function rememberInvite(value){
+ const found=extractInviteToken(value);if(!found)return "";
+ try{sessionStorage.setItem("navidad_invite_token",found);}catch{}
+ try{localStorage.setItem("navidad_invite_token",found);}catch{}
+ return found;
+}
+if(urlInvite)rememberInvite(urlInvite);
+let token = urlInvite || (()=>{try{return sessionStorage.getItem("navidad_invite_token")||localStorage.getItem("navidad_invite_token")||"";}catch{return "";}})();
 const isWhatsAppInApp = /WhatsApp/i.test(navigator.userAgent) && !!token;
 
 let signedIn=false, currentUser=null, inviteValid=false, inviteEdition=null, communityPollTimer=null, selectedEditionId=new URLSearchParams(location.search).get("editionId")||localStorage.getItem("navidad_selected_edition")||"";
@@ -61,7 +72,12 @@ function setLoginView(){
   $("#join-card").innerHTML=`<div class="login-brand"><span>🎄</span><p class="kicker">CLIENTE 360 · NAVIDAD 2026</p><h1>Navidad Pyme</h1><p>Una Navidad, muchas sorpresas.</p></div><div id="login-context" class="login-context">${token?"Inicia sesión con Google para validar tu invitación y unirte a la celebración.":"Inicia sesión con tu cuenta de Google para continuar."}</div><div id="google-button" class="google-button"></div><div id="login-feedback" class="status hidden" role="status"></div><div class="privacy-note">🔒 Tu participación y tu asignación secreta estarán protegidas.</div>`;
 }
 function showFeedback(message,error=false){const el=$("#login-feedback");if(!el)return;el.textContent=message;el.classList.remove("hidden","error");if(error)el.classList.add("error");}
-async function loadInvite(){if(!token)return;try{const r=await api("/api/invitations/"+encodeURIComponent(token));inviteValid=true;inviteEdition=r.edition;}catch{inviteValid=false;}}
+async function loadInvite(){
+ if(!token){try{token=sessionStorage.getItem("navidad_invite_token")||localStorage.getItem("navidad_invite_token")||"";}catch{}}
+ if(!token)return;
+ try{const r=await api("/api/invitations/"+encodeURIComponent(token),{noMemoryCache:true});inviteValid=true;inviteEdition=r.edition;}
+ catch{inviteValid=false;}
+}
 function showProfileForm(profile=null){
  setSnowfall(false);
  const card=$("#join-card");card.classList.remove("hidden");card.innerHTML=`<div class="card-heading"><div class="icon-bubble">👤</div><div><p class="kicker">TU PERFIL DE PARTICIPANTE</p><h2>¿Cómo te llamas?</h2></div></div><p class="muted">Escribe tus nombres y apellidos reales. Estos datos serán utilizados para identificarte durante el sorteo; no mostraremos tu correo como nombre.</p><form id="participant-profile-form" class="profile-form"><label>Nombres<input name="firstName" autocomplete="given-name" maxlength="80" required value="${esc(profile?.first_name||"")}"></label><label>Apellidos<input name="lastName" autocomplete="family-name" maxlength="100" required value="${esc(profile?.last_name||"")}"></label><button class="primary-button" type="submit">Guardar mi nombre <span>→</span></button></form><div id="profile-feedback" class="status hidden" role="status"></div>`;
@@ -785,11 +801,21 @@ async function checkSession(){
  if(!signedIn){setLoginView();await initGoogle();return;}
  setClass("#hero","hidden",true);setClass("#features","hidden",true);setClass("#site-footer","hidden",true);setClass("#google-area","hidden",true);
  if(token&&!currentUser.isPrimaryAdmin&&currentUser.membership?.status!=="confirmed"){$("#join-card").classList.remove("hidden");$("#join-card").innerHTML=`<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">INVITACIÓN</p><h2>${esc(inviteEdition?.title||"Navidad Pyme")}</h2></div></div><p class="muted">${inviteValid?"Tu invitación está lista. Confirma tu participación para continuar.":"La invitación no es válida o venció."}</p><button id="confirm-join" class="primary-button" ${inviteValid?"":"disabled"}>Confirmar mi participación →</button><div id="join-feedback" class="status hidden"></div>`;
- $("#confirm-join").addEventListener("click",async()=>{try{await api("/api/invitations/join",{method:"POST",body:JSON.stringify({token})});sessionStorage.removeItem("navidad_invite_token");currentUser=await api("/api/me");showProfileForm();}catch(e){const fb=$("#join-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
+ $("#confirm-join").addEventListener("click",async()=>{try{await api("/api/invitations/join",{method:"POST",body:JSON.stringify({token})});try{sessionStorage.removeItem("navidad_invite_token");localStorage.removeItem("navidad_invite_token");}catch{}token="";currentUser=await api("/api/me");showProfileForm();}catch(e){const fb=$("#join-feedback");fb.textContent=e.message;fb.classList.remove("hidden");fb.classList.add("error");}});
  }else if(currentUser.membership?.status==="confirmed"&&!currentUser.participantProfile){$("#join-card").classList.add("hidden");showProfileForm();}
  else if(currentUser.membership?.status==="confirmed"){renderMemberApp();} else if(currentUser.membership?.status==="withdrawn"&&!currentUser.isPrimaryAdmin){renderRejoinView();}
  else if(currentUser.isPrimaryAdmin){$("#join-card").classList.add("hidden");setClass("#admin-panel","hidden",false);}
- else {$("#join-card").classList.remove("hidden");$("#join-card").innerHTML="<h2>Tu cuenta está activa</h2><p>Tu participación aún no está confirmada. Abre el enlace de invitación vigente para unirte.</p>";}
+ else {
+  const card=$("#join-card");card.classList.remove("hidden");
+  card.innerHTML='<div class="card-heading"><div class="icon-bubble">🎄</div><div><p class="kicker">ONBOARDING DIGITAL · INVITACIÓN</p><h2>Tu cuenta está activa</h2></div></div><p class="muted">Tu participación aún no está confirmada. Pega aquí el enlace de invitación que te compartieron para continuar.</p><form id="recover-invite-form" class="profile-form"><label>Enlace de invitación<input name="inviteUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://…?invite=…" required></label><button class="primary-button" type="submit">Validar invitación →</button></form><div id="recover-invite-feedback" class="status hidden" role="status"></div>';
+  $("#recover-invite-form").addEventListener("submit",async event=>{
+   event.preventDefault();const input=event.currentTarget.elements.inviteUrl;const recovered=rememberInvite(input.value);const feedback=$("#recover-invite-feedback");
+   if(!recovered){feedback.textContent="El enlace no parece ser una invitación válida. Pega el enlace completo que recibiste.";feedback.classList.remove("hidden");feedback.classList.add("error");return;}
+   token=recovered;await loadInvite();
+   if(!inviteValid){feedback.textContent="Esta invitación no es válida o ya venció. Solicita al organizador un enlace vigente.";feedback.classList.remove("hidden");feedback.classList.add("error");return;}
+   const query=new URLSearchParams(location.search);query.set("invite",token);location.replace(location.pathname+"?"+query.toString());
+  });
+ }
  await renderAdmin();
 }
 window.handleGoogleCredential=async response=>{try{if(!response?.credential)throw new Error("Google no devolvió una credencial válida. Intenta nuevamente.");await api("/api/auth/google",{method:"POST",body:JSON.stringify({credential:response.credential})});try{try {
