@@ -79,21 +79,28 @@ async function loadInvite(){
  try{const r=await api("/api/invitations/"+encodeURIComponent(token),{noMemoryCache:true});inviteValid=true;inviteEdition=r.edition;}
  catch{inviteValid=false;}
 }
-async function profileImageDataUrl(file){
+async function loadProfileImage(file){
  if(!file||!file.type.startsWith("image/"))throw new Error("Selecciona una imagen JPG, PNG o WebP.");
  const objectUrl=URL.createObjectURL(file);
  try{
   const image=new Image();image.src=objectUrl;
-  await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error("No se pudo abrir la imagen seleccionada."));});
-  const max=512,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
-  const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-  const ctx=canvas.getContext("2d");if(!ctx)throw new Error("No se pudo procesar la foto.");
-  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);
-  let blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.82));
-  for(const quality of [.72,.62,.52]){if(blob&&blob.size<=160*1024)break;blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));}
-  if(!blob||blob.size>180*1024)throw new Error("La foto pesa demasiado. Prueba con otra imagen más ligera.");
-  return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error("No se pudo leer la foto."));reader.readAsDataURL(blob);});
- }finally{URL.revokeObjectURL(objectUrl);}
+  await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error("No se pudo abrir la imagen. Prueba con una foto JPG o PNG."));});
+  return {image,objectUrl};
+ }catch(error){URL.revokeObjectURL(objectUrl);throw error;}
+}
+async function croppedProfileImageDataUrl(image,offsetX,offsetY,zoom){
+ const viewport=240,output=512;
+ const scale=Math.max(viewport/image.naturalWidth,viewport/image.naturalHeight);
+ const drawWidth=image.naturalWidth*scale*zoom,drawHeight=image.naturalHeight*scale*zoom;
+ const canvas=document.createElement("canvas");canvas.width=output;canvas.height=output;
+ const ctx=canvas.getContext("2d");if(!ctx)throw new Error("No se pudo procesar la foto.");
+ ctx.fillStyle="#ffffff";ctx.fillRect(0,0,output,output);
+ const factor=output/viewport;
+ ctx.drawImage(image,((viewport-drawWidth)/2+offsetX)*factor,((viewport-drawHeight)/2+offsetY)*factor,drawWidth*factor,drawHeight*factor);
+ let blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.84));
+ for(const quality of [.76,.68,.58]){if(blob&&blob.size<=160*1024)break;blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));}
+ if(!blob||blob.size>180*1024)throw new Error("La foto pesa demasiado. Prueba con otra imagen.");
+ return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error("No se pudo leer la foto recortada."));reader.readAsDataURL(blob);});
 }
 function showProfileForm(profile=null){
  setSnowfall(false);
@@ -102,15 +109,39 @@ function showProfileForm(profile=null){
  setClass("#admin-panel","hidden",true);
  const card=$("#join-card");card.classList.remove("hidden");
  const currentAvatar=currentUser?.user?.avatar_url||"";
- card.innerHTML=`<div class="card-heading"><div class="icon-bubble">👤</div><div><p class="kicker">TU PERFIL DE PARTICIPANTE</p><h2>Personaliza tu perfil</h2></div></div><p class="muted">Actualiza tu nombre y tu foto. Tu imagen aparecerá junto a tus publicaciones y en la lista de participantes.</p><form id="participant-profile-form" class="profile-form"><div class="profile-photo-editor"><div class="profile-photo-preview" id="profile-photo-preview">${currentAvatar&&isAvatarSource(currentAvatar)?'<img src="'+esc(avatarUrl(currentAvatar,160))+'" alt="Foto de perfil actual">':'<span>👤</span>'}</div><div class="profile-photo-controls"><label class="profile-photo-picker">Cambiar foto<input name="avatarFile" id="profile-avatar-file" type="file" accept="image/*"></label><small>JPG, PNG o WebP. Se optimiza automáticamente.</small></div></div><label>Nombres<input name="firstName" autocomplete="given-name" maxlength="80" required value="${esc(profile?.first_name||"")}"></label><label>Apellidos<input name="lastName" autocomplete="family-name" maxlength="100" required value="${esc(profile?.last_name||"")}"></label><button class="primary-button" id="save-profile-button" type="submit">Guardar cambios <span>→</span></button></form><div id="profile-feedback" class="status hidden" role="status"></div>`;
+ card.innerHTML=`<div class="card-heading"><div class="icon-bubble">👤</div><div><p class="kicker">TU PERFIL DE PARTICIPANTE</p><h2>Personaliza tu perfil</h2></div></div><p class="muted">Actualiza tu nombre y tu foto. Tu imagen aparecerá junto a tus publicaciones y en la lista de participantes.</p><form id="participant-profile-form" class="profile-form"><div class="profile-photo-editor"><div class="profile-photo-preview" id="profile-photo-preview">${currentAvatar&&isAvatarSource(currentAvatar)?'<img src="'+esc(avatarUrl(currentAvatar,160))+'" alt="Foto de perfil actual">':'<span>👤</span>'}</div><div class="profile-photo-controls"><label class="profile-photo-picker">Cambiar foto<input name="avatarFile" id="profile-avatar-file" type="file" accept="image/*"></label><small>JPG, PNG o WebP. Podrás centrarla y ajustar el zoom.</small></div></div><section class="profile-crop-editor hidden" id="profile-crop-editor" aria-label="Ajustar encuadre de foto"><div class="profile-crop-heading"><b>Ajusta tu foto</b><span>Arrastra para centrarla</span></div><div class="profile-crop-viewport" id="profile-crop-viewport"><img id="profile-crop-image" alt="Vista previa del encuadre"></div><label class="profile-crop-zoom">Zoom <input id="profile-crop-zoom" type="range" min="1" max="3" step="0.05" value="1"></label><button class="secondary-action profile-crop-apply" id="profile-crop-apply" type="button">Aplicar encuadre</button></section><label>Nombres<input name="firstName" autocomplete="given-name" maxlength="80" required value="${esc(profile?.first_name||"")}"></label><label>Apellidos<input name="lastName" autocomplete="family-name" maxlength="100" required value="${esc(profile?.last_name||"")}"></label><button class="primary-button" id="save-profile-button" type="submit">Guardar cambios <span>→</span></button></form><div id="profile-feedback" class="status hidden" role="status"></div>`;
  const form=$("#participant-profile-form"),fileInput=$("#profile-avatar-file"),preview=$("#profile-photo-preview"),save=$("#save-profile-button"),feedback=$("#profile-feedback");
- let avatarData=null;
+ const cropEditor=$("#profile-crop-editor"),cropViewport=$("#profile-crop-viewport"),cropImage=$("#profile-crop-image"),cropZoomInput=$("#profile-crop-zoom"),cropApply=$("#profile-crop-apply");
+ let avatarData=null,cropImageSource=null,cropObjectUrl=null,cropZoom=1,cropX=0,cropY=0,dragState=null;
+ function cropMetrics(){const scale=Math.max(240/cropImageSource.naturalWidth,240/cropImageSource.naturalHeight);return {width:cropImageSource.naturalWidth*scale*cropZoom,height:cropImageSource.naturalHeight*scale*cropZoom};}
+ function clampCrop(){if(!cropImageSource)return;const size=cropMetrics();cropX=Math.max(-(size.width-240)/2,Math.min((size.width-240)/2,cropX));cropY=Math.max(-(size.height-240)/2,Math.min((size.height-240)/2,cropY));}
+ function updateCropPreview(){if(!cropImageSource)return;clampCrop();const size=cropMetrics();cropImage.style.width=size.width+"px";cropImage.style.height=size.height+"px";cropImage.style.transform="translate(-50%,-50%) translate("+cropX+"px,"+cropY+"px)";cropZoomInput.value=String(cropZoom);}
+ cropViewport.addEventListener("pointerdown",event=>{if(!cropImageSource)return;dragState={x:event.clientX,y:event.clientY,originX:cropX,originY:cropY};cropViewport.setPointerCapture(event.pointerId);});
+ cropViewport.addEventListener("pointermove",event=>{if(!dragState)return;cropX=dragState.originX+event.clientX-dragState.x;cropY=dragState.originY+event.clientY-dragState.y;updateCropPreview();});
+ const endCropDrag=()=>{dragState=null;};cropViewport.addEventListener("pointerup",endCropDrag);cropViewport.addEventListener("pointercancel",endCropDrag);
+ cropZoomInput.addEventListener("input",()=>{cropZoom=Number(cropZoomInput.value)||1;updateCropPreview();});
  fileInput.addEventListener("change",async()=>{
   const file=fileInput.files?.[0];if(!file)return;
-  feedback.classList.add("hidden");save.disabled=true;save.textContent="Preparando foto…";
-  try{avatarData=await profileImageDataUrl(file);preview.innerHTML='<img src="'+avatarData+'" alt="Vista previa de tu nueva foto">';}
-  catch(error){fileInput.value="";avatarData=null;feedback.textContent=error.message;feedback.classList.remove("hidden");feedback.classList.add("error");}
+  feedback.classList.add("hidden");save.disabled=true;save.textContent="Abriendo foto…";
+  try{
+   const loaded=await loadProfileImage(file);
+   if(cropObjectUrl)URL.revokeObjectURL(cropObjectUrl);
+   cropImageSource=loaded.image;cropObjectUrl=loaded.objectUrl;cropZoom=1;cropX=0;cropY=0;avatarData=null;
+   cropImage.src=cropObjectUrl;cropEditor.classList.remove("hidden");updateCropPreview();
+   cropApply.disabled=false;
+  }catch(error){fileInput.value="";cropImageSource=null;feedback.textContent=error.message;feedback.classList.remove("hidden");feedback.classList.add("error");}
   finally{save.disabled=false;save.innerHTML="Guardar cambios <span>→</span>";}
+ });
+ cropApply.addEventListener("click",async()=>{
+  if(!cropImageSource)return;
+  cropApply.disabled=true;cropApply.textContent="Aplicando…";
+  try{
+   avatarData=await croppedProfileImageDataUrl(cropImageSource,cropX,cropY,cropZoom);
+   preview.innerHTML='<img src="'+avatarData+'" alt="Vista previa de tu foto centrada">';
+   cropEditor.classList.add("hidden");
+   if(cropObjectUrl){URL.revokeObjectURL(cropObjectUrl);cropObjectUrl=null;}cropImageSource=null;
+  }catch(error){feedback.textContent=error.message;feedback.classList.remove("hidden");feedback.classList.add("error");}
+  finally{cropApply.disabled=false;cropApply.textContent="Aplicar encuadre";}
  });
  form.addEventListener("submit",async e=>{
   e.preventDefault();const values=Object.fromEntries(new FormData(form));delete values.avatarFile;
