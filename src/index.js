@@ -974,11 +974,13 @@ async function handleApi(request, env, url) {
   if (request.method === "POST" && url.pathname === "/api/participation/rejoin") {
     return json({ error: "Para volver a participar necesitas una nueva invitación del organizador." }, 409);
   }
-  const profileAvatarMatch=url.pathname.match(/^\\/api\\/profile\\/avatar\\/([A-Za-z0-9-]+)$/);
+  const profileAvatarPrefix="/api/profile/avatar/";
+  const profileAvatarId=url.pathname.startsWith(profileAvatarPrefix)?url.pathname.slice(profileAvatarPrefix.length):"";
+  if(request.method==="GET"&&profileAvatarId&&/^[A-Za-z0-9-]+$/.test(profileAvatarId)){
   if(request.method==="GET"&&profileAvatarMatch){
     const viewer=await currentUser(request,env);if(!viewer)return json({error:"Inicia sesión primero."},401);
     await ensureParticipantProfileImagesSchema(env);
-    const image=await env.DB.prepare("SELECT image_data FROM participant_profile_images WHERE user_id=?").bind(profileAvatarMatch[1]).first();
+    const image=await env.DB.prepare("SELECT image_data FROM participant_profile_images WHERE user_id=?").bind(profileAvatarId).first();
     return image?.image_data?dataUrlResponse(image.image_data,"image/jpeg",request):json({error:"Foto de perfil no disponible."},404);
   }
   if (request.method === "POST" && url.pathname === "/api/profile/participant") {
