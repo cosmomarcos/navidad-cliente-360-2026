@@ -535,8 +535,8 @@ async function handleApi(request, env, url) {
       if(!vote)return json({error:"Todavía no has dado Me gusta a esta publicación."},404);
       const submissionInfo=await env.DB.prepare("SELECT challenge_id,user_id FROM spirit_submissions WHERE id=?").bind(submission.id).first();
       await env.DB.batch([
-        env.DB.prepare("DELETE FROM spirit_votes WHERE id=?").bind(vote.id),
         env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,submissionInfo.challenge_id,submissionInfo.user_id),
+        env.DB.prepare("DELETE FROM spirit_votes WHERE id=?").bind(vote.id),
         env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submissionInfo.challenge_id,submissionInfo.user_id)
       ]);
       const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?").bind(submissionInfo.challenge_id,submissionInfo.user_id).first();
