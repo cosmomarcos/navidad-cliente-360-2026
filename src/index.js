@@ -989,8 +989,8 @@ async function handleApi(request, env, url) {
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Primero confirma tu participación." }, 403);
     const body = await request.json();
-    const firstName = String(body.firstName || "").trim().replace(/\\s+/g," ");
-    const lastName = String(body.lastName || "").trim().replace(/\\s+/g," ");
+    const firstName = String(body.firstName || "").trim().split(" ").filter(Boolean).join(" ");
+    const lastName = String(body.lastName || "").trim().split(" ").filter(Boolean).join(" ");
     if (firstName.length < 2 || lastName.length < 2 || firstName.length > 80 || lastName.length > 100) return json({ error: "Ingresa nombres y apellidos válidos." }, 400);
     if(body.avatarData!==undefined){
       const imageData=String(body.avatarData||"");
