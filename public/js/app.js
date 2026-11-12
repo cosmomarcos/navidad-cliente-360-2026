@@ -43,6 +43,7 @@ const api=async(path,options={})=>{
 function prefetchMemberTabs(){ /* Las pestañas se consultan bajo demanda al abrirse. */ }
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function isAvatarSource(value){if(!value)return false;try{const url=new URL(value,location.origin);return url.protocol==="https:"||url.origin===location.origin&&url.pathname.startsWith("/api/profile/avatar/");}catch{return false;}}
+function avatarUrl(value,size=64){if(!isAvatarSource(value))return "";try{const url=new URL(value,location.origin);if(url.hostname==="googleusercontent.com"||url.hostname.endsWith(".googleusercontent.com")){url.pathname=url.pathname.replace(/=s[0-9]+(-c)?$/i,"")+"=s"+size+"-c";}return url.href;}catch{return value;}}
 function avatarUrl(value,size=64){if(!isAvatarSource(value))return "";try{const url=new URL(value,location.origin);if(/(^|\\.)googleusercontent\\.com$/i.test(url.hostname)){url.pathname=url.pathname.replace(/=s\\d+(?:-c)?$/i,"")+"=s"+size+"-c";}return url.href;}catch{return value;}}
 let snowFrame=0,snowflakes=[],snowCanvas=null,snowCtx=null,snowEnabled=false,snowWidth=0,snowHeight=0,snowLast=0;
 function setSnowfall(enabled){
