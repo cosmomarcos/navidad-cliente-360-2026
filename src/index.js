@@ -310,7 +310,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.13.24" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "1.13.25" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -1002,7 +1002,10 @@ async function handleApi(request, env, url) {
     const viewer=await currentUser(request,env);if(!viewer)return json({error:"Inicia sesión primero."},401);
     await ensureParticipantProfileImagesSchema(env);
     const image=await env.DB.prepare("SELECT image_data FROM participant_profile_images WHERE user_id=?").bind(profileAvatarId).first();
-    return image?.image_data?dataUrlResponse(image.image_data,"image/jpeg",request):json({error:"Foto de perfil no disponible."},404);
+    if(!image?.image_data)return json({error:"Foto de perfil no disponible."},404);
+    const response=dataUrlResponse(image.image_data,"image/jpeg",request);
+    response.headers.set("cache-control","private, no-store, max-age=0");
+    return response;
   }
   if (request.method === "POST" && url.pathname === "/api/profile/participant") {
     const user = await currentUser(request, env);

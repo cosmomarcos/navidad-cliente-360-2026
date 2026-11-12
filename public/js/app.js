@@ -148,7 +148,7 @@ function showProfileForm(profile=null){
   e.preventDefault();const values=Object.fromEntries(new FormData(form));delete values.avatarFile;
   if(avatarData)values.avatarData=avatarData;
   const fb=$("#profile-feedback");save.disabled=true;save.textContent="Guardando…";
-  try{await api("/api/profile/participant",{method:"POST",body:JSON.stringify(values)});currentUser=await api("/api/me"+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):""));renderMemberApp();}
+  try{await api("/api/profile/participant",{method:"POST",body:JSON.stringify(values)});const spiritCacheKey="spirit-board:"+selectedEditionId+":"+currentUser.user.id;try{localStorage.removeItem(spiritCacheKey);sessionStorage.removeItem(spiritCacheKey);}catch{}apiMemoryCache.clear();currentUser=await api("/api/me"+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):""));renderMemberApp();}
   catch(err){fb.textContent=err.message;fb.classList.remove("hidden");fb.classList.add("error");}
   finally{save.disabled=false;save.innerHTML="Guardar cambios <span>→</span>";}
  });
