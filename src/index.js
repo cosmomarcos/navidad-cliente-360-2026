@@ -977,7 +977,6 @@ async function handleApi(request, env, url) {
   const profileAvatarPrefix="/api/profile/avatar/";
   const profileAvatarId=url.pathname.startsWith(profileAvatarPrefix)?url.pathname.slice(profileAvatarPrefix.length):"";
   if(request.method==="GET"&&profileAvatarId&&/^[A-Za-z0-9-]+$/.test(profileAvatarId)){
-  if(request.method==="GET"&&profileAvatarMatch){
     const viewer=await currentUser(request,env);if(!viewer)return json({error:"Inicia sesión primero."},401);
     await ensureParticipantProfileImagesSchema(env);
     const image=await env.DB.prepare("SELECT image_data FROM participant_profile_images WHERE user_id=?").bind(profileAvatarId).first();
@@ -995,7 +994,7 @@ async function handleApi(request, env, url) {
     if (firstName.length < 2 || lastName.length < 2 || firstName.length > 80 || lastName.length > 100) return json({ error: "Ingresa nombres y apellidos válidos." }, 400);
     if(body.avatarData!==undefined){
       const imageData=String(body.avatarData||"");
-      if(!/^data:image\\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(imageData)||imageData.length>250000)return json({error:"La foto no es válida o supera el tamaño permitido. Selecciona otra imagen."},400);
+      if(!new RegExp("^data:image/jpeg;base64,[A-Za-z0-9+/=]+$").test(imageData)||imageData.length>250000)return json({error:"La foto no es válida o supera el tamaño permitido. Selecciona otra imagen."},400);
       await ensureParticipantProfileImagesSchema(env);
       await env.DB.prepare("INSERT INTO participant_profile_images (user_id,image_data,updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(user_id) DO UPDATE SET image_data=excluded.image_data,updated_at=datetime('now')").bind(user.id,imageData).run();
       await env.DB.prepare("UPDATE users SET avatar_url=? WHERE id=?").bind("/api/profile/avatar/"+user.id+"?v="+Date.now(),user.id).run();
