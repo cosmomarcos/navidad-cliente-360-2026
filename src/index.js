@@ -172,7 +172,7 @@ async function ensureSpiritSchema(env) {
 async function finalizeExpiredSpiritChallenges(env, editionId) {
   const expired = await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND ends_at<=datetime('now')").bind(editionId).all();
   for (const challenge of expired.results || []) {
-    const winners = await env.DB.prepare("SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.id HAVING COUNT(v.id)>0 AND COUNT(v.id)=(SELECT MAX(vote_count) FROM (SELECT COUNT(v2.id) AS vote_count FROM spirit_submissions s2 LEFT JOIN spirit_votes v2 ON v2.submission_id=s2.id WHERE s2.challenge_id=? GROUP BY s2.id))").bind(challenge.id,challenge.id).all();
+    const winners = await env.DB.prepare("WITH participant_votes AS (SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.user_id), max_votes AS (SELECT MAX(votes) AS votes FROM participant_votes) SELECT pv.user_id,pv.votes FROM participant_votes pv,max_votes mv WHERE pv.votes>0 AND pv.votes=mv.votes").bind(challenge.id).all();
     for (const winner of winners.results || []) {
       await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,10,"Publicación más votada del día").run();
     }
@@ -432,11 +432,11 @@ async function handleApi(request, env, url) {
       const mine=allRows.findIndex(x=>x.user_id===user.id);
       const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
-      const feedPromise=challenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN mine.id IS NULL THEN 0 ELSE 1 END AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id LEFT JOIN spirit_votes mine ON mine.submission_id=s.id AND mine.voter_user_id=? WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,challenge.id).all():Promise.resolve({results:[]});
+      const feedPromise=challenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,challenge.id).all():Promise.resolve({results:[]});
       const readPromise=env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
       const [feed]=await Promise.all([feedPromise,readPromise]);
       submissions=(feed.results||[]).map(item=>({...item,mediaUrl:item.has_media?"/api/spirit/media/"+encodeURIComponent(item.id):null,eligibleForVoting:challenge?.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
-      return json({challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
+      return json({challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:submissions.filter(x=>x.user_id===user.id).length,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     const commentsMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/comments$/);
     if(commentsMatch&&(request.method==="GET"||request.method==="POST")){
@@ -483,8 +483,6 @@ async function handleApi(request, env, url) {
       const configRaw=await env.DB.prepare("SELECT config_json FROM spirit_challenges WHERE id=?").bind(challenge.id).first();
       let challengeConfig={};try{challengeConfig=JSON.parse(configRaw?.config_json||"{}");}catch{}
       const correct=challengeType!=="trivia"||String(caption)===String(challengeConfig.correctAnswer||"");
-      const prior=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first();
-      if(prior)return json({error:"Ya participaste en el reto de hoy. ¡Vuelve mañana!"},409);
       const id=crypto.randomUUID();
       await env.DB.batch([
         env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),null,mediaData||null,mediaType||null),
