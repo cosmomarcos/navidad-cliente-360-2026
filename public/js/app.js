@@ -286,20 +286,18 @@ async function createSpiritPostImage(post,challenge){
 async function shareSpiritPost(post,challenge){
  const button=document.querySelector('[data-spirit-share="'+CSS.escape(post.id)+'"]');
  if(button){button.disabled=true;button.textContent="Preparando imagen…";}
- const text="🎄 Espíritu Navideño · Navidad Pyme 2026\n"+(challenge?.title?"🎯 Reto: "+challenge.title+"\n":"")+"👤 "+(post.display_name||"Participante")+"\n\n"+(post.caption||"¡Compartiendo la alegría de la Navidad!")+"\n\n✨ ¡Compartido desde nuestra comunidad navideña!";
  try{
   const blob=await createSpiritPostImage(post,challenge);
   const file=new File([blob],"espiritu-navideno-"+String(post.id).slice(0,8)+".png",{type:"image/png"});
   if(navigator.share&&navigator.canShare?.({files:[file]})){
-   await navigator.share({title:"Comunidad navideña · Navidad Pyme 2026",text,files:[file]});
+   await navigator.share({files:[file]});
    await notifySpiritShare(post.id);
    return;
   }
   const url=URL.createObjectURL(blob),download=document.createElement("a");
   download.href=url;download.download=file.name;document.body.appendChild(download);download.click();download.remove();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
-  const whatsapp="https://wa.me/?text="+encodeURIComponent(text+"\n\n📎 La tarjeta se descargó como imagen. Adjunta el PNG en este chat de WhatsApp.");
-  window.open(whatsapp,"_blank","noopener,noreferrer");
+  alert("La imagen se descargó. Adjunta el PNG en WhatsApp para compartirla sin descripción.");
   await notifySpiritShare(post.id);
  }catch(error){
   if(error?.name==="AbortError")return;
