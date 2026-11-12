@@ -806,3 +806,11 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .profile-crop-actions{display:flex;gap:10px}.profile-crop-actions button{flex:1;min-height:44px}.profile-crop-cancel{background:#eee6d6!important;color:#315444!important}
 
 .profile-crop-actions .profile-crop-apply{width:auto}
+
+/* Control administrativo independiente de los horarios de Espíritu */
+.spirit-activity-switch{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:18px 0 22px;padding:16px 18px;border:1px solid #dce7df;border-radius:16px;background:linear-gradient(135deg,#f7fbf8,#fff);flex-wrap:wrap}
+.spirit-activity-switch>div{display:grid;gap:5px;min-width:180px}
+.spirit-activity-switch b{color:#174536;font-size:15px}
+.spirit-activity-switch small{color:#66766d;font-size:12px;line-height:1.45}
+.spirit-activity-switch button{white-space:nowrap}
+@media(max-width:520px){.spirit-activity-switch{align-items:stretch}.spirit-activity-switch button{width:100%}}
