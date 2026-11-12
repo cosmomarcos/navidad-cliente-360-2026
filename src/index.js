@@ -131,6 +131,7 @@ async function ensureSpiritSchema(env) {
   return ensureSchemaOnce("spirit", async () => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenges (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 10, bonus_points INTEGER NOT NULL DEFAULT 5, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_activity_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    try { await env.DB.prepare("ALTER TABLE spirit_activity_settings ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN challenge_type TEXT NOT NULL DEFAULT 'text'").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN config_json TEXT").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_data TEXT").run(); } catch {}
@@ -413,11 +414,11 @@ async function handleApi(request, env, url) {
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_submissions WHERE edition_id=? AND user_id<>? AND created_at>?").bind(member.edition_id,user.id,read?.last_seen_at || "1970-01-01 00:00:00").first();
       return json({ unread: count?.total || 0 });
     }
-    const activitySetting = await env.DB.prepare("SELECT enabled FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first();
-    const activitiesEnabled = activitySetting ? Number(activitySetting.enabled) === 1 : true;
-    const challengePromise = activitiesEnabled
-      ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first()
-      : Promise.resolve(null);
+    const activitySetting = await env.DB.prepare("SELECT manual_override FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first();
+    const manualOverride = Number(activitySetting?.manual_override || 0) === 1;
+    const challengePromise = manualOverride
+      ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? ORDER BY CASE WHEN starts_at<=datetime('now') AND ends_at>datetime('now') THEN 0 WHEN starts_at>datetime('now') THEN 1 ELSE 2 END, CASE WHEN starts_at>datetime('now') THEN starts_at END ASC, starts_at DESC LIMIT 1").bind(member.edition_id).first()
+      : env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
     const normalizeChallenge = raw => {
       if (!raw) return { challenge: null, challengeCorrectAnswer: null };
       let config={};try{config=JSON.parse(raw.config_json||"{}");}catch{}
@@ -441,7 +442,7 @@ async function handleApi(request, env, url) {
       const readPromise=env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
       const [feed]=await Promise.all([feedPromise,readPromise]);
       submissions=(feed.results||[]).map(item=>({...item,mediaUrl:item.has_media?"/api/spirit/media/"+encodeURIComponent(item.id):null,eligibleForVoting:challenge?.challenge_type!=="trivia"||item.caption===challengeCorrectAnswer}));
-      return json({activitiesEnabled,challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:submissions.filter(x=>x.user_id===user.id).length,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
+      return json({activitiesEnabled:!!challenge,manualOverride,challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:submissions.filter(x=>x.user_id===user.id).length,mySubmission:submissions.find(x=>x.user_id===user.id)||null});
     }
     const commentsMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/comments$/);
     if(commentsMatch&&(request.method==="GET"||request.method==="POST")){
@@ -569,15 +570,16 @@ async function handleApi(request, env, url) {
       const edition = await getAdminEdition(env, url);
       if (!edition) return json({ error: "No hay una edición configurada." }, 404);
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_activity_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    try { await env.DB.prepare("ALTER TABLE spirit_activity_settings ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0").run(); } catch {}
       if (request.method === "GET") {
-        const row = await env.DB.prepare("SELECT enabled,updated_at FROM spirit_activity_settings WHERE edition_id=?").bind(edition.id).first();
-        return json({ enabled: row ? Number(row.enabled) === 1 : true, updatedAt: row?.updated_at || null });
+        const row = await env.DB.prepare("SELECT manual_override,updated_at FROM spirit_activity_settings WHERE edition_id=?").bind(edition.id).first();
+        return json({ manualOverride: Number(row?.manual_override || 0) === 1, updatedAt: row?.updated_at || null });
       }
       if (request.method === "PATCH") {
         const body = await request.json();
-        if (typeof body.enabled !== "boolean") return json({ error: "Indica si las actividades deben estar activadas o pausadas." }, 400);
-        await env.DB.prepare("INSERT INTO spirit_activity_settings (edition_id,enabled,updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET enabled=excluded.enabled,updated_at=datetime('now')").bind(edition.id, body.enabled ? 1 : 0).run();
-        return json({ ok: true, enabled: body.enabled });
+        if (typeof body.manualOverride !== "boolean") return json({ error: "Indica si deseas activar manualmente o volver al horario automático." }, 400);
+        await env.DB.prepare("INSERT INTO spirit_activity_settings (edition_id,enabled,manual_override,updated_at) VALUES (?,1,?,datetime('now')) ON CONFLICT(edition_id) DO UPDATE SET manual_override=excluded.manual_override,updated_at=datetime('now')").bind(edition.id, body.manualOverride ? 1 : 0).run();
+        return json({ ok: true, manualOverride: body.manualOverride });
       }
       return json({ error: "Método no permitido." }, 405);
     }
