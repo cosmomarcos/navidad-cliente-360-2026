@@ -494,11 +494,14 @@ async function handleApi(request, env, url) {
     if(request.method==="DELETE"&&deleteMatch){
       const submission=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(deleteMatch[1],member.edition_id,user.id).first();
       if(!submission)return json({error:"No encontramos una participación tuya para eliminar."},404);
+      const submissionInfo=await env.DB.prepare("SELECT challenge_id,user_id FROM spirit_submissions WHERE id=?").bind(submission.id).first();
       await env.DB.batch([
         env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND ((source_id=? AND source_type IN (?,?)) OR (source_type=? AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)))").bind(member.edition_id,submission.id,"submission","community_bonus","like",submission.id),
-        env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(submission.id,member.edition_id,user.id)
+        env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(submission.id,member.edition_id,user.id),
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,submissionInfo.challenge_id,user.id),
+        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submissionInfo.challenge_id,user.id)
       ]);
-      return json({ok:true,message:"Tu participación y los puntos asociados fueron eliminados."});
+      return json({ok:true,message:"Tu participación fue eliminada y el puntaje se recalculó correctamente."});
     }
     const voteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/vote$/);
     if(request.method==="POST"&&voteMatch){
