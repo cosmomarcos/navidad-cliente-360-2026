@@ -795,3 +795,8 @@ html,body{max-width:100%;overflow-x:clip}
 .spirit-heading>div{flex:1;min-width:0}
 .spirit-heading p,.spirit-challenge p,.spirit-challenge>small{overflow-wrap:anywhere;word-break:normal}
 .bottom-nav{left:0;right:0;transform:none;width:100%;max-width:820px;margin-inline:auto;box-sizing:border-box}
+
+
+/* v1.13.22 · El editor de perfil conserva la navegación inferior */
+body:has(#join-card:not(.hidden)) .shell{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
