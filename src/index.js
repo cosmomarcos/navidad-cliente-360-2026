@@ -135,7 +135,7 @@ async function ensureSpiritSchema(env) {
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_data TEXT").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_type TEXT").run(); } catch {}
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_challenges_active ON spirit_challenges(edition_id, starts_at, ends_at)").run();
-      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(challenge_id,user_id))").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_submissions_challenge ON spirit_submissions(challenge_id, created_at)").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_votes (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
@@ -145,6 +145,27 @@ async function ensureSpiritSchema(env) {
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submission_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_comments (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, comment TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_comments_submission ON spirit_comments(submission_id,created_at)").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+      const multiPostMigration=await env.DB.prepare("SELECT name FROM spirit_schema_migrations WHERE name='multiple_submissions_v1'").first();
+      if(!multiPostMigration){
+        await env.DB.batch([
+          env.DB.prepare("CREATE TABLE spirit_submissions_v2 (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), media_data TEXT, media_type TEXT)"),
+          env.DB.prepare("INSERT INTO spirit_submissions_v2 SELECT id,edition_id,challenge_id,user_id,caption,image_data,created_at,media_data,media_type FROM spirit_submissions"),
+          env.DB.prepare("CREATE TABLE spirit_votes_v2 (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions_v2(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))"),
+          env.DB.prepare("INSERT INTO spirit_votes_v2 SELECT id,submission_id,voter_user_id,created_at FROM spirit_votes"),
+          env.DB.prepare("CREATE TABLE spirit_comments_v2 (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions_v2(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, comment TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))"),
+          env.DB.prepare("INSERT INTO spirit_comments_v2 SELECT id,submission_id,edition_id,user_id,comment,created_at FROM spirit_comments"),
+          env.DB.prepare("DROP TABLE spirit_votes"),
+          env.DB.prepare("DROP TABLE spirit_comments"),
+          env.DB.prepare("DROP TABLE spirit_submissions"),
+          env.DB.prepare("ALTER TABLE spirit_submissions_v2 RENAME TO spirit_submissions"),
+          env.DB.prepare("ALTER TABLE spirit_votes_v2 RENAME TO spirit_votes"),
+          env.DB.prepare("ALTER TABLE spirit_comments_v2 RENAME TO spirit_comments"),
+          env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_submissions_challenge ON spirit_submissions(challenge_id,created_at)"),
+          env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_comments_submission ON spirit_comments(submission_id,created_at)"),
+          env.DB.prepare("INSERT INTO spirit_schema_migrations (name) VALUES ('multiple_submissions_v1')")
+        ]);
+      }
   });
 }
 
