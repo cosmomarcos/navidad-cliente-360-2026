@@ -303,13 +303,19 @@ async function createSpiritPostImage(post,challenge,comments=[]){
  const width=1080,cardX=66,cardW=width-132,innerX=cardX+54,innerW=cardW-108;
  const caption=String(post.caption||"").trim()||"Una publicación llena de espíritu navideño.";
  const type=String(post.media_type||"").toLowerCase(),isAudio=type.startsWith("audio/"),isPhoto=!!post.has_media&&!isAudio;
- let mediaBitmap=null;
+ let mediaBitmap=null,avatarBitmap=null;
  if(isPhoto){
   try{
    const mediaUrl=(post.mediaUrl||"/api/spirit/media/"+encodeURIComponent(post.id))+(selectedEditionId?"?editionId="+encodeURIComponent(selectedEditionId):"");
-   const response=await fetch(mediaUrl,{credentials:"same-origin"});
+   const response=await fetch(mediaUrl,{credentials:"same-origin",cache:"no-store"});
    if(response.ok){const blob=await response.blob();if(blob.type.startsWith("image/")&&window.createImageBitmap)mediaBitmap=await createImageBitmap(blob);}
   }catch(error){console.warn("No se pudo incluir la foto en la tarjeta compartida:",error);}
+ }
+ if(post.avatar_url&&isAvatarSource(post.avatar_url)){
+  try{
+   const response=await fetch(avatarUrl(post.avatar_url,160),{credentials:"same-origin",cache:"no-store"});
+   if(response.ok){const blob=await response.blob();if(blob.type.startsWith("image/")&&window.createImageBitmap)avatarBitmap=await createImageBitmap(blob);}
+  }catch(error){console.warn("No se pudo incluir la foto de perfil en la tarjeta compartida:",error);}
  }
  const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
  if(!ctx)throw new Error("Este dispositivo no permite generar la imagen para compartir.");
@@ -344,9 +350,16 @@ async function createSpiritPostImage(post,challenge,comments=[]){
  rounded(cardX,contentTop,cardW,cardBottom-contentTop,38,"#f6efdc","#d8cdb5",3);
  rounded(cardX+18,contentTop+18,cardW-36,cardBottom-contentTop-36,30,"#fffaf0","#eee4d1",2);
  const avatarX=innerX+45,avatarY=contentTop+78;
- ctx.beginPath();ctx.arc(avatarX,avatarY,47,0,Math.PI*2);ctx.fillStyle="#075b4d";ctx.fill();
- const initials=String(post.display_name||"P").trim().split(/\s+/).slice(0,2).map(s=>s[0]||"").join("").toLocaleUpperCase("es-PE").slice(0,2);
- drawText(initials,avatarX,avatarY+16,43,"#fffaf0","700","center");
+ ctx.save();ctx.beginPath();ctx.arc(avatarX,avatarY,47,0,Math.PI*2);ctx.clip();
+ ctx.fillStyle="#075b4d";ctx.fillRect(avatarX-47,avatarY-47,94,94);
+ if(avatarBitmap){
+  const scale=Math.max(94/avatarBitmap.width,94/avatarBitmap.height),aw=avatarBitmap.width*scale,ah=avatarBitmap.height*scale;
+  ctx.drawImage(avatarBitmap,avatarX-aw/2,avatarY-ah/2,aw,ah);
+ }else{
+  const initials=String(post.display_name||"P").trim().split(/\s+/).slice(0,2).map(s=>s[0]||"").join("").toLocaleUpperCase("es-PE").slice(0,2);
+  ctx.font="700 43px "+font;ctx.fillStyle="#fffaf0";ctx.textAlign="center";ctx.fillText(initials,avatarX,avatarY+16);
+ }
+ ctx.restore();ctx.beginPath();ctx.arc(avatarX,avatarY,47,0,Math.PI*2);ctx.strokeStyle="#d8c675";ctx.lineWidth=4;ctx.stroke();
  drawText(String(post.display_name||"Participante").slice(0,38),innerX+112,contentTop+70,38,"#174536","700");
  const created=post.created_at?new Date(String(post.created_at).replace(" ","T")+"Z"):new Date();
  const dateText=Number.isNaN(created.getTime())?"":created.toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short"});
@@ -397,7 +410,12 @@ async function shareSpiritPost(post,challenge){
    const data=await api("/api/spirit/submissions/"+encodeURIComponent(post.id)+"/comments",{noMemoryCache:true});
    comments=data.comments||[];
   }
-  const blob=await createSpiritPostImage(post,challenge,comments);
+  let currentPost=post;
+  try{
+   const latestBoard=await api("/api/spirit/board",{noMemoryCache:true,timeoutMs:12000});
+   currentPost=(latestBoard.submissions||[]).find(item=>item.id===post.id)||post;
+  }catch(error){console.warn("No se pudo actualizar el perfil para la imagen compartida:",error);}
+  const blob=await createSpiritPostImage(currentPost,challenge,comments);
   const file=new File([blob],"espiritu-navideno-"+String(post.id).slice(0,8)+".png",{type:"image/png"});
   if(navigator.share&&navigator.canShare?.({files:[file]})){
    await navigator.share({files:[file]});
