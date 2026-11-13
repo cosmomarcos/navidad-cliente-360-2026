@@ -753,6 +753,18 @@ async function handleApi(request, env, url) {
       ]);
       return json({ ok: true, edition: { id: editionId, title, year, teamName } }, 201);
     }
+    if (request.method === "GET" && url.pathname === "/api/admin/secret-messages") {
+      const edition=await getAdminEdition(env,url);
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureCommunitySchema(env);
+      await ensureParticipantProfilesSchema(env);
+      const [chat,clues]=await Promise.all([
+        env.DB.prepare("SELECT m.id,m.message,m.created_at,m.run_number,'chat' AS message_type,m.sender_user_id,m.recipient_user_id,COALESCE(NULLIF(TRIM(COALESCE(ps.first_name,'') || ' ' || COALESCE(ps.last_name,'')),''),us.display_name) AS sender_name,COALESCE(NULLIF(TRIM(COALESCE(pr.first_name,'') || ' ' || COALESCE(pr.last_name,'')),''),ur.display_name) AS recipient_name FROM anonymous_chat_messages m JOIN users us ON us.id=m.sender_user_id JOIN users ur ON ur.id=m.recipient_user_id LEFT JOIN participant_profiles ps ON ps.user_id=m.sender_user_id LEFT JOIN participant_profiles pr ON pr.user_id=m.recipient_user_id WHERE m.edition_id=? ORDER BY m.created_at DESC LIMIT 500").bind(edition.id).all(),
+        env.DB.prepare("SELECT c.id,c.message,c.created_at,c.run_number,'clue' AS message_type,c.giver_user_id AS sender_user_id,c.recipient_user_id,COALESCE(NULLIF(TRIM(COALESCE(ps.first_name,'') || ' ' || COALESCE(ps.last_name,'')),''),us.display_name) AS sender_name,COALESCE(NULLIF(TRIM(COALESCE(pr.first_name,'') || ' ' || COALESCE(pr.last_name,'')),''),ur.display_name) AS recipient_name FROM anonymous_clues c JOIN users us ON us.id=c.giver_user_id JOIN users ur ON ur.id=c.recipient_user_id LEFT JOIN participant_profiles ps ON ps.user_id=c.giver_user_id LEFT JOIN participant_profiles pr ON pr.user_id=c.recipient_user_id WHERE c.edition_id=? ORDER BY c.created_at DESC LIMIT 500").bind(edition.id).all()
+      ]);
+      const messages=[...(chat.results||[]),...(clues.results||[])].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,500);
+      return json({messages,total:messages.length,edition:{id:edition.id,title:edition.title}});
+    }
     if (request.method === "GET" && url.pathname === "/api/admin/activity") {
       const edition = await getAdminEdition(env, url);
       if (!edition) return json({ activeNow: 0, activeToday: 0, activeWeek: 0, participants: 0, recent: [] });
