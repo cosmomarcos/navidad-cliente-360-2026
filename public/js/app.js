@@ -447,7 +447,7 @@ async function renderSpiritTab(dataOverride=null){
   const spiritCacheKey="spirit-board:"+selectedEditionId+":"+currentUser.user.id;
   let cachedBoard=null;
   if(!dataOverride){try{const saved=JSON.parse(localStorage.getItem(spiritCacheKey)||sessionStorage.getItem(spiritCacheKey)||"null");if(saved&&Date.now()-saved.savedAt<86400000)cachedBoard=saved.data;}catch{}}
-  const data=dataOverride||(cachedBoard?{...cachedBoard,challenge:null,activitiesEnabled:false,submissions:[]}:await api("/api/spirit/board",{timeoutMs:12000}));
+  const data=dataOverride||await api("/api/spirit/board",{noMemoryCache:true,timeoutMs:12000});
   const bonusData=await api("/api/spirit/extra",{timeoutMs:10000}).catch(()=>({challenge:null,submission:null}));
   if(dataOverride||!cachedBoard){const snapshot=JSON.stringify({savedAt:Date.now(),data});try{localStorage.setItem(spiritCacheKey,snapshot);sessionStorage.setItem(spiritCacheKey,snapshot);}catch{}}
   const host=$("#spirit-content"),challenge=data.challenge,ranking=data.ranking||[],submissions=data.submissions||[],medals=["🥇","🥈","🥉"];
