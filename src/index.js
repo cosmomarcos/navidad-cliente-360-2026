@@ -742,7 +742,7 @@ async function handleApi(request, env, url) {
       await ensureSpiritSchema(env);
       const edition = await getAdminEdition(env, url);
       if(!edition)return json({error:"No hay una edición configurada."},404);
-      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text");
+      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text"),kind=body.challengeKind==="extra"?"extra":"daily";
       const points=Number(body.points||10),bonus=Number(body.bonusPoints||5),config=body.config&&typeof body.config==="object"?body.config:{};
       if(!["text","photo","voice","trivia"].includes(type))return json({error:"Tipo de reto no válido."},400);
       if(title.length<3||title.length>80||description.length<5||description.length>300)return json({error:"Completa un título y una descripción válidos."},400);
