@@ -339,7 +339,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.11" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.12" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -459,11 +459,15 @@ async function handleApi(request, env, url) {
 
     if(request.method==="GET"&&url.pathname==="/api/spirit/extra"){
       await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(member.edition_id).run();
-      const challenge=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+      const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
+      const eligible=!rankRow||Number(rankRow.rank)>1;
+      const challenge=eligible?await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first():null;
       const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
-      return json({challenge:challenge||null,submission:submission||null});
+      return json({challenge:challenge||null,submission:submission||null,eligible,rank:rankRow?.rank||null});
     }
     if(request.method==="POST"&&url.pathname==="/api/spirit/extra/submissions"){
+      const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
+      if(rankRow&&Number(rankRow.rank)===1)return json({error:"El reto bonus está reservado para todos los participantes excepto el primer lugar."},403);
       const challenge=await env.DB.prepare("SELECT id,challenge_type FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
       if(!challenge)return json({error:"No hay un reto bonus activo."},409);
       const body=await request.json(),caption=String(body.caption||"").trim(),mediaData=String(body.mediaData||""),mediaType=String(body.mediaType||"");
