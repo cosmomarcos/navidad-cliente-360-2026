@@ -841,3 +841,15 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
   border-color: #8ca88f;
   box-shadow: 0 0 0 3px rgba(140,168,143,.2);
 }
+
+
+/* v2.0.0 · Ranking completo y desplazamiento vertical */
+.spirit-full-rank-row{min-height:72px;padding:12px 13px;gap:11px;border:1px solid #e9dfca;border-radius:13px;box-shadow:0 2px 7px #172d2010}
+.spirit-rank-position{width:34px;flex:none;color:#9a7a3e;font-size:15px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums}
+.spirit-rank-avatar{width:42px;height:42px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:#e9e2d2;color:#947b49;font-size:20px}
+.spirit-rank-avatar img{width:100%;height:100%;object-fit:cover}
+.spirit-full-rank-row .spirit-rank-name{min-width:0}
+.spirit-full-rank-row .spirit-rank-names{overflow-wrap:anywhere;line-height:1.45}
+.spirit-complete-ranking .spirit-ranking{gap:9px}
+.spirit-complete-ranking .spirit-section-title small{font-variant-numeric:tabular-nums}
+@media(max-width:520px){.spirit-full-rank-row{min-height:68px;padding:10px 8px;gap:8px}.spirit-rank-position{width:28px;font-size:13px}.spirit-rank-avatar{width:38px;height:38px}.spirit-full-rank-row .spirit-rank-points{font-size:10px}}
