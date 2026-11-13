@@ -457,6 +457,7 @@ async function handleApi(request, env, url) {
 
 
     if(request.method==="GET"&&url.pathname==="/api/spirit/extra"){
+      await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(member.edition_id).run();
       const challenge=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
       const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
       return json({challenge:challenge||null,submission:submission||null});
@@ -652,6 +653,7 @@ async function handleApi(request, env, url) {
       const edition=await getAdminEdition(env,url);if(!edition)return json({active:null,submissions:[]});
       await ensureSpiritSchema(env);
       await ensureParticipantProfilesSchema(env);
+      await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(edition.id).run();
       const active=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
       const submissions=active?await env.DB.prepare("SELECT x.id,x.user_id,x.caption,x.media_type,x.status,x.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM spirit_extra_submissions x JOIN users u ON u.id=x.user_id LEFT JOIN participant_profiles p ON p.user_id=x.user_id WHERE x.challenge_id=? ORDER BY CASE x.status WHEN 'pending' THEN 0 ELSE 1 END,x.created_at").bind(active.id).all():{results:[]};
       return json({active:active||null,submissions:submissions.results||[]});
