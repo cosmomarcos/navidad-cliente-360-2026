@@ -450,6 +450,24 @@ async function handleApi(request, env, url) {
       delete challenge.config_json;
       return { challenge, challengeCorrectAnswer:String(config.correctAnswer||"") };
     };
+
+    if(request.method==="GET"&&url.pathname==="/api/spirit/extra"){
+      const challenge=await env.DB.prepare("SELECT id,title,description,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+      const proposals=await env.DB.prepare("SELECT id,title,description,challenge_type,status,admin_note,created_at FROM spirit_extra_proposals WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 20").bind(member.edition_id,user.id).all();
+      const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
+      let config={};try{config=JSON.parse(challenge?.config_json||"{}");}catch{}
+      if(challenge){challenge.config={question:config.question||"",options:Array.isArray(config.options)?config.options:[]};delete challenge.config_json;}
+      return json({challenge:challenge||null,submission:submission||null,proposals:proposals.results||[]});
+    }
+    if(request.method==="POST"&&url.pathname==="/api/spirit/extra/proposals"){
+      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text"),kind=body.challengeKind==="extra"?"extra":"daily";
+      if(title.length<4||title.length>80||description.length<10||description.length>400||!["text","photo","voice","trivia"].includes(type))return json({error:"Completa un título, descripción y tipo válidos."},400);
+      const pending=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_extra_proposals WHERE edition_id=? AND user_id=? AND status='pending'").bind(member.edition_id,user.id).first();
+      if(Number(pending?.total||0)>=3)return json({error:"Puedes tener como máximo 3 propuestas pendientes."},409);
+      const id=crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO spirit_extra_proposals (id,edition_id,user_id,title,description,challenge_type) VALUES (?,?,?,?,?,?)").bind(id,member.edition_id,user.id,title,description,type).run();
+      return json({ok:true,id,status:"pending"},201);
+    }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
       const [ranking, rawChallenge] = await Promise.all([
         env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id).all(),
@@ -693,6 +711,24 @@ async function handleApi(request, env, url) {
       return json({ activeNow: activeNow?.total||0, activeToday: activeToday?.total||0, activeWeek: activeWeek?.total||0, participants: participants?.total||0, recent: (recent.results||[]).map(row=>({...row,last_seen_label:row.last_seen_at})), participation: participation.results||[] });
     }
 
+
+    if(url.pathname==="/api/admin/spirit/extra/proposals"&&request.method==="GET"){
+      const edition=await getAdminEdition(env,url);if(!edition)return json({proposals:[]});
+      await ensureSpiritSchema(env);
+      const rows=await env.DB.prepare("SELECT p.*,COALESCE(NULLIF(TRIM(COALESCE(pr.first_name,'') || ' ' || COALESCE(pr.last_name,'')),''),u.display_name) AS proposer_name FROM spirit_extra_proposals p JOIN users u ON u.id=p.user_id LEFT JOIN participant_profiles pr ON pr.user_id=p.user_id WHERE p.edition_id=? ORDER BY CASE p.status WHEN 'pending' THEN 0 ELSE 1 END,p.created_at DESC LIMIT 100").bind(edition.id).all();
+      return json({proposals:rows.results||[]});
+    }
+    const proposalReview=url.pathname.match(/^\/api\/admin\/spirit\/extra\/proposals\/([A-Za-z0-9-]+)$/);
+    if(proposalReview&&request.method==="PATCH"){
+      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      const body=await request.json(),status=String(body.status||"");
+      if(!["approved","rejected"].includes(status))return json({error:"Estado de revisión no válido."},400);
+      const result=await env.DB.prepare("UPDATE spirit_extra_proposals SET status=?,admin_note=?,reviewed_at=datetime('now') WHERE id=? AND edition_id=? AND status='pending'").bind(status,String(body.adminNote||"").slice(0,300),proposalReview[1],edition.id).run();
+      if(!result.meta?.changes)return json({error:"La propuesta ya fue revisada o no existe."},404);
+      const proposal=await env.DB.prepare("SELECT user_id FROM spirit_extra_proposals WHERE id=?").bind(proposalReview[1]).first();
+      await sendPushToUser(env,proposal.user_id,{title:status==="approved"?"Propuesta aprobada":"Propuesta revisada",body:status==="approved"?"Tu idea fue aprobada. El administrador podrá publicarla como reto.":(String(body.adminNote||"")||"Gracias por compartir tu idea."),tag:"spirit-proposal-"+proposalReview[1],url:"/?tab=spirit"},url.origin);
+      return json({ok:true,status});
+    }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
       await ensureSpiritSchema(env);
       const edition=await getAdminEdition(env, url);
@@ -717,10 +753,10 @@ async function handleApi(request, env, url) {
       const start=new Date(scheduledDate+"T23:00:00.000Z"),end=new Date(start.getTime()+12*60*60*1000);
       if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now())return json({error:"Elige una fecha futura. Los retos abren a las 6:00 p. m. y cierran a las 6:00 a. m. del día siguiente (hora Perú)."},400);
       const startSql=start.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," ");
-      const overlap=await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND starts_at<? AND ends_at>? LIMIT 1").bind(edition.id,endSql,startSql).first();
+      const overlap=await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND challenge_kind=? AND starts_at<? AND ends_at>? LIMIT 1").bind(edition.id,kind,endSql,startSql).first();
       if(overlap)return json({error:"Ya existe un reto programado para ese día."},409);
       const id=crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,points,bonus,type,JSON.stringify(config),startSql,endSql,user.id).run();
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,edition.id,title,description,kind==="extra"?3:points,kind==="extra"?0:bonus,type,JSON.stringify(config),startSql,endSql,user.id,kind).run();
       return json({ok:true,id,startsAt:startSql,endsAt:endSql});
     }
 
