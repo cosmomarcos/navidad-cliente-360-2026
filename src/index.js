@@ -153,6 +153,11 @@ async function ensureSpiritSchema(env) {
     try { await env.DB.prepare("ALTER TABLE spirit_activity_settings ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN challenge_type TEXT NOT NULL DEFAULT 'text'").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN config_json TEXT").run(); } catch {}
+      try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN challenge_kind TEXT NOT NULL DEFAULT 'daily'").run(); } catch {}
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_extra_proposals (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, challenge_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', admin_note TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), reviewed_at TEXT)").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_extra_proposals ON spirit_extra_proposals(edition_id,status,created_at)").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_extra_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL DEFAULT '', media_data TEXT, media_type TEXT, status TEXT NOT NULL DEFAULT 'pending', reviewed_at TEXT, reviewed_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(challenge_id,user_id))").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_extra_submissions ON spirit_extra_submissions(challenge_id,status)").run();
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_data TEXT").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_type TEXT").run(); } catch {}
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_challenges_active ON spirit_challenges(edition_id, starts_at, ends_at)").run();
@@ -195,7 +200,7 @@ async function finalizeExpiredSpiritChallenges(env, editionId) {
   for (const challenge of expired.results || []) {
     const winners = await env.DB.prepare("WITH participant_votes AS (SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.user_id), max_votes AS (SELECT MAX(votes) AS votes FROM participant_votes) SELECT pv.user_id,pv.votes FROM participant_votes pv,max_votes mv WHERE pv.votes>0 AND pv.votes=mv.votes").bind(challenge.id).all();
     for (const winner of winners.results || []) {
-      await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,10,"Publicación más votada del día").run();
+      await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,2,"Publicación más votada del día").run();
     }
   }
 }
