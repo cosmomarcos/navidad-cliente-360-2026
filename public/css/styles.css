@@ -912,3 +912,13 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 /* v2.0.11 · Quitar los bordes de tarjeta duplicados en formularios embebidos */
 .member-home .spirit-submit-form-embedded{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:16px 0 0!important;margin:16px 0 0!important;border-radius:0!important}
 .member-home .spirit-submit-form-embedded:focus-within{outline:0!important}
+
+.admin-secret-messages-list{display:grid;gap:12px;margin-top:18px}
+.admin-secret-message{background:#fffaf0;border:1px solid rgba(151,126,76,.24);border-radius:16px;padding:16px;box-shadow:0 4px 14px rgba(24,48,38,.05)}
+.admin-secret-message-top,.admin-secret-message-route{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.admin-secret-message-top{justify-content:space-between;color:#887b5e;font-size:.82rem}
+.admin-secret-message-kind{font-weight:800;letter-spacing:.04em}
+.admin-secret-message-route{margin-top:12px;color:#173f32}
+.admin-secret-message-route span{color:#9a8656}
+.admin-secret-message p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin:12px 0;color:#34463d}
+.admin-secret-message small{color:#897d66}
