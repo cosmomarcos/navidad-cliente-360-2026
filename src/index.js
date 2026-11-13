@@ -336,7 +336,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.2" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -429,7 +429,8 @@ async function handleApi(request, env, url) {
     await ensureSpiritSchema(env);
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
     if(request.method==="GET"&&spiritMediaMatch){
-      const media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
+      let media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
+      if(!media)media=await env.DB.prepare("SELECT media_data,NULL AS image_data,media_type FROM spirit_extra_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(spiritMediaMatch[1],member.edition_id,user.id).first();
       if(!media)return json({error:"No encontramos el archivo de esta publicación."},404);
       return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg",request);
     }
@@ -451,21 +452,23 @@ async function handleApi(request, env, url) {
       return { challenge, challengeCorrectAnswer:String(config.correctAnswer||"") };
     };
 
+
     if(request.method==="GET"&&url.pathname==="/api/spirit/extra"){
-      const challenge=await env.DB.prepare("SELECT id,title,description,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
-      const proposals=await env.DB.prepare("SELECT id,title,description,challenge_type,status,admin_note,created_at FROM spirit_extra_proposals WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 20").bind(member.edition_id,user.id).all();
+      const challenge=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
       const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
-      let config={};try{config=JSON.parse(challenge?.config_json||"{}");}catch{}
-      if(challenge){challenge.config={question:config.question||"",options:Array.isArray(config.options)?config.options:[]};delete challenge.config_json;}
-      return json({challenge:challenge||null,submission:submission||null,proposals:proposals.results||[]});
+      return json({challenge:challenge||null,submission:submission||null});
     }
-    if(request.method==="POST"&&url.pathname==="/api/spirit/extra/proposals"){
-      const body=await request.json(),title=String(body.title||"").trim(),description=String(body.description||"").trim(),type=String(body.challengeType||"text"),kind=body.challengeKind==="extra"?"extra":"daily";
-      if(title.length<4||title.length>80||description.length<10||description.length>400||!["text","photo","voice","trivia"].includes(type))return json({error:"Completa un título, descripción y tipo válidos."},400);
-      const pending=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_extra_proposals WHERE edition_id=? AND user_id=? AND status='pending'").bind(member.edition_id,user.id).first();
-      if(Number(pending?.total||0)>=3)return json({error:"Puedes tener como máximo 3 propuestas pendientes."},409);
+    if(request.method==="POST"&&url.pathname==="/api/spirit/extra/submissions"){
+      const challenge=await env.DB.prepare("SELECT id,challenge_type FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+      if(!challenge)return json({error:"No hay un reto bonus activo."},409);
+      const body=await request.json(),caption=String(body.caption||"").trim(),mediaData=String(body.mediaData||""),mediaType=String(body.mediaType||"");
+      if(caption.length>500||mediaData.length>5500000)return json({error:"La participación supera el límite permitido."},400);
+      if(challenge.challenge_type==="photo"&&(!mediaData.startsWith("data:image/")||!/^image\/(jpeg|png|webp)$/.test(mediaType)))return json({error:"Adjunta una foto válida."},400);
+      if(challenge.challenge_type==="voice"&&(!mediaData.startsWith("data:audio/")||!mediaType.startsWith("audio/")))return json({error:"Adjunta una grabación válida."},400);
+      if(challenge.challenge_type==="text"&&caption.length<2)return json({error:"Escribe tu participación."},400);
       const id=crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO spirit_extra_proposals (id,edition_id,user_id,title,description,challenge_type) VALUES (?,?,?,?,?,?)").bind(id,member.edition_id,user.id,title,description,type).run();
+      try{await env.DB.prepare("INSERT INTO spirit_extra_submissions (id,edition_id,challenge_id,user_id,caption,media_data,media_type) VALUES (?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,mediaData||null,mediaType||null).run();}
+      catch{return json({error:"Ya enviaste tu participación para este reto bonus."},409);}
       return json({ok:true,id,status:"pending"},201);
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
@@ -641,6 +644,43 @@ async function handleApi(request, env, url) {
       return json({ok:true,message:"Publicación eliminada. Se retiraron sus comentarios, votos y puntos, y se recalculó la puntuación."});
     }
 
+
+    if(url.pathname==="/api/admin/spirit/bonus"&&request.method==="GET"){
+      const edition=await getAdminEdition(env,url);if(!edition)return json({active:null,submissions:[]});
+      await ensureSpiritSchema(env);
+      const active=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
+      const submissions=active?await env.DB.prepare("SELECT x.id,x.user_id,x.caption,x.media_type,x.status,x.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM spirit_extra_submissions x JOIN users u ON u.id=x.user_id LEFT JOIN participant_profiles p ON p.user_id=x.user_id WHERE x.challenge_id=? ORDER BY CASE x.status WHEN 'pending' THEN 0 ELSE 1 END,x.created_at").bind(active.id).all():{results:[]};
+      return json({active:active||null,submissions:submissions.results||[]});
+    }
+    if(url.pathname==="/api/admin/spirit/bonus/activate"&&request.method==="POST"){
+      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureSpiritSchema(env);
+      const active=await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') LIMIT 1").bind(edition.id).first();
+      if(active)return json({error:"Ya hay un reto bonus activo."},409);
+      const catalog=[["navidad-foto-01","Postal navideña viviente","Recrea una postal navideña con objetos que tengas a mano y comparte una foto.","photo"],["navidad-foto-02","El árbol inesperado","Fotografía un árbol navideño hecho con materiales poco comunes.","photo"],["navidad-foto-03","Un detalle rojo","Comparte una foto donde el color rojo sea el protagonista navideño.","photo"],["navidad-foto-04","Navidad en miniatura","Crea una escena navideña pequeña y fotografíala.","photo"],["navidad-foto-05","El regalo misterioso","Envuelve un objeto cotidiano y comparte una foto sin revelar qué es.","photo"],["navidad-audio-01","Locutor de Navidad","Graba un saludo navideño como locutor de radio, máximo 30 segundos.","voice"],["navidad-audio-02","Risa de duende","Graba tu mejor risa de duende navideño, máximo 15 segundos.","voice"],["navidad-audio-03","Tráiler navideño","Narra el avance de una película navideña inventada, máximo 30 segundos.","voice"],["navidad-audio-04","Reno reportero","Graba un reporte divertido desde el taller de Santa, máximo 30 segundos.","voice"],["navidad-audio-05","Villancico express","Tararea un villancico durante 15 segundos.","voice"],["navidad-texto-01","Titular de última hora","Escribe un titular gracioso sobre la llegada de la Navidad al equipo.","text"],["navidad-texto-02","Manual del duende","Escribe una regla absurda que todo duende debería cumplir.","text"],["navidad-texto-03","Mi deseo en seis palabras","Comparte un deseo navideño usando exactamente seis palabras.","text"],["navidad-texto-04","El regalo imposible","Describe el regalo más absurdo que podría recibir Santa.","text"],["navidad-texto-05","Un superpoder festivo","Inventa un superpoder que solo funcione en Navidad.","text"],["navidad-texto-06","Excusa del reno","Escribe la excusa más creativa de un reno que llegó tarde.","text"],["navidad-trivia-01","Trivia del trineo","¿Cuántos renos tiran tradicionalmente del trineo contando a Rudolph? Responde correctamente.","trivia"],["navidad-trivia-02","Trivia cinematográfica","¿Cómo se llama el niño protagonista de Mi pobre angelito? Responde correctamente.","trivia"],["navidad-trivia-03","Trivia del Grinch","¿Qué quería robar el Grinch? Responde correctamente.","trivia"],["navidad-trivia-04","Trivia de Rudolph","¿De qué color es la nariz de Rudolph? Responde correctamente.","trivia"]];
+      const used=await env.DB.prepare("SELECT bonus_key FROM spirit_bonus_history WHERE edition_id=?").bind(edition.id).all();
+      const usedKeys=new Set((used.results||[]).map(x=>x.bonus_key)),available=catalog.filter(x=>!usedKeys.has(x[0]));
+      if(!available.length)return json({error:"Se agotó el catálogo único de retos bonus. Ninguno se repetirá."},409);
+      const item=available[Math.floor(Math.random()*available.length)],now=new Date(),end=new Date(now.getTime()+24*60*60*1000),startSql=now.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," "),id=crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,3,0,?,?,?,?, 'extra')").bind(id,edition.id,item[1],item[2],item[3],startSql,endSql,user.id).run();
+      const reservation=await env.DB.prepare("INSERT OR IGNORE INTO spirit_bonus_history (edition_id,bonus_key,challenge_id) VALUES (?,?,?)").bind(edition.id,item[0],id).run();
+      if(!reservation.meta?.changes){await env.DB.prepare("DELETE FROM spirit_challenges WHERE id=?").bind(id).run();return json({error:"El reto ya fue reservado. Vuelve a intentar."},409);}
+      return json({ok:true,title:item[1],points:3,endsAt:endSql});
+    }
+    if(url.pathname.startsWith("/api/admin/spirit/bonus/submissions/")&&request.method==="PATCH"){
+      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureSpiritSchema(env);
+      const id=url.pathname.split("/").pop(),body=await request.json(),status=String(body.status||"");
+      if(!["approved","rejected"].includes(status))return json({error:"Estado de revisión no válido."},400);
+      const submission=await env.DB.prepare("SELECT id,user_id,status FROM spirit_extra_submissions WHERE id=? AND edition_id=?").bind(id,edition.id).first();
+      if(!submission)return json({error:"No encontramos esa participación."},404);
+      if(submission.status!=="pending")return json({error:"Esta participación ya fue revisada."},409);
+      const changed=await env.DB.prepare("UPDATE spirit_extra_submissions SET status=?,reviewed_at=datetime('now'),reviewed_by=? WHERE id=? AND status='pending'").bind(status,user.id,id).run();
+      if(!changed.meta?.changes)return json({error:"Esta participación ya fue revisada."},409);
+      if(status==="approved")await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),edition.id,submission.user_id,"bonus_approved",id,3,"Reto bonus aprobado").run();
+      await sendPushToUser(env,submission.user_id,{title:status==="approved"?"🎁 ¡Bonus aprobado!":"Reto bonus revisado",body:status==="approved"?"Tu participación fue aprobada y recibiste 3 puntos extra.":"Tu evidencia fue revisada y no recibió puntos.",tag:"spirit-bonus-"+id,url:"/?tab=spirit"},url.origin);
+      return json({ok:true,status,points:status==="approved"?3:0});
+    }
     if (url.pathname === "/api/admin/spirit/activities") {
       const edition = await getAdminEdition(env, url);
       if (!edition) return json({ error: "No hay una edición configurada." }, 404);
@@ -712,23 +752,6 @@ async function handleApi(request, env, url) {
     }
 
 
-    if(url.pathname==="/api/admin/spirit/extra/proposals"&&request.method==="GET"){
-      const edition=await getAdminEdition(env,url);if(!edition)return json({proposals:[]});
-      await ensureSpiritSchema(env);
-      const rows=await env.DB.prepare("SELECT p.*,COALESCE(NULLIF(TRIM(COALESCE(pr.first_name,'') || ' ' || COALESCE(pr.last_name,'')),''),u.display_name) AS proposer_name FROM spirit_extra_proposals p JOIN users u ON u.id=p.user_id LEFT JOIN participant_profiles pr ON pr.user_id=p.user_id WHERE p.edition_id=? ORDER BY CASE p.status WHEN 'pending' THEN 0 ELSE 1 END,p.created_at DESC LIMIT 100").bind(edition.id).all();
-      return json({proposals:rows.results||[]});
-    }
-    const proposalReview=url.pathname.match(/^\/api\/admin\/spirit\/extra\/proposals\/([A-Za-z0-9-]+)$/);
-    if(proposalReview&&request.method==="PATCH"){
-      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
-      const body=await request.json(),status=String(body.status||"");
-      if(!["approved","rejected"].includes(status))return json({error:"Estado de revisión no válido."},400);
-      const result=await env.DB.prepare("UPDATE spirit_extra_proposals SET status=?,admin_note=?,reviewed_at=datetime('now') WHERE id=? AND edition_id=? AND status='pending'").bind(status,String(body.adminNote||"").slice(0,300),proposalReview[1],edition.id).run();
-      if(!result.meta?.changes)return json({error:"La propuesta ya fue revisada o no existe."},404);
-      const proposal=await env.DB.prepare("SELECT user_id FROM spirit_extra_proposals WHERE id=?").bind(proposalReview[1]).first();
-      await sendPushToUser(env,proposal.user_id,{title:status==="approved"?"Propuesta aprobada":"Propuesta revisada",body:status==="approved"?"Tu idea fue aprobada. El administrador podrá publicarla como reto.":(String(body.adminNote||"")||"Gracias por compartir tu idea."),tag:"spirit-proposal-"+proposalReview[1],url:"/?tab=spirit"},url.origin);
-      return json({ok:true,status});
-    }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
       await ensureSpiritSchema(env);
       const edition=await getAdminEdition(env, url);

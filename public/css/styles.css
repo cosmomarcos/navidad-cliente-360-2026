@@ -899,3 +899,5 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 @media(max-width:380px){.spirit-ranking-podium{gap:5px}.spirit-podium-card{padding:10px 3px}.spirit-podium-name{font-size:10px}.spirit-compact-rank-row{gap:7px!important;padding:7px 6px!important}.spirit-compact-rank-row .spirit-rank-points{font-size:11px}}
 
 
+
+.spirit-bonus-card{border:1px solid #d8b76d;background:linear-gradient(135deg,#fffaf0,#fff)}.spirit-bonus-review{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid #eadfc9}.spirit-bonus-review small{flex:1 1 100%}
