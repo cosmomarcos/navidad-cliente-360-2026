@@ -158,6 +158,8 @@ async function ensureSpiritSchema(env) {
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_extra_proposals ON spirit_extra_proposals(edition_id,status,created_at)").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_extra_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL DEFAULT '', media_data TEXT, media_type TEXT, status TEXT NOT NULL DEFAULT 'pending', reviewed_at TEXT, reviewed_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(challenge_id,user_id))").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_extra_submissions ON spirit_extra_submissions(challenge_id,status)").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_bonus_history (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, bonus_key TEXT NOT NULL, challenge_id TEXT NOT NULL UNIQUE REFERENCES spirit_challenges(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,bonus_key))").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_bonus_history_edition ON spirit_bonus_history(edition_id,created_at)").run();
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_data TEXT").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN media_type TEXT").run(); } catch {}
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_challenges_active ON spirit_challenges(edition_id, starts_at, ends_at)").run();
