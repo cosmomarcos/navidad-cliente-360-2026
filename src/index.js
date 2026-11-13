@@ -1,6 +1,23 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...extra } }); }
+function containsUnsafePayload(value) {
+  const text = String(value || "");
+  return [
+    /(?:^|[;&|\n])\s*(?:mkfifo|nc\s+-|netcat\s+-|ncat\s+-)/i,
+    /\/dev\/(?:tcp|udp)\//i,
+    /\b(?:bash|sh|zsh)\s+-[ic]/i,
+    /\bsqlite3\b[\s\S]{0,120}\.shell\b/i,
+    /\b(?:curl|wget)\b[\s\S]{0,100}\|\s*(?:sh|bash)\b/i,
+    /\b(?:powershell|pwsh)\b[\s\S]{0,80}(?:-enc(?:odedcommand)?|-e\s)/i,
+    /\b(?:rm\s+-rf|chmod\s+\+x)\b/i
+  ].some(pattern => pattern.test(text));
+}
+function rejectUnsafePayload(value) {
+  return containsUnsafePayload(value)
+    ? json({ error: "El contenido parece incluir instrucciones de terminal o código ejecutable. Comparte tu mensaje como texto normal." }, 400)
+    : null;
+}
 const schemaInitPromises = new Map();
 function ensureSchemaOnce(key, initialize) {
   if (!schemaInitPromises.has(key)) {
@@ -459,6 +476,7 @@ async function handleApi(request, env, url) {
         return json({comments:rows.results||[]});
       }
       const body=await request.json(),comment=String(body.comment||"").trim();
+      const unsafeComment=rejectUnsafePayload(comment);if(unsafeComment)return unsafeComment;
       if(comment.length<1||comment.length>500)return json({error:"El comentario debe tener entre 1 y 500 caracteres."},400);
       const id=crypto.randomUUID();
       await env.DB.prepare("INSERT INTO spirit_comments (id,submission_id,edition_id,user_id,comment) VALUES (?,?,?,?,?)").bind(id,submission.id,member.edition_id,user.id,comment).run();
@@ -486,6 +504,7 @@ async function handleApi(request, env, url) {
     if (request.method === "POST" && url.pathname === "/api/spirit/submissions") {
       if(!challenge)return json({error:"No hay un reto activo en este momento."},409);
       const body=await request.json(),caption=String(body.caption||"").trim(),mediaData=String(body.mediaData||body.imageData||""),mediaType=String(body.mediaType||(body.imageData?"image/jpeg":""));
+      const unsafeCaption=rejectUnsafePayload(caption);if(unsafeCaption)return unsafeCaption;
       const challengeType=challenge.challenge_type||"text";
       if(challengeType==="text"&&(caption.length<2||caption.length>500))return json({error:"Tu participación debe tener entre 2 y 500 caracteres."},400);
       if(challengeType==="photo"&&(!mediaData.startsWith("data:image/jpeg;base64,")||mediaData.length>300000))return json({error:"Debes adjuntar una foto JPG válida."},400);
@@ -571,6 +590,25 @@ async function handleApi(request, env, url) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
+
+    const adminSpiritDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
+    if(request.method==="DELETE"&&adminSpiritDeleteMatch){
+      const edition=await getAdminEdition(env,url);
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureSpiritSchema(env);
+      const submission=await env.DB.prepare("SELECT id,challenge_id,user_id FROM spirit_submissions WHERE id=? AND edition_id=?").bind(adminSpiritDeleteMatch[1],edition.id).first();
+      if(!submission)return json({error:"La publicación no existe en este intercambio o ya fue eliminada."},404);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_id=? AND source_type IN ('submission','community_bonus')").bind(edition.id,submission.id),
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(edition.id,submission.id),
+        env.DB.prepare("DELETE FROM spirit_comments WHERE submission_id=? AND edition_id=?").bind(submission.id,edition.id),
+        env.DB.prepare("DELETE FROM spirit_votes WHERE submission_id=?").bind(submission.id),
+        env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=?").bind(submission.id,edition.id),
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(edition.id,submission.challenge_id,submission.user_id),
+        env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submission.challenge_id,submission.user_id)
+      ]);
+      return json({ok:true,message:"Publicación eliminada. Se retiraron sus comentarios, votos y puntos, y se recalculó la puntuación."});
+    }
 
     if (url.pathname === "/api/admin/spirit/activities") {
       const edition = await getAdminEdition(env, url);
@@ -893,6 +931,7 @@ async function handleApi(request, env, url) {
     }
     if (request.method === "POST" && url.pathname === "/api/community/chats") {
       const body=await request.json(),message=String(body.message||"").trim(),thread=String(body.thread||"");
+      const unsafeMessage=rejectUnsafePayload(message);if(unsafeMessage)return unsafeMessage;
       if(!message||message.length>500)return json({error:"El mensaje debe tener entre 1 y 500 caracteres."},400);
       if(thread!=="outgoing"&&thread!=="incoming")return json({error:"Conversación no válida."},400);
       const draw=await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
@@ -918,6 +957,7 @@ async function handleApi(request, env, url) {
     }
     if (request.method === "POST" && url.pathname === "/api/community/clues") {
       const body = await request.json(); const message = String(body.message || "").trim();
+      const unsafeClue=rejectUnsafePayload(message);if(unsafeClue)return unsafeClue;
       if (message.length < 2 || message.length > 240) return json({ error: "La pista debe tener entre 2 y 240 caracteres." }, 400);
       const draw = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(member.edition_id).first();
       if (draw?.state !== "drawn") return json({ error: "Las pistas anónimas estarán disponibles después del sorteo." }, 409);
