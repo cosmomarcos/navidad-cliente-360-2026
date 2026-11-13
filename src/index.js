@@ -339,7 +339,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.6" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.7" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -445,8 +445,8 @@ async function handleApi(request, env, url) {
     const activitySetting = await env.DB.prepare("SELECT manual_override FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first();
     const manualOverride = Number(activitySetting?.manual_override || 0) === 1;
     const challengePromise = manualOverride
-      ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? ORDER BY CASE WHEN starts_at<=datetime('now') AND ends_at>datetime('now') THEN 0 WHEN starts_at>datetime('now') THEN 1 ELSE 2 END, CASE WHEN starts_at>datetime('now') THEN starts_at END ASC, starts_at DESC LIMIT 1").bind(member.edition_id).first()
-      : env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+      ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' ORDER BY CASE WHEN starts_at<=datetime('now') AND ends_at>datetime('now') THEN 0 WHEN starts_at>datetime('now') THEN 1 ELSE 2 END, CASE WHEN starts_at>datetime('now') THEN starts_at END ASC, starts_at DESC LIMIT 1").bind(member.edition_id).first()
+      : env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
     const normalizeChallenge = raw => {
       if (!raw) return { challenge: null, challengeCorrectAnswer: null };
       let config={};try{config=JSON.parse(raw.config_json||"{}");}catch{}
