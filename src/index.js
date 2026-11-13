@@ -453,7 +453,7 @@ async function handleApi(request, env, url) {
       const {challenge,challengeCorrectAnswer}=normalizeChallenge(rawChallenge);
       let previousPoints=null,previousRank=0;
       const allRows=(ranking.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:previousRank+1;previousPoints=score;previousRank=rank;return {...person,rank};});
-      const rows=allRows.filter(person=>person.rank<=3).map(person=>({...person,tieCount:allRows.filter(other=>other.rank===person.rank).length}));
+      const rows=allRows;
       const mine=allRows.findIndex(x=>x.user_id===user.id);
       const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
