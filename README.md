@@ -121,3 +121,8 @@ Aplicar la migración antes del despliegue:
 npx wrangler d1 migrations apply navidad-cliente-360-db --remote
 npx wrangler deploy
 ```
+
+
+## Reintento de despliegue en producción
+
+Los cambios integrados en `main` vuelven a activar el flujo de Cloudflare Workers Builds. Si la API de versiones de Workers responde con un error transitorio, se puede reintentar el despliegue desde el último commit de `main` en Cloudflare; no se deben recrear ni modificar las bases D1 para resolver errores de publicación.
