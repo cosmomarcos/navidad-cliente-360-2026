@@ -524,8 +524,6 @@ async function loadSpiritAdmin(){
   const proposalData=await api("/api/admin/spirit/extra/proposals",{noMemoryCache:true}).catch(()=>({proposals:[]}));
   host.innerHTML+='<section class="spirit-extra-admin"><div class="management-heading"><div><h3>🌟 Propuestas extraordinarias</h3><p>Revisa las ideas enviadas por los participantes.</p></div></div>'+(proposalData.proposals||[]).map(p=>'<article class="spirit-extra-review"><div><b>'+esc(p.title)+'</b><small>Por '+esc(p.proposer_name)+' · '+esc(p.challenge_type)+'</small><p>'+esc(p.description)+'</p><small>Estado: '+(p.status==="pending"?"Pendiente":p.status==="approved"?"Aprobada":"Rechazada")+(p.admin_note?" · "+esc(p.admin_note):"")+'</small></div>'+(p.status==="pending"?'<div class="spirit-extra-review-actions"><button type="button" data-extra-review="'+esc(p.id)+'" data-status="approved">Aprobar</button><button type="button" data-extra-review="'+esc(p.id)+'" data-status="rejected">Rechazar</button></div>':'')+'</article>').join("")+'</section>';
   host.querySelectorAll("[data-extra-review]").forEach(button=>button.addEventListener("click",async()=>{button.disabled=true;try{await api("/api/admin/spirit/extra/proposals/"+encodeURIComponent(button.dataset.extraReview),{method:"PATCH",body:JSON.stringify({status:button.dataset.status})});await loadSpiritAdmin();}catch(error){button.disabled=false;alert(error.message);}}));
-  const kindLabel=document.createElement("label");kindLabel.className="spirit-extra-kind";kindLabel.innerHTML='Tipo de reto<select name="challengeKind"><option value="daily">Reto diario</option><option value="extra">Reto extraordinario</option></select>';
-  const typeInput=form.querySelector('input[name="challengeType"]');typeInput.insertAdjacentElement("afterend",kindLabel);
   $("#spirit-activity-toggle").addEventListener("click",async ev=>{
    const button=ev.currentTarget,nextOverride=!activityState.manualOverride;
    if(!confirm(nextOverride?"¿Activar ahora las actividades de Espíritu? Esto mostrará el reto programado sin esperar a las 6:00 p. m.":"¿Volver al horario automático? Las actividades respetarán nuevamente las 6:00 p. m. y las 6:00 a. m."))return;
@@ -535,6 +533,9 @@ async function loadSpiritAdmin(){
   });
   let chosen=null,lastIndex=-1;
   const editor=$("#spirit-suggestion-editor"),form=$("#spirit-admin-form"),ideaCard=$("#spirit-generated-idea");
+  const kindLabel=document.createElement("label");kindLabel.className="spirit-extra-kind";kindLabel.innerHTML='Tipo de reto<select name="challengeKind"><option value="daily">Reto diario</option><option value="extra">Reto extraordinario</option></select>';
+  const typeInput=form.querySelector('input[name="challengeType"]');typeInput.insertAdjacentElement("afterend",kindLabel);
+
   const generate=()=>{let index;do{index=Math.floor(Math.random()*ideas.length);}while(index===lastIndex&&ideas.length>1);lastIndex=index;chosen=ideas[index];$("#spirit-generated-icon").textContent=chosen.icon;$("#spirit-generated-type").textContent=typeLabels[chosen.type];$("#spirit-generated-title").textContent=chosen.title;$("#spirit-generated-description").textContent=chosen.description;ideaCard.classList.remove("hidden");$("#spirit-generator-hint").classList.add("hidden");editor.classList.add("hidden");};
   const localToday=new Date(Date.now()-new Date().getTimezoneOffset()*60000),minDate=localToday.toISOString().slice(0,10);localToday.setDate(localToday.getDate()+1);const defaultDate=localToday.toISOString().slice(0,10);
   form.elements.scheduledDate.min=minDate;form.elements.scheduledDate.value=defaultDate;
