@@ -429,7 +429,8 @@ async function handleApi(request, env, url) {
     await ensureSpiritSchema(env);
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
     if(request.method==="GET"&&spiritMediaMatch){
-      const media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
+      let media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
+      if(!media)media=await env.DB.prepare("SELECT media_data,NULL AS image_data,media_type FROM spirit_extra_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(spiritMediaMatch[1],member.edition_id,user.id).first();
       if(!media)return json({error:"No encontramos el archivo de esta publicación."},404);
       return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg",request);
     }
@@ -661,10 +662,9 @@ async function handleApi(request, env, url) {
       const usedKeys=new Set((used.results||[]).map(x=>x.bonus_key)),available=catalog.filter(x=>!usedKeys.has(x[0]));
       if(!available.length)return json({error:"Se agotó el catálogo único de retos bonus. Ninguno se repetirá."},409);
       const item=available[Math.floor(Math.random()*available.length)],now=new Date(),end=new Date(now.getTime()+24*60*60*1000),startSql=now.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," "),id=crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,3,0,?,?,?,?, 'extra')").bind(id,edition.id,item[1],item[2],item[3],startSql,endSql,user.id).run();
       const reservation=await env.DB.prepare("INSERT OR IGNORE INTO spirit_bonus_history (edition_id,bonus_key,challenge_id) VALUES (?,?,?)").bind(edition.id,item[0],id).run();
-      if(!reservation.meta?.changes)return json({error:"El reto ya fue reservado. Vuelve a intentar."},409);
-      try{await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,3,0,?,?,?,?, 'extra')").bind(id,edition.id,item[1],item[2],item[3],startSql,endSql,user.id).run();}
-      catch(error){await env.DB.prepare("DELETE FROM spirit_bonus_history WHERE edition_id=? AND bonus_key=?").bind(edition.id,item[0]).run();throw error;}
+      if(!reservation.meta?.changes){await env.DB.prepare("DELETE FROM spirit_challenges WHERE id=?").bind(id).run();return json({error:"El reto ya fue reservado. Vuelve a intentar."},409);}
       return json({ok:true,title:item[1],points:3,endsAt:endSql});
     }
     if(url.pathname.startsWith("/api/admin/spirit/bonus/submissions/")&&request.method==="PATCH"){
