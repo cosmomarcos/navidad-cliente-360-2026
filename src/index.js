@@ -339,7 +339,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.9" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.11" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
