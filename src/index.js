@@ -339,7 +339,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.12" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.13" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -429,8 +429,13 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
-    await ensureSpiritSchema(env);
-    await ensureParticipantProfilesSchema(env);
+    try {
+      await ensureSpiritSchema(env);
+      await ensureParticipantProfilesSchema(env);
+    } catch (error) {
+      console.error("Spirit schema initialization failed", { message:error?.message||String(error) });
+      return json({ error:"Espíritu está iniciando una actualización de datos. Intenta nuevamente en unos segundos.", code:"SPIRIT_SCHEMA_UNAVAILABLE", retryable:true },503,{"retry-after":"5"});
+    }
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
     if(request.method==="GET"&&spiritMediaMatch){
       let media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
@@ -443,7 +448,9 @@ async function handleApi(request, env, url) {
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_submissions WHERE edition_id=? AND user_id<>? AND created_at>?").bind(member.edition_id,user.id,read?.last_seen_at || "1970-01-01 00:00:00").first();
       return json({ unread: count?.total || 0 });
     }
-    const activitySetting = await env.DB.prepare("SELECT manual_override FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first();
+    let activitySetting=null;
+    try { activitySetting=await env.DB.prepare("SELECT manual_override FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first(); }
+    catch(error) { console.error("Spirit activity settings query failed",{message:error?.message||String(error)}); }
     const manualOverride = Number(activitySetting?.manual_override || 0) === 1;
     const challengePromise = manualOverride
       ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' ORDER BY CASE WHEN starts_at<=datetime('now') AND ends_at>datetime('now') THEN 0 WHEN starts_at>datetime('now') THEN 1 ELSE 2 END, CASE WHEN starts_at>datetime('now') THEN starts_at END ASC, starts_at DESC LIMIT 1").bind(member.edition_id).first()
@@ -481,26 +488,23 @@ async function handleApi(request, env, url) {
       return json({ok:true,id,status:"pending"},201);
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
-      const [ranking, rawChallenge] = await Promise.all([
-        env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id).all(),
-        challengePromise
-      ]);
+      let ranking={results:[]},rawChallenge=null;
+      const rankingPromise=env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id).all().catch(error=>{console.error("Spirit ranking query failed",{message:error?.message||String(error)});return {results:[]};});
+      const challengeSafe=challengePromise.catch(error=>{console.error("Spirit challenge query failed",{message:error?.message||String(error)});return null;});
+      [ranking,rawChallenge]=await Promise.all([rankingPromise,challengeSafe]);
       const {challenge,challengeCorrectAnswer}=normalizeChallenge(rawChallenge);
       let previousPoints=null,previousRank=0;
-      const allRows=(ranking.results||[]).map((person,index)=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:previousRank+1;previousPoints=score;previousRank=rank;return {...person,rank};});
-      const rows=allRows;
+      const allRows=(ranking.results||[]).map(person=>{const score=Number(person.points||0),rank=previousPoints===score?previousRank:previousRank+1;previousPoints=score;previousRank=rank;return {...person,rank};});
       const mine=allRows.findIndex(x=>x.user_id===user.id);
       const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
-      // Keep the latest community feed visible even while the automatic challenge window is closed.
       const feedChallenge=challenge;
-      let feedCorrectAnswer=challengeCorrectAnswer;
-      if(!challenge&&feedChallenge?.challenge_type==="trivia"){try{feedCorrectAnswer=String(JSON.parse(feedChallenge.config_json||"{}").correctAnswer||"");}catch{feedCorrectAnswer="";}}
-      const feedPromise=feedChallenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted,(SELECT liked.id FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id ORDER BY mine.created_at LIMIT 1) AS my_vote_submission_id FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,user.id,feedChallenge.id).all():Promise.resolve({results:[]});
-      const readPromise=env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run();
+      const feedCorrectAnswer=challengeCorrectAnswer;
+      const feedPromise=feedChallenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted,(SELECT liked.id FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id ORDER BY mine.created_at LIMIT 1) AS my_vote_submission_id FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,user.id,feedChallenge.id).all().catch(error=>{console.error("Spirit feed query failed",{message:error?.message||String(error)});return {results:[]};}):Promise.resolve({results:[]});
+      const readPromise=env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run().catch(error=>console.error("Spirit read marker update failed",{message:error?.message||String(error)}));
       const [feed]=await Promise.all([feedPromise,readPromise]);
       submissions=(feed.results||[]).map(item=>({...item,mediaUrl:item.has_media?"/api/spirit/media/"+encodeURIComponent(item.id):null,eligibleForVoting:feedChallenge?.challenge_type!=="trivia"||item.caption===feedCorrectAnswer}));
-      return json({activitiesEnabled:!!challenge,manualOverride,challenge:challenge||null,submissions,ranking:rows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:challenge?submissions.filter(x=>x.user_id===user.id).length:0,mySubmission:challenge?submissions.find(x=>x.user_id===user.id)||null:null});
+      return json({activitiesEnabled:!!challenge,manualOverride,challenge:challenge||null,submissions,ranking:allRows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:challenge?submissions.filter(x=>x.user_id===user.id).length:0,mySubmission:challenge?submissions.find(x=>x.user_id===user.id)||null:null,partial:!rawChallenge||!ranking.results});
     }
     const commentsMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/comments$/);
     if(commentsMatch&&(request.method==="GET"||request.method==="POST")){
