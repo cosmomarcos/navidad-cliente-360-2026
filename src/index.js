@@ -429,12 +429,14 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
+    // La lectura de Espíritu no debe ejecutar migraciones estructurales.
+    // Las tablas del módulo se crean desde las rutas administrativas/de configuración.
+    // En la navegación normal solo garantizamos el perfil, que usa el ranking.
     try {
-      await ensureSpiritSchema(env);
       await ensureParticipantProfilesSchema(env);
     } catch (error) {
-      console.error("Spirit schema initialization failed", { message:error?.message||String(error) });
-      return json({ error:"Espíritu está iniciando una actualización de datos. Intenta nuevamente en unos segundos.", code:"SPIRIT_SCHEMA_UNAVAILABLE", retryable:true },503,{"retry-after":"5"});
+      console.error("Spirit participant profile schema unavailable", { message:error?.message||String(error) });
+      return json({ error:"No se pudo preparar el perfil de participantes. Intenta nuevamente.", code:"SPIRIT_PROFILE_SCHEMA_UNAVAILABLE", retryable:true },503,{"retry-after":"5"});
     }
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
     if(request.method==="GET"&&spiritMediaMatch){
