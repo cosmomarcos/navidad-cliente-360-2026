@@ -458,7 +458,7 @@ async function handleApi(request, env, url) {
       const myRank=mine>=0?allRows[mine].rank:null;
       let submissions=[];
       // Keep the latest community feed visible even while the automatic challenge window is closed.
-      const feedChallenge=challenge||await env.DB.prepare("SELECT c.id,c.challenge_type,c.config_json FROM spirit_challenges c JOIN spirit_submissions s ON s.challenge_id=c.id WHERE c.edition_id=? ORDER BY s.created_at DESC LIMIT 1").bind(member.edition_id).first();
+      const feedChallenge=challenge;
       let feedCorrectAnswer=challengeCorrectAnswer;
       if(!challenge&&feedChallenge?.challenge_type==="trivia"){try{feedCorrectAnswer=String(JSON.parse(feedChallenge.config_json||"{}").correctAnswer||"");}catch{feedCorrectAnswer="";}}
       const feedPromise=feedChallenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted,(SELECT liked.id FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id ORDER BY mine.created_at LIMIT 1) AS my_vote_submission_id FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,user.id,feedChallenge.id).all():Promise.resolve({results:[]});
@@ -533,6 +533,14 @@ async function handleApi(request, env, url) {
         env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submissionInfo.challenge_id,user.id)
       ]);
       return json({ok:true,message:"Tu participación fue eliminada y el puntaje se recalculó correctamente."});
+    }
+    const likesMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/likes$/);
+    if(request.method==="GET"&&likesMatch){
+      if(!challenge)return json({error:"Los Me gusta solo se pueden consultar durante un reto activo."},409);
+      const submission=await env.DB.prepare("SELECT id FROM spirit_submissions WHERE id=? AND edition_id=? AND challenge_id=?").bind(likesMatch[1],member.edition_id,challenge.id).first();
+      if(!submission)return json({error:"La publicación no pertenece al reto activo."},404);
+      const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,v.created_at FROM spirit_votes v JOIN users u ON u.id=v.voter_user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE v.submission_id=? ORDER BY v.created_at ASC").bind(submission.id).all();
+      return json({likes:rows.results||[]});
     }
     const voteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/vote$/);
     if(request.method==="POST"&&voteMatch){
