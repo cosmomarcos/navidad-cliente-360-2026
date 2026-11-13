@@ -430,6 +430,7 @@ async function handleApi(request, env, url) {
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     await ensureSpiritSchema(env);
+    await ensureParticipantProfilesSchema(env);
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
     if(request.method==="GET"&&spiritMediaMatch){
       let media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
