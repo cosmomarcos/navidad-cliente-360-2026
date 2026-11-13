@@ -907,3 +907,8 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .member-home .spirit-submit-form-embedded{margin:16px 0 0;padding:16px 0 0;border-top:1px solid #e4dccb;border-radius:0;background:transparent;box-shadow:none}
 .member-home .spirit-bonus-card .spirit-submit-form-embedded{border-top-color:#eadfc9}
 .member-home .spirit-challenge .spirit-submit-form-embedded{border-top-color:#e4dccb}
+
+
+/* v2.0.11 · Quitar los bordes de tarjeta duplicados en formularios embebidos */
+.member-home .spirit-submit-form-embedded{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:16px 0 0!important;margin:16px 0 0!important;border-radius:0!important}
+.member-home .spirit-submit-form-embedded:focus-within{outline:0!important}
