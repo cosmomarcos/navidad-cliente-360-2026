@@ -866,3 +866,34 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .spirit-like-person b{font-size:11px;overflow-wrap:anywhere}
 .spirit-like-person small,.spirit-likes-loading,.spirit-likes-empty,.spirit-likes-error{font-size:10px;color:#758277}
 .spirit-likes-error{color:#a83e36}
+
+/* Ranking Espíritu: podio destacado y clasificación compacta */
+.spirit-complete-ranking{overflow:hidden}
+.spirit-complete-ranking>.spirit-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.spirit-complete-ranking>.spirit-section-title>div{min-width:0}
+.spirit-complete-ranking>.spirit-section-title h3{margin:0}
+.spirit-ranking-total{display:grid;place-items:center;min-width:34px;height:34px;padding:0 9px;border-radius:999px;background:#e9dfc8;color:#315244;font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}
+.spirit-ranking{display:grid;gap:7px}
+.spirit-ranking-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0 12px}
+.spirit-podium-card{position:relative;display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;padding:12px 5px 11px;border:1px solid #e7dcc5;border-radius:15px;background:linear-gradient(180deg,#fffdf7,#f6efdf);text-align:center}
+.spirit-podium-rank-1{background:linear-gradient(180deg,#fff8e6,#f2e3bd);border-color:#d8bd7d;transform:translateY(-3px)}
+.spirit-podium-medal{font-size:23px;line-height:1}
+.spirit-podium-card .spirit-rank-avatar{width:43px;height:43px}
+.spirit-podium-name{display:block;width:100%;overflow-wrap:anywhere;color:#243d33;font-size:11px;line-height:1.3}
+.spirit-podium-card>strong{color:#28513e;font-size:16px;font-variant-numeric:tabular-nums}
+.spirit-podium-card>strong small{font-size:10px;font-weight:700}
+.spirit-podium-card.is-me{outline:2px solid #b8974d;outline-offset:1px}
+.spirit-podium-card .spirit-streak{display:inline-flex;margin:3px 0 0;font-size:9px}
+.spirit-compact-rank-row{min-height:55px!important;padding:7px 9px!important;gap:9px!important;border:1px solid #eee5d4;background:#fffdf7}
+.spirit-compact-rank-row .spirit-rank-position{width:27px;font-size:13px}
+.spirit-compact-rank-row .spirit-rank-avatar{width:35px;height:35px;font-size:17px}
+.spirit-compact-rank-row .spirit-rank-name{flex:1;min-width:0}
+.spirit-compact-rank-row .spirit-rank-names{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
+.spirit-compact-rank-row .spirit-rank-points{flex:none;color:#28513e;font-size:12px;font-weight:900;white-space:nowrap}
+.spirit-compact-rank-row.is-me{border-color:#c7a65f;background:#f7efd9;outline:none}
+.spirit-compact-rank-row[hidden]{display:none!important}
+.spirit-ranking-toggle{display:flex;width:100%;align-items:center;justify-content:center;gap:8px;margin:10px 0 2px;padding:11px 14px;border:1px solid #ded2b8;border-radius:12px;background:#f7f0e1;color:#315244;font:inherit;font-size:13px;font-weight:800}
+.spirit-ranking-toggle span{font-size:17px;line-height:1}
+.spirit-my-rank-label{margin:14px 0 6px;color:#927744;font-size:10px;font-weight:900;letter-spacing:.9px}
+.spirit-share-podium{margin-top:12px}
+@media(max-width:380px){.spirit-ranking-podium{gap:5px}.spirit-podium-card{padding:10px 3px}.spirit-podium-name{font-size:10px}.spirit-compact-rank-row{gap:7px!important;padding:7px 6px!important}.spirit-compact-rank-row .spirit-rank-points{font-size:11px}}
