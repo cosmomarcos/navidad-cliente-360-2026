@@ -901,3 +901,9 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 
 
 .spirit-bonus-card{border:1px solid #d8b76d;background:linear-gradient(135deg,#fffaf0,#fff)}.spirit-bonus-review{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid #eadfc9}.spirit-bonus-review small{flex:1 1 100%}
+
+
+/* v2.0.8 · Formularios integrados en la tarjeta del reto correspondiente */
+.member-home .spirit-submit-form-embedded{margin:16px 0 0;padding:16px 0 0;border-top:1px solid #e4dccb;border-radius:0;background:transparent;box-shadow:none}
+.member-home .spirit-bonus-card .spirit-submit-form-embedded{border-top-color:#eadfc9}
+.member-home .spirit-challenge .spirit-submit-form-embedded{border-top-color:#e4dccb}
