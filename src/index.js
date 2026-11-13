@@ -338,7 +338,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.3" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.4" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -650,6 +650,7 @@ async function handleApi(request, env, url) {
     if(url.pathname==="/api/admin/spirit/bonus"&&request.method==="GET"){
       const edition=await getAdminEdition(env,url);if(!edition)return json({active:null,submissions:[]});
       await ensureSpiritSchema(env);
+      await ensureParticipantProfilesSchema(env);
       const active=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
       const submissions=active?await env.DB.prepare("SELECT x.id,x.user_id,x.caption,x.media_type,x.status,x.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM spirit_extra_submissions x JOIN users u ON u.id=x.user_id LEFT JOIN participant_profiles p ON p.user_id=x.user_id WHERE x.challenge_id=? ORDER BY CASE x.status WHEN 'pending' THEN 0 ELSE 1 END,x.created_at").bind(active.id).all():{results:[]};
       return json({active:active||null,submissions:submissions.results||[]});
