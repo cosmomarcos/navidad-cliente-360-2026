@@ -199,11 +199,11 @@ async function ensureSpiritSchema(env) {
 }
 
 async function finalizeExpiredSpiritChallenges(env, editionId) {
-  const expired = await env.DB.prepare("SELECT id FROM spirit_challenges WHERE edition_id=? AND ends_at<=datetime('now')").bind(editionId).all();
+  const expired = await env.DB.prepare("SELECT id,bonus_points,challenge_kind FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND ends_at<=datetime('now')").bind(editionId).all();
   for (const challenge of expired.results || []) {
     const winners = await env.DB.prepare("WITH participant_votes AS (SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.user_id), max_votes AS (SELECT MAX(votes) AS votes FROM participant_votes) SELECT pv.user_id,pv.votes FROM participant_votes pv,max_votes mv WHERE pv.votes>0 AND pv.votes=mv.votes").bind(challenge.id).all();
     for (const winner of winners.results || []) {
-      await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,2,"Publicación más votada del día").run();
+      await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,Math.max(0,Number(challenge.bonus_points||0)),"Publicación más votada del día (+"+Math.max(0,Number(challenge.bonus_points||0))+" puntos de bonificación)").run();
     }
   }
 }
