@@ -430,7 +430,6 @@ async function handleApi(request, env, url) {
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
-      await ensureSpiritSchema(env);
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_resets (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, reset_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       const reset=await env.DB.prepare("INSERT OR IGNORE INTO spirit_achievement_resets (edition_id) VALUES (?)").bind(member.edition_id).run();
