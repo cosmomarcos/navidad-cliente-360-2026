@@ -958,3 +958,14 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .achievement-mini-track i{display:block;height:100%;background:#b99a51;border-radius:99px}
 .achievements-footnote{font-size:10px;line-height:1.5;color:#8b887d;text-align:center;margin:15px 6px 24px}
 @media(max-width:380px){.achievements-grid{gap:8px}.achievement-card{padding:11px}.achievement-card h3{font-size:14px}.achievement-card p{font-size:10px}.achievement-status{font-size:7px}.achievements-summary{padding:14px}}
+
+/* Achievement rewards: high-contrast, prominent point display */
+.achievement-card-bottom{align-items:center;gap:8px;padding-top:10px}
+.achievement-progress{font-size:10px;line-height:1.25;max-width:52%;font-weight:700}
+.achievement-reward{display:flex;align-items:baseline;justify-content:center;gap:4px;min-width:92px;padding:7px 10px;border-radius:11px;background:#f0dfaa;color:#4b3916;white-space:nowrap;box-shadow:inset 0 0 0 1px #c6a65c}
+.achievement-reward span{font-size:8px;letter-spacing:.8px;font-weight:900}
+.achievement-reward strong{font-size:21px;line-height:1;font-weight:950;color:#3b2c12}
+.achievement-reward small{font-size:9px;font-weight:900}
+.is-locked .achievement-reward{background:#e4dfd3;color:#68645b;box-shadow:inset 0 0 0 1px #c8c0b1}
+.is-locked .achievement-reward strong{color:#57534b}
+@media(max-width:380px){.achievement-reward{min-width:82px;padding:6px 7px}.achievement-reward strong{font-size:19px}.achievement-progress{font-size:9px}}
