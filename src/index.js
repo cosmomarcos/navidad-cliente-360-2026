@@ -712,6 +712,19 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if(request.method==="GET"&&url.pathname==="/api/admin/spirit/points-analysis"){
+      const edition=await getAdminEdition(env,url);
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      const targetUserId=String(url.searchParams.get("userId")||"").trim();
+      if(!targetUserId)return json({error:"Selecciona un participante."},400);
+      const member=await env.DB.prepare("SELECT em.user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,em.status FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.user_id=? AND em.status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
+      if(!member)return json({error:"El participante no pertenece a esta edición."},404);
+      await ensureSpiritSchema(env);
+      const ledger=await env.DB.prepare("SELECT source_type,source_id,points,description,created_at FROM spirit_points WHERE edition_id=? AND user_id=? ORDER BY created_at ASC,id ASC").bind(edition.id,targetUserId).all();
+      const entries=ledger.results||[];
+      return json({participant:{userId:member.user_id,displayName:member.display_name,status:member.status},totalPoints:entries.reduce((sum,row)=>sum+Number(row.points||0),0),entries});
+    }
+
     const adminSpiritDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&adminSpiritDeleteMatch){
       const edition=await getAdminEdition(env,url);
