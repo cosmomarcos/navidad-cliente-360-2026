@@ -442,7 +442,7 @@ async function shareSpiritPost(post,challenge){
 }
 async function renderAchievementsTab(){
  const home=$("#member-app .member-home");if(!home)return;
- home.innerHTML='<div class="achievements-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>🏆 Mis logros</h2><p>Completa desafíos, desbloquea insignias y suma puntos a tu ranking.</p></div><div id="achievements-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
+ home.innerHTML='<div class="achievements-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>🏆 MIS LOGROS</h2><p>Completa desafíos, desbloquea insignias y suma puntos a tu ranking.</p></div><div id="achievements-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  const host=$("#achievements-content");
  try{
   const data=await api("/api/spirit/achievements",{noMemoryCache:true,timeoutMs:12000});
