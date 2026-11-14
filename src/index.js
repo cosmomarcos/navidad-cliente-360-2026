@@ -339,7 +339,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.13" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.21" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -488,6 +488,35 @@ async function handleApi(request, env, url) {
       try{await env.DB.prepare("INSERT INTO spirit_extra_submissions (id,edition_id,challenge_id,user_id,caption,media_data,media_type) VALUES (?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,mediaData||null,mediaType||null).run();}
       catch{return json({error:"Ya enviaste tu participación para este reto bonus."},409);}
       return json({ok:true,id,status:"pending"},201);
+    }
+    if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
+      await ensureSpiritSchema(env);
+      const [activity,likes,bonus,rankRow]=await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours','-18 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count FROM spirit_submissions WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first(),
+        env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=?").bind(member.edition_id,user.id).first(),
+        env.DB.prepare("SELECT COUNT(*) AS approved FROM spirit_extra_submissions WHERE edition_id=? AND user_id=? AND status='approved'").bind(member.edition_id,user.id).first(),
+        env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first()
+      ]);
+      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),likes:Number(likes?.likes||0),approvedBonus:Number(bonus?.approved||0),rank:Number(rankRow?.rank||0)};
+      const definitions=[
+        {id:"first_post",icon:"🎄",title:"Primera participación",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
+        {id:"three_posts",icon:"🎅",title:"Espíritu navideño",description:"Completa 3 publicaciones en los retos diarios.",reward:10,progress:metrics.submissions,target:3},
+        {id:"five_posts",icon:"⭐",title:"Estrella navideña",description:"Completa 5 publicaciones en los retos diarios.",reward:15,progress:metrics.submissions,target:5},
+        {id:"community_star",icon:"❤️",title:"Popular",description:"Consigue 10 Me gusta en tus publicaciones.",reward:20,progress:metrics.likes,target:10},
+        {id:"frequent",icon:"🔥",title:"Participante frecuente",description:"Participa en 3 días diferentes.",reward:10,progress:metrics.activeDays,target:3},
+        {id:"multimedia",icon:"🎙️",title:"Artista navideño",description:"Publica al menos una foto y un audio en los retos.",reward:15,progress:Math.min(metrics.voiceCount,metrics.photoCount),target:1,detail:metrics.photoCount+" foto(s) · "+metrics.voiceCount+" audio(s)"},
+        {id:"bonus_winner",icon:"🎁",title:"Bonus conquistado",description:"Consigue que aprueben una participación de reto bonus y gana otros 10 puntos.",reward:10,progress:metrics.approvedBonus,target:1},
+        {id:"leader",icon:"👑",title:"Rey del ranking",description:"Alcanza el primer puesto del ranking general.",reward:20,progress:metrics.rank===1?1:0,target:1}
+      ];
+      for(const achievement of definitions){
+        if(achievement.progress>=achievement.target){
+          await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"achievement",achievement.id,achievement.reward,"Logro desbloqueado: "+achievement.title).run();
+        }
+      }
+      const earned=await env.DB.prepare("SELECT source_id,points,created_at FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='achievement'").bind(member.edition_id,user.id).all();
+      const earnedMap=new Map((earned.results||[]).map(row=>[row.source_id,row]));
+      const achievements=definitions.map(item=>{const row=earnedMap.get(item.id);return {...item,progress:Math.min(item.progress,item.target),unlocked:!!row,earnedPoints:Number(row?.points||0),unlockedAt:row?.created_at||null};});
+      return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0)});
     }
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
       let ranking={results:[]},rawChallenge=null;
