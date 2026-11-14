@@ -438,57 +438,6 @@ async function handleApi(request, env, url) {
       console.error("Spirit participant profile schema unavailable", { message:error?.message||String(error) });
       return json({ error:"No se pudo preparar el perfil de participantes. Intenta nuevamente.", code:"SPIRIT_PROFILE_SCHEMA_UNAVAILABLE", retryable:true },503,{"retry-after":"5"});
     }
-    const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
-    if(request.method==="GET"&&spiritMediaMatch){
-      let media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
-      if(!media)media=await env.DB.prepare("SELECT media_data,NULL AS image_data,media_type FROM spirit_extra_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(spiritMediaMatch[1],member.edition_id,user.id).first();
-      if(!media)return json({error:"No encontramos el archivo de esta publicación."},404);
-      return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg",request);
-    }
-    if (request.method === "GET" && url.pathname === "/api/spirit/unread") {
-      const read = await env.DB.prepare("SELECT last_seen_at FROM spirit_submission_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
-      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_submissions WHERE edition_id=? AND user_id<>? AND created_at>?").bind(member.edition_id,user.id,read?.last_seen_at || "1970-01-01 00:00:00").first();
-      return json({ unread: count?.total || 0 });
-    }
-    let activitySetting=null;
-    try { activitySetting=await env.DB.prepare("SELECT manual_override FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first(); }
-    catch(error) { console.error("Spirit activity settings query failed",{message:error?.message||String(error)}); }
-    const manualOverride = Number(activitySetting?.manual_override || 0) === 1;
-    const challengePromise = manualOverride
-      ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' ORDER BY CASE WHEN starts_at<=datetime('now') AND ends_at>datetime('now') THEN 0 WHEN starts_at>datetime('now') THEN 1 ELSE 2 END, CASE WHEN starts_at>datetime('now') THEN starts_at END ASC, starts_at DESC LIMIT 1").bind(member.edition_id).first()
-      : env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
-    const normalizeChallenge = raw => {
-      if (!raw) return { challenge: null, challengeCorrectAnswer: null };
-      let config={};try{config=JSON.parse(raw.config_json||"{}");}catch{}
-      const challenge={...raw,config:{question:config.question||"",options:Array.isArray(config.options)?config.options:[]}};
-      delete challenge.config_json;
-      return { challenge, challengeCorrectAnswer:String(config.correctAnswer||"") };
-    };
-
-
-    if(request.method==="GET"&&url.pathname==="/api/spirit/extra"){
-      await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(member.edition_id).run();
-      const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
-      const eligible=!rankRow||Number(rankRow.rank)>1;
-      const challenge=eligible?await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first():null;
-      const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
-      return json({challenge:challenge||null,submission:submission||null,eligible,rank:rankRow?.rank||null});
-    }
-    if(request.method==="POST"&&url.pathname==="/api/spirit/extra/submissions"){
-      const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
-      if(rankRow&&Number(rankRow.rank)===1)return json({error:"El reto bonus está reservado para todos los participantes excepto el primer lugar."},403);
-      const challenge=await env.DB.prepare("SELECT id,challenge_type FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
-      if(!challenge)return json({error:"No hay un reto bonus activo."},409);
-      const body=await request.json(),caption=String(body.caption||"").trim(),mediaData=String(body.mediaData||""),mediaType=String(body.mediaType||"");
-      if(caption.length>500||mediaData.length>5500000)return json({error:"La participación supera el límite permitido."},400);
-      if(challenge.challenge_type==="photo"&&(!mediaData.startsWith("data:image/")||!/^image\/(jpeg|png|webp)$/.test(mediaType)))return json({error:"Adjunta una foto válida."},400);
-      if(challenge.challenge_type==="voice"&&(!mediaData.startsWith("data:audio/")||!mediaType.startsWith("audio/")))return json({error:"Adjunta una grabación válida."},400);
-      if(challenge.challenge_type==="text"&&caption.length<2)return json({error:"Escribe tu participación."},400);
-      const id=crypto.randomUUID();
-      try{await env.DB.prepare("INSERT INTO spirit_extra_submissions (id,edition_id,challenge_id,user_id,caption,media_data,media_type) VALUES (?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,mediaData||null,mediaType||null).run();}
-      catch{return json({error:"Ya enviaste tu participación para este reto bonus."},409);}
-      return json({ok:true,id,status:"pending"},201);
-    }
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       await ensureSpiritSchema(env);
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
@@ -541,6 +490,58 @@ async function handleApi(request, env, url) {
       const achievements=definitions.map(item=>{const row=earnedMap.get(item.id);return {...item,progress:Math.min(item.progress,item.target),unlocked:!!row,earnedPoints:Number(row?.points||0),unlockedAt:row?.created_at||null};});
       return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0)});
     }
+    const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
+    if(request.method==="GET"&&spiritMediaMatch){
+      let media=await env.DB.prepare("SELECT media_data,image_data,media_type FROM spirit_submissions WHERE id=? AND edition_id=?").bind(spiritMediaMatch[1],member.edition_id).first();
+      if(!media)media=await env.DB.prepare("SELECT media_data,NULL AS image_data,media_type FROM spirit_extra_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(spiritMediaMatch[1],member.edition_id,user.id).first();
+      if(!media)return json({error:"No encontramos el archivo de esta publicación."},404);
+      return dataUrlResponse(media.media_data||media.image_data,media.media_type||"image/jpeg",request);
+    }
+    if (request.method === "GET" && url.pathname === "/api/spirit/unread") {
+      const read = await env.DB.prepare("SELECT last_seen_at FROM spirit_submission_reads WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+      const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_submissions WHERE edition_id=? AND user_id<>? AND created_at>?").bind(member.edition_id,user.id,read?.last_seen_at || "1970-01-01 00:00:00").first();
+      return json({ unread: count?.total || 0 });
+    }
+    let activitySetting=null;
+    try { activitySetting=await env.DB.prepare("SELECT manual_override FROM spirit_activity_settings WHERE edition_id=?").bind(member.edition_id).first(); }
+    catch(error) { console.error("Spirit activity settings query failed",{message:error?.message||String(error)}); }
+    const manualOverride = Number(activitySetting?.manual_override || 0) === 1;
+    const challengePromise = manualOverride
+      ? env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' ORDER BY CASE WHEN starts_at<=datetime('now') AND ends_at>datetime('now') THEN 0 WHEN starts_at>datetime('now') THEN 1 ELSE 2 END, CASE WHEN starts_at>datetime('now') THEN starts_at END ASC, starts_at DESC LIMIT 1").bind(member.edition_id).first()
+      : env.DB.prepare("SELECT id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+    const normalizeChallenge = raw => {
+      if (!raw) return { challenge: null, challengeCorrectAnswer: null };
+      let config={};try{config=JSON.parse(raw.config_json||"{}");}catch{}
+      const challenge={...raw,config:{question:config.question||"",options:Array.isArray(config.options)?config.options:[]}};
+      delete challenge.config_json;
+      return { challenge, challengeCorrectAnswer:String(config.correctAnswer||"") };
+    };
+
+
+    if(request.method==="GET"&&url.pathname==="/api/spirit/extra"){
+      await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(member.edition_id).run();
+      const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
+      const eligible=!rankRow||Number(rankRow.rank)>1;
+      const challenge=eligible?await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first():null;
+      const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
+      return json({challenge:challenge||null,submission:submission||null,eligible,rank:rankRow?.rank||null});
+    }
+    if(request.method==="POST"&&url.pathname==="/api/spirit/extra/submissions"){
+      const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
+      if(rankRow&&Number(rankRow.rank)===1)return json({error:"El reto bonus está reservado para todos los participantes excepto el primer lugar."},403);
+      const challenge=await env.DB.prepare("SELECT id,challenge_type FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+      if(!challenge)return json({error:"No hay un reto bonus activo."},409);
+      const body=await request.json(),caption=String(body.caption||"").trim(),mediaData=String(body.mediaData||""),mediaType=String(body.mediaType||"");
+      if(caption.length>500||mediaData.length>5500000)return json({error:"La participación supera el límite permitido."},400);
+      if(challenge.challenge_type==="photo"&&(!mediaData.startsWith("data:image/")||!/^image\/(jpeg|png|webp)$/.test(mediaType)))return json({error:"Adjunta una foto válida."},400);
+      if(challenge.challenge_type==="voice"&&(!mediaData.startsWith("data:audio/")||!mediaType.startsWith("audio/")))return json({error:"Adjunta una grabación válida."},400);
+      if(challenge.challenge_type==="text"&&caption.length<2)return json({error:"Escribe tu participación."},400);
+      const id=crypto.randomUUID();
+      try{await env.DB.prepare("INSERT INTO spirit_extra_submissions (id,edition_id,challenge_id,user_id,caption,media_data,media_type) VALUES (?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,mediaData||null,mediaType||null).run();}
+      catch{return json({error:"Ya enviaste tu participación para este reto bonus."},409);}
+      return json({ok:true,id,status:"pending"},201);
+    }
+
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
       let ranking={results:[]},rawChallenge=null;
       const rankingPromise=env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id).all().catch(error=>{console.error("Spirit ranking query failed",{message:error?.message||String(error)});return {results:[]};});
