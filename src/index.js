@@ -443,7 +443,7 @@ async function handleApi(request, env, url) {
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_resets (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, reset_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       const reset=await env.DB.prepare("INSERT OR IGNORE INTO spirit_achievement_resets (edition_id) VALUES (?)").bind(member.edition_id).run();
-      if(reset.meta?.changes>0) await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement'").bind(member.edition_id).run();
+      if(reset.meta?.changes>0) await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement' AND source_id<>'son_webadas'").bind(member.edition_id).run();
       const [activity,likes,commentsGiven,votesGiven,commentTargets,earlyDays,challengeRows,icebreaker]=await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count,COUNT(DISTINCT challenge_id) AS distinct_challenges FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
         env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=? AND v.created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
@@ -460,6 +460,7 @@ async function handleApi(request, env, url) {
       const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),distinctChallenges:Number(activity?.distinct_challenges||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,icebreaker:Number(icebreaker?.count||0)};
       const definitions=[
         {id:"first_post",icon:"🎄",title:"¿Qué así va ser?",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
+        {id:"son_webadas",icon:"🛌",title:"Son Webadas",description:"Pasa 24 horas sin conectarte a la aplicación ni participar en Espíritu. Vuelve después de ese descanso para reclamar tu logro.",reward:20,progress:0,target:1},
         {id:"three_posts",icon:"🎅",title:"Espíritu navideño",description:"Completa 3 publicaciones en los retos diarios.",reward:10,progress:metrics.submissions,target:3},
         {id:"five_posts",icon:"⭐",title:"Estrella navideña",description:"Completa 5 publicaciones en los retos diarios.",reward:15,progress:metrics.submissions,target:5},
         {id:"community_star",icon:"❤️",title:"Coke de cokes",description:"Consigue 10 Me gusta en tus publicaciones.",reward:20,progress:metrics.likes,target:10},
@@ -684,6 +685,14 @@ async function handleApi(request, env, url) {
     const membership=await getParticipantEdition(env,user,url);
     if (!membership) return json({ ok: true, tracked: false });
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS app_activity (edition_id TEXT NOT NULL, user_id TEXT NOT NULL, last_seen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id))").run();
+    const previousActivity=await env.DB.prepare("SELECT last_seen_at FROM app_activity WHERE edition_id=? AND user_id=?").bind(membership.edition_id,user.id).first();
+    if(previousActivity?.last_seen_at){
+      const idle=await env.DB.prepare("SELECT CASE WHEN datetime(?)<=datetime('now','-1 day') THEN 1 ELSE 0 END AS eligible").bind(previousActivity.last_seen_at).first();
+      if(Number(idle?.eligible)===1){
+        await ensureSpiritSchema(env);
+        await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),membership.edition_id,user.id,"achievement","son_webadas",20,"Logro desbloqueado: Son Webadas").run();
+      }
+    }
     await env.DB.prepare("INSERT INTO app_activity (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(membership.edition_id,user.id).run();
     return json({ ok: true, tracked: true });
   }
@@ -719,7 +728,7 @@ async function handleApi(request, env, url) {
       await ensureParticipantProfilesSchema(env);
       await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(edition.id).run();
       const active=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(edition.id).first();
-      const submissions=active?await env.DB.prepare("SELECT x.id,x.user_id,x.caption,x.media_type,x.status,x.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM spirit_extra_submissions x JOIN users u ON u.id=x.user_id LEFT JOIN participant_profiles p ON p.user_id=x.user_id WHERE x.challenge_id=? ORDER BY CASE x.status WHEN 'pending' THEN 0 ELSE 1 END,x.created_at").bind(active.id).all():{results:[]};
+      const submissions=await env.DB.prepare("SELECT x.id,x.user_id,x.caption,x.media_type,x.status,x.created_at,x.challenge_id,c.title AS challenge_title,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM spirit_extra_submissions x JOIN users u ON u.id=x.user_id JOIN spirit_challenges c ON c.id=x.challenge_id LEFT JOIN participant_profiles p ON p.user_id=x.user_id WHERE x.edition_id=? AND (x.status='pending' OR x.created_at>=datetime('now','-30 days')) ORDER BY CASE x.status WHEN 'pending' THEN 0 ELSE 1 END,x.created_at DESC LIMIT 100").bind(edition.id).all();
       return json({active:active||null,submissions:submissions.results||[]});
     }
     if(url.pathname==="/api/admin/spirit/bonus/activate"&&request.method==="POST"){
@@ -738,6 +747,14 @@ async function handleApi(request, env, url) {
       if(!reservation.meta?.changes){await env.DB.prepare("DELETE FROM spirit_challenges WHERE id=?").bind(id).run();return json({error:"El reto ya fue reservado. Vuelve a intentar."},409);}
       return json({ok:true,title:item[1],points:10,endsAt:endSql});
     }
+    const bonusMediaMatch=url.pathname.match(/^\/api\/admin\/spirit\/bonus\/media\/([A-Za-z0-9-]+)$/);
+    if(bonusMediaMatch&&request.method==="GET"){
+      const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureSpiritSchema(env);
+      const media=await env.DB.prepare("SELECT media_data,media_type FROM spirit_extra_submissions WHERE id=? AND edition_id=?").bind(bonusMediaMatch[1],edition.id).first();
+      if(!media?.media_data)return json({error:"Esta evidencia no tiene un archivo adjunto."},404);
+      return dataUrlResponse(media.media_data,media.media_type||"application/octet-stream",request);
+    }
     if(url.pathname.startsWith("/api/admin/spirit/bonus/submissions/")&&request.method==="PATCH"){
       const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
       await ensureSpiritSchema(env);
@@ -749,8 +766,12 @@ async function handleApi(request, env, url) {
       const changed=await env.DB.prepare("UPDATE spirit_extra_submissions SET status=?,reviewed_at=datetime('now'),reviewed_by=? WHERE id=? AND status='pending'").bind(status,user.id,id).run();
       if(!changed.meta?.changes)return json({error:"Esta participación ya fue revisada."},409);
       if(status==="approved")await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),edition.id,submission.user_id,"bonus_approved",id,10,"Reto bonus aprobado").run();
-      await sendPushToUser(env,submission.user_id,{title:status==="approved"?"🎁 ¡Bonus aprobado!":"Reto bonus revisado",body:status==="approved"?"Tu participación fue aprobada y recibiste 10 puntos extra.":"Tu evidencia fue revisada y no recibió puntos.",tag:"spirit-bonus-"+id,url:"/?tab=spirit"},url.origin);
-      return json({ok:true,status,points:status==="approved"?10:0});
+      try {
+        await sendPushToUser(env,submission.user_id,{title:status==="approved"?"🎁 ¡Bonus aprobado!":"Reto bonus revisado",body:status==="approved"?"Tu participación fue aprobada y recibiste 10 puntos extra.":"Tu evidencia fue revisada y no recibió puntos.",tag:"spirit-bonus-"+id,url:"/?tab=spirit"},url.origin);
+      } catch(error) {
+        console.error("Bonus review push notification failed",{submissionId:id,message:error?.message||String(error)});
+      }
+      return json({ok:true,status,points:status==="approved"?10:0,notificationAttempted:true});
     }
     if (url.pathname === "/api/admin/spirit/activities") {
       const edition = await getAdminEdition(env, url);
