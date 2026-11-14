@@ -491,13 +491,14 @@ async function handleApi(request, env, url) {
     }
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       await ensureSpiritSchema(env);
-      const [activity,likes,bonus,rankRow]=await Promise.all([
+      await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement' AND source_id IN ('bonus_winner','leader')").bind(member.edition_id).run();
+      const [activity,likes,commentsGiven,votesGiven]=await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours','-18 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count FROM spirit_submissions WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first(),
         env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=?").bind(member.edition_id,user.id).first(),
-        env.DB.prepare("SELECT COUNT(*) AS approved FROM spirit_extra_submissions WHERE edition_id=? AND user_id=? AND status='approved'").bind(member.edition_id,user.id).first(),
-        env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first()
+        env.DB.prepare("SELECT COUNT(*) AS comments FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>?").bind(member.edition_id,user.id,user.id).first(),
+        env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND v.voter_user_id=? AND s.user_id<>?").bind(member.edition_id,user.id,user.id).first()
       ]);
-      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),likes:Number(likes?.likes||0),approvedBonus:Number(bonus?.approved||0),rank:Number(rankRow?.rank||0)};
+      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0)};
       const definitions=[
         {id:"first_post",icon:"🎄",title:"Primera participación",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
         {id:"three_posts",icon:"🎅",title:"Espíritu navideño",description:"Completa 3 publicaciones en los retos diarios.",reward:10,progress:metrics.submissions,target:3},
@@ -505,8 +506,8 @@ async function handleApi(request, env, url) {
         {id:"community_star",icon:"❤️",title:"Popular",description:"Consigue 10 Me gusta en tus publicaciones.",reward:20,progress:metrics.likes,target:10},
         {id:"frequent",icon:"🔥",title:"Participante frecuente",description:"Participa en 3 días diferentes.",reward:10,progress:metrics.activeDays,target:3},
         {id:"multimedia",icon:"🎙️",title:"Artista navideño",description:"Publica al menos una foto y un audio en los retos.",reward:15,progress:Math.min(metrics.voiceCount,metrics.photoCount),target:1,detail:metrics.photoCount+" foto(s) · "+metrics.voiceCount+" audio(s)"},
-        {id:"bonus_winner",icon:"🎁",title:"Bonus conquistado",description:"Consigue que aprueben una participación de reto bonus y gana otros 10 puntos.",reward:10,progress:metrics.approvedBonus,target:1},
-        {id:"leader",icon:"👑",title:"Rey del ranking",description:"Alcanza el primer puesto del ranking general.",reward:20,progress:metrics.rank===1?1:0,target:1}
+        {id:"kind_companion",icon:"🤝",title:"Buen compañero",description:"Regala 10 Me gusta a publicaciones de otros participantes.",reward:10,progress:metrics.likesGiven,target:10},
+        {id:"star_commenter",icon:"💬",title:"Comentarista estrella",description:"Deja 5 comentarios en publicaciones de tus compañeros.",reward:20,progress:metrics.commentsGiven,target:5}
       ];
       for(const achievement of definitions){
         if(achievement.progress>=achievement.target){
