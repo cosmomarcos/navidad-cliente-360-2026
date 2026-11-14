@@ -88,6 +88,35 @@ async function loadProfileImage(file){
   return {image,objectUrl};
  }catch(error){URL.revokeObjectURL(objectUrl);throw error;}
 }
+async function compressWishImage(file){
+ if(!file||!["image/jpeg","image/png","image/webp"].includes(file.type))throw new Error("Selecciona una imagen JPG, PNG o WebP.");
+ if(file.size>8*1024*1024)throw new Error("La imagen supera los 8 MB. Selecciona una foto más ligera.");
+ const loaded=await loadProfileImage(file);
+ try{
+  const image=loaded.image;
+  if(!image.naturalWidth||!image.naturalHeight)throw new Error("No se pudo leer la imagen seleccionada.");
+  let scale=Math.min(1,1280/Math.max(image.naturalWidth,image.naturalHeight));
+  for(let attempt=0;attempt<7;attempt++){
+   const width=Math.max(1,Math.round(image.naturalWidth*scale));
+   const height=Math.max(1,Math.round(image.naturalHeight*scale));
+   const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+   const context=canvas.getContext("2d");
+   if(!context)throw new Error("No se pudo preparar la imagen. Inténtalo con otra foto.");
+   context.fillStyle="#ffffff";context.fillRect(0,0,width,height);
+   context.drawImage(image,0,0,width,height);
+   for(const quality of [.84,.76,.68,.60,.52]){
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));
+    if(!blob)continue;
+    if(blob.size<=190*1024){
+     const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error("No se pudo preparar la imagen."));reader.readAsDataURL(blob);});
+     if(typeof dataUrl==="string"&&dataUrl.length<=260000)return dataUrl;
+    }
+   }
+   scale*=.78;
+  }
+  throw new Error("No se pudo reducir la imagen al tamaño permitido. Prueba con otra foto.");
+ }finally{URL.revokeObjectURL(loaded.objectUrl);}
+}
 async function croppedProfileImageDataUrl(image,offsetX,offsetY,zoom){
  const viewport=240,output=512;
  const scale=Math.max(viewport/image.naturalWidth,viewport/image.naturalHeight);
