@@ -500,6 +500,7 @@ async function handleApi(request, env, url) {
         {id:"kindness_giver",icon:"💖",title:"Elegante",description:"Regala 25 Me gusta a publicaciones de otros participantes.",reward:25,progress:metrics.likesGiven,target:25},
         {id:"official_motivator",icon:"👏",title:"Motivador oficial",description:"Comenta publicaciones de 5 compañeros diferentes.",reward:30,progress:metrics.peopleMotivated,target:5},
         {id:"christmas_voice",icon:"🎤",title:"La voz de Navidad",description:"Publica 5 audios en los retos.",reward:30,progress:metrics.voiceCount,target:5},
+        {id:"sopranos",icon:"🎙️",title:"Sopranos",description:"Envía 10 audios en los retos diarios.",reward:70,progress:metrics.voiceCount,target:10},
         {id:"multitalented_artist",icon:"🎨",title:"Artista multifacético",description:"Publica al menos 3 fotos y 3 audios.",reward:40,progress:Math.min(Math.floor(metrics.photoCount/3),Math.floor(metrics.voiceCount/3)),target:1,detail:metrics.photoCount+" foto(s) · "+metrics.voiceCount+" audio(s)"},
         {id:"icebreaker",icon:"🧊",title:"El rompehielo",description:"Sé la primera persona en publicar en 3 retos diferentes.",reward:15,progress:metrics.icebreaker,target:3}
       ];
