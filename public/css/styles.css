@@ -958,3 +958,7 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .achievement-mini-track i{display:block;height:100%;background:#b99a51;border-radius:99px}
 .achievements-footnote{font-size:10px;line-height:1.5;color:#8b887d;text-align:center;margin:15px 6px 24px}
 @media(max-width:380px){.achievements-grid{gap:8px}.achievement-card{padding:11px}.achievement-card h3{font-size:14px}.achievement-card p{font-size:10px}.achievement-status{font-size:7px}.achievements-summary{padding:14px}}
+
+/* Logros: mismo nivel tipográfico que los encabezados de las demás pestañas */
+.achievements-heading h2{font-size:24px;font-weight:700;letter-spacing:0;line-height:1.2;text-shadow:none;margin:5px 0 8px}
+@media(max-width:600px){.achievements-heading h2{font-size:24px}}
