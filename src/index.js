@@ -540,7 +540,16 @@ async function handleApi(request, env, url) {
       const id=crypto.randomUUID();
       try{await env.DB.prepare("INSERT INTO spirit_extra_submissions (id,edition_id,challenge_id,user_id,caption,media_data,media_type) VALUES (?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption,mediaData||null,mediaType||null).run();}
       catch{return json({error:"Ya enviaste tu participación para este reto bonus."},409);}
-      return json({ok:true,id,status:"pending"},201);
+      try {
+        if (env.ADMIN_EMAIL) {
+          const admin = await env.DB.prepare("SELECT id FROM users WHERE lower(email)=lower(?) LIMIT 1").bind(env.ADMIN_EMAIL).first();
+          if (admin?.id) {
+            const bonusTitle = await env.DB.prepare("SELECT title FROM spirit_challenges WHERE id=?").bind(challenge.id).first();
+            await sendPushToUser(env, admin.id, {title:"🔔 Nueva evidencia Bonus por aprobar",body:"Un participante envió evidencia para «"+String(bonusTitle?.title||"Reto bonus").slice(0,90)+"».",tag:"spirit-bonus-review-"+id,url:"/?tab=spirit"},url.origin);
+          }
+        }
+      } catch(error) { console.warn("Admin bonus review push notification failed",{submissionId:id,message:error?.message||String(error)}); }
+      return json({ok:true,id,status:"pending",adminNotificationAttempted:true},201);
     }
 
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
