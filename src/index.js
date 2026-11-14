@@ -462,6 +462,11 @@ async function handleApi(request, env, url) {
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_resets (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, reset_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       const reset=await env.DB.prepare("INSERT OR IGNORE INTO spirit_achievement_resets (edition_id) VALUES (?)").bind(member.edition_id).run();
       if(reset.meta?.changes>0) await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement' AND source_id<>'son_webadas'").bind(member.edition_id).run();
+      // El logro de deseos es la única excepción retroactiva: premiar a todos los participantes que ya tengan al menos 3 deseos.
+      const wishQualifiers=await env.DB.prepare("SELECT user_id,COUNT(*) AS total FROM participant_wishes WHERE edition_id=? GROUP BY user_id HAVING COUNT(*)>=3").bind(member.edition_id).all();
+      for(const participant of (wishQualifiers.results||[])){
+        await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,participant.user_id,"achievement","wishes_full",30,"Logro desbloqueado: Besitos o Paciencias").run();
+      }
       const [activity,likes,commentsGiven,votesGiven,commentTargets,earlyDays,challengeRows,icebreaker]=await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count,COUNT(DISTINCT challenge_id) AS distinct_challenges FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
         env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=? AND v.created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
@@ -478,7 +483,7 @@ async function handleApi(request, env, url) {
       const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),distinctChallenges:Number(activity?.distinct_challenges||0),wishCount:Number(wishesCount?.total||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,icebreaker:Number(icebreaker?.count||0)};
       const definitions=[
         {id:"first_post",icon:"🎄",title:"¿Qué así va ser?",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
-        {id:"wishes_full",icon:"💋",title:"Besitos o Paciencias",description:"Completa los 10 espacios de tu lista de deseos.",reward:30,progress:metrics.wishCount,target:10},
+        {id:"wishes_full",icon:"💋",title:"Besitos o Paciencias",description:"Registra al menos 3 deseos en tu lista.",reward:30,progress:metrics.wishCount,target:3},
         {id:"son_webadas",icon:"🛌",title:"Son Webadas",description:"Pasa 24 horas sin conectarte a la aplicación ni participar en Espíritu. Vuelve después de ese descanso para reclamar tu logro.",reward:20,progress:0,target:1},
         {id:"three_posts",icon:"🎅",title:"Espíritu navideño",description:"Completa 3 publicaciones en los retos diarios.",reward:10,progress:metrics.submissions,target:3},
         {id:"five_posts",icon:"⭐",title:"Estrella navideña",description:"Completa 5 publicaciones en los retos diarios.",reward:15,progress:metrics.submissions,target:5},
