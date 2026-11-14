@@ -706,7 +706,7 @@ async function handleApi(request, env, url) {
       const voteId=crypto.randomUUID();
       const inserted=await env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM spirit_votes v JOIN spirit_submissions liked ON liked.id=v.submission_id WHERE v.voter_user_id=? AND liked.challenge_id=? AND liked.user_id=?)").bind(voteId,submission.id,user.id,user.id,challenge.id,submission.user_id).run();
       if(!(inserted.meta?.changes>0))return json({error:"Ya diste Me gusta a una publicación de este participante en el reto."},409);
-      await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_like",5,"Logro diario: dar Me gusta a una publicación (+5 puntos)");
+      const dailyLikeAward=await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_like",5,"Logro diario: dar Me gusta a una publicación (+5 puntos)");
       await env.DB.batch([
         env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,challenge.id,submission.user_id),
         env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(challenge.id,submission.user_id)
@@ -715,7 +715,7 @@ async function handleApi(request, env, url) {
       const earned=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,challenge.id,submission.user_id).first();
       const voter=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
       await sendPushToUser(env,submission.user_id,{title:"❤️ ¡Nueva reacción en Espíritu!",body:(voter?.name||"Un participante")+" le dio me gusta a tu publicación.",tag:"spirit-like-"+submission.id,url:"/?tab=spirit"},url.origin);
-      return json({ok:true,voted:true,votes:count?.total||0,pointsForPost:earned?.total||0});
+      return json({ok:true,voted:true,votes:count?.total||0,pointsForPost:earned?.total||0,dailyActionAwarded:dailyLikeAward.awarded});
     }
     if(request.method==="DELETE"&&voteMatch){
       if(!challenge)return json({error:"El reto ya terminó."},409);
