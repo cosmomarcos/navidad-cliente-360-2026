@@ -455,6 +455,8 @@ async function renderSpiritTab(dataOverride=null){
  home.innerHTML='<div class="spirit-heading"><span>🎄</span><div><p class="kicker">NAVIDAD PYME · 2026</p><h2>Espíritu Navideño</h2><p>Comparte, participa y contagia la alegría de estas fiestas. ¡El primer puesto se llevará un premio sorpresa!</p></div></div><div id="spirit-content"><div class="tab-skeleton"><span></span><span></span><span></span></div></div>';
  try{
   const spiritCacheKey="spirit-board:"+selectedEditionId+":"+currentUser.user.id;
+  await api("/api/spirit/achievements",{noMemoryCache:true,timeoutMs:10000}).catch(()=>null);
+  try{localStorage.removeItem(spiritCacheKey);sessionStorage.removeItem(spiritCacheKey);}catch{}
   let cachedBoard=null;
   if(!dataOverride){try{const saved=JSON.parse(localStorage.getItem(spiritCacheKey)||sessionStorage.getItem(spiritCacheKey)||"null");if(saved&&Date.now()-saved.savedAt<86400000)cachedBoard=saved.data;}catch{}}
   const data=dataOverride||await api("/api/spirit/board",{noMemoryCache:true,timeoutMs:12000});
