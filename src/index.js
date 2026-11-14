@@ -492,7 +492,9 @@ async function handleApi(request, env, url) {
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       await ensureSpiritSchema(env);
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú. Todos comienzan desde esta fecha.
-      await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement'").bind(member.edition_id).run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_resets (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, reset_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+      const reset=await env.DB.prepare("INSERT OR IGNORE INTO spirit_achievement_resets (edition_id) VALUES (?)").bind(member.edition_id).run();
+      if(reset.meta?.changes>0) await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement'").bind(member.edition_id).run();
       const [activity,likes,commentsGiven,votesGiven]=await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours','-18 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
         env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=? AND v.created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
