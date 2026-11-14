@@ -491,17 +491,24 @@ async function handleApi(request, env, url) {
     }
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       await ensureSpiritSchema(env);
-      const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú. Todos comienzan desde esta fecha.
+      const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_resets (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, reset_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       const reset=await env.DB.prepare("INSERT OR IGNORE INTO spirit_achievement_resets (edition_id) VALUES (?)").bind(member.edition_id).run();
       if(reset.meta?.changes>0) await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement'").bind(member.edition_id).run();
-      const [activity,likes,commentsGiven,votesGiven]=await Promise.all([
-        env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours','-18 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
+      const [activity,likes,commentsGiven,votesGiven,commentTargets,earlyDays,challengeRows,icebreaker]=await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count,COUNT(DISTINCT challenge_id) AS distinct_challenges FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
         env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=? AND v.created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
         env.DB.prepare("SELECT COUNT(*) AS comments FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>? AND c.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND v.voter_user_id=? AND s.user_id<>? AND v.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first()
+        env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND v.voter_user_id=? AND s.user_id<>? AND v.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first(),
+        env.DB.prepare("SELECT COUNT(DISTINCT s.user_id) AS people FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>? AND c.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first(),
+        env.DB.prepare("SELECT COUNT(DISTINCT date(created_at,'-5 hours')) AS days FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=? AND CAST(strftime('%H',created_at,'-5 hours') AS INTEGER)<8").bind(member.edition_id,user.id,achievementStart).first(),
+        env.DB.prepare("SELECT c.id,c.starts_at,CASE WHEN EXISTS(SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=c.id AND s.user_id=? AND s.created_at>=?) THEN 1 ELSE 0 END AS participated FROM spirit_challenges c WHERE c.edition_id=? AND c.challenge_kind='daily' AND c.starts_at>=? ORDER BY c.starts_at,c.id").bind(user.id,achievementStart,member.edition_id,achievementStart).all(),
+        env.DB.prepare("SELECT COUNT(DISTINCT s.challenge_id) AS count FROM spirit_submissions s WHERE s.edition_id=? AND s.user_id=? AND s.created_at>=? AND s.id=(SELECT s2.id FROM spirit_submissions s2 WHERE s2.challenge_id=s.challenge_id ORDER BY s2.created_at,s2.id LIMIT 1)").bind(member.edition_id,user.id,achievementStart).first()
       ]);
-      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0)};
+      const rows=challengeRows.results||[];
+      let challengeStreak=0,maxChallengeStreak=0;
+      for(const row of rows){challengeStreak=Number(row.participated)?challengeStreak+1:0;maxChallengeStreak=Math.max(maxChallengeStreak,challengeStreak);}
+      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),distinctChallenges:Number(activity?.distinct_challenges||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,icebreaker:Number(icebreaker?.count||0)};
       const definitions=[
         {id:"first_post",icon:"🎄",title:"Primera participación",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
         {id:"three_posts",icon:"🎅",title:"Espíritu navideño",description:"Completa 3 publicaciones en los retos diarios.",reward:10,progress:metrics.submissions,target:3},
@@ -510,8 +517,20 @@ async function handleApi(request, env, url) {
         {id:"frequent",icon:"🔥",title:"Participante frecuente",description:"Participa en 3 días diferentes.",reward:10,progress:metrics.activeDays,target:3},
         {id:"multimedia",icon:"🎙️",title:"Artista navideño",description:"Publica al menos una foto y un audio en los retos.",reward:15,progress:Math.min(metrics.voiceCount,metrics.photoCount),target:1,detail:metrics.photoCount+" foto(s) · "+metrics.voiceCount+" audio(s)"},
         {id:"kind_companion",icon:"🤝",title:"Buen compañero",description:"Regala 10 Me gusta a publicaciones de otros participantes.",reward:10,progress:metrics.likesGiven,target:10},
-        {id:"star_commenter",icon:"💬",title:"Comentarista estrella",description:"Deja 5 comentarios en publicaciones de tus compañeros.",reward:20,progress:metrics.commentsGiven,target:5}
+        {id:"star_commenter",icon:"💬",title:"Comentarista estrella",description:"Deja 5 comentarios en publicaciones de tus compañeros.",reward:20,progress:metrics.commentsGiven,target:5},
+        {id:"early_bird",icon:"🌅",title:"Madrugador navideño",description:"Participa antes de las 8:00 a. m. en 3 días diferentes (hora Perú).",reward:15,progress:metrics.earlyDays,target:3},
+        {id:"unstoppable_days",icon:"📅",title:"Incansable",description:"Participa en 7 días diferentes.",reward:25,progress:metrics.activeDays,target:7},
+        {id:"challenge_marathon",icon:"🏃",title:"Maratón navideña",description:"Participa en 5 retos diarios consecutivos.",reward:30,progress:metrics.maxChallengeStreak,target:5},
+        {id:"spirit_unstoppable",icon:"🚀",title:"Espíritu imparable",description:"Participa en 20 retos diarios diferentes.",reward:60,progress:metrics.distinctChallenges,target:20},
+        {id:"good_neighbor",icon:"💌",title:"Buen vecino",description:"Deja 10 comentarios en publicaciones de tus compañeros.",reward:25,progress:metrics.commentsGiven,target:10},
+        {id:"kindness_giver",icon:"💖",title:"Repartidor de cariño",description:"Regala 25 Me gusta a publicaciones de otros participantes.",reward:25,progress:metrics.likesGiven,target:25},
+        {id:"official_motivator",icon:"👏",title:"Motivador oficial",description:"Comenta publicaciones de 5 compañeros diferentes.",reward:30,progress:metrics.peopleMotivated,target:5},
+        {id:"christmas_voice",icon:"🎤",title:"La voz de Navidad",description:"Publica 5 audios en los retos.",reward:30,progress:metrics.voiceCount,target:5},
+        {id:"multitalented_artist",icon:"🎨",title:"Artista multifacético",description:"Publica al menos 3 fotos y 3 audios.",reward:40,progress:Math.min(Math.floor(metrics.photoCount/3),Math.floor(metrics.voiceCount/3)),target:1,detail:metrics.photoCount+" foto(s) · "+metrics.voiceCount+" audio(s)"},
+        {id:"icebreaker",icon:"🧊",title:"El rompehielo",description:"Sé la primera persona en publicar en 3 retos diferentes.",reward:15,progress:metrics.icebreaker,target:3}
       ];
+      const completedCount=definitions.filter(item=>item.progress>=item.target).length;
+      definitions.push({id:"christmas_legend",icon:"👑",title:"Leyenda de Navidad",description:"Desbloquea todos los demás logros de esta colección.",reward:100,progress:completedCount,target:definitions.length,detail:completedCount+" de "+definitions.length+" logros"});
       for(const achievement of definitions){
         if(achievement.progress>=achievement.target){
           await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"achievement",achievement.id,achievement.reward,"Logro desbloqueado: "+achievement.title).run();
