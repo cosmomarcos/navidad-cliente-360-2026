@@ -209,6 +209,29 @@ async function finalizeExpiredSpiritChallenges(env, editionId) {
 }
 
 
+async function spiritDailyCycleKey(env,editionId){
+  const latest=await env.DB.prepare("SELECT starts_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' ORDER BY starts_at DESC LIMIT 1").bind(editionId).first();
+  let startHour=18,startMinute=0;
+  if(latest?.starts_at){
+    const date=new Date(String(latest.starts_at).replace(" ","T")+"Z");
+    if(Number.isFinite(date.getTime())){
+      const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"America/Lima",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date);
+      startHour=Number(parts.find(x=>x.type==="hour")?.value||18);
+      startMinute=Number(parts.find(x=>x.type==="minute")?.value||0);
+    }
+  }
+  const nowParts=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+  const get=type=>Number(nowParts.find(x=>x.type===type)?.value||0);
+  const day=new Date(Date.UTC(get("year"),get("month")-1,get("day"),12));
+  if(get("hour")*60+get("minute")<startHour*60+startMinute)day.setUTCDate(day.getUTCDate()-1);
+  return spiritLimaDay(day);
+}
+async function awardSpiritDailyAction(env,editionId,userId,actionKey,points,description){
+  await ensureSpiritSchema(env);
+  const cycle=await spiritDailyCycleKey(env,editionId);
+  const result=await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,userId,"daily_action",cycle+":"+actionKey,points,description).run();
+  return {cycle,awarded:result.meta?.changes>0};
+}
 function spiritLimaDay(value) {
   return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(value);
 }
@@ -431,6 +454,11 @@ async function handleApi(request, env, url) {
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
+      await ensureWishesSchema(env);
+      const dailyCycle=await spiritDailyCycleKey(env,member.edition_id);
+      const dailyEarned=await env.DB.prepare("SELECT source_id,points FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='daily_action' AND source_id LIKE ?").bind(member.edition_id,user.id,dailyCycle+":%").all();
+      const dailyEarnedMap=new Map((dailyEarned.results||[]).map(row=>[String(row.source_id).slice(dailyCycle.length+1),Number(row.points||0)]));
+      const wishesCount=await env.DB.prepare("SELECT COUNT(*) AS total FROM participant_wishes WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_resets (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, reset_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       const reset=await env.DB.prepare("INSERT OR IGNORE INTO spirit_achievement_resets (edition_id) VALUES (?)").bind(member.edition_id).run();
       if(reset.meta?.changes>0) await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='achievement' AND source_id<>'son_webadas'").bind(member.edition_id).run();
@@ -447,9 +475,10 @@ async function handleApi(request, env, url) {
       const rows=challengeRows.results||[];
       let challengeStreak=0,maxChallengeStreak=0;
       for(const row of rows){challengeStreak=Number(row.participated)?challengeStreak+1:0;maxChallengeStreak=Math.max(maxChallengeStreak,challengeStreak);}
-      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),distinctChallenges:Number(activity?.distinct_challenges||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,icebreaker:Number(icebreaker?.count||0)};
+      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),distinctChallenges:Number(activity?.distinct_challenges||0),wishCount:Number(wishesCount?.total||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,icebreaker:Number(icebreaker?.count||0)};
       const definitions=[
         {id:"first_post",icon:"🎄",title:"¿Qué así va ser?",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
+        {id:"wishes_full",icon:"💋",title:"Besitos o Paciencias",description:"Completa los 10 espacios de tu lista de deseos.",reward:30,progress:metrics.wishCount,target:10},
         {id:"son_webadas",icon:"🛌",title:"Son Webadas",description:"Pasa 24 horas sin conectarte a la aplicación ni participar en Espíritu. Vuelve después de ese descanso para reclamar tu logro.",reward:20,progress:0,target:1},
         {id:"three_posts",icon:"🎅",title:"Espíritu navideño",description:"Completa 3 publicaciones en los retos diarios.",reward:10,progress:metrics.submissions,target:3},
         {id:"five_posts",icon:"⭐",title:"Estrella navideña",description:"Completa 5 publicaciones en los retos diarios.",reward:15,progress:metrics.submissions,target:5},
@@ -479,7 +508,13 @@ async function handleApi(request, env, url) {
       const earned=await env.DB.prepare("SELECT source_id,points,created_at FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='achievement'").bind(member.edition_id,user.id).all();
       const earnedMap=new Map((earned.results||[]).map(row=>[row.source_id,row]));
       const achievements=definitions.map(item=>{const row=earnedMap.get(item.id);return {...item,progress:Math.min(item.progress,item.target),unlocked:!!row,earnedPoints:Number(row?.points||0),unlockedAt:row?.created_at||null};});
-      return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0)});
+      const dailyDefinitions=[
+        {id:"secret_message",icon:"💌",title:"Un mensajito secreto",description:"Envía un mensaje a tu amigo secreto.",reward:10},
+        {id:"daily_like",icon:"❤️",title:"Reparte cariño",description:"Dale Me gusta a una publicación.",reward:5},
+        {id:"daily_share",icon:"📲",title:"Comparte la magia",description:"Comparte una publicación.",reward:5},
+        {id:"daily_comment",icon:"💬",title:"No te quedes callado",description:"Comenta una publicación.",reward:5}
+      ].map(item=>({...item,daily:true,unlocked:dailyEarnedMap.has(item.id),earnedPoints:dailyEarnedMap.get(item.id)||0,progress:dailyEarnedMap.has(item.id)?1:0,target:1}));
+      return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0),dailyAchievements:dailyDefinitions,dailyPoints:dailyDefinitions.reduce((sum,x)=>sum+x.earnedPoints,0),dailyCycle});
     }
     // La lectura de Espíritu no debe ejecutar migraciones estructurales.
     // Las tablas del módulo se crean desde las rutas administrativas/de configuración.
@@ -585,6 +620,7 @@ async function handleApi(request, env, url) {
       if(comment.length<1||comment.length>500)return json({error:"El comentario debe tener entre 1 y 500 caracteres."},400);
       const id=crypto.randomUUID();
       await env.DB.prepare("INSERT INTO spirit_comments (id,submission_id,edition_id,user_id,comment) VALUES (?,?,?,?,?)").bind(id,submission.id,member.edition_id,user.id,comment).run();
+      await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_comment",5,"Logro diario: comentar una publicación (+5 puntos)");
       const author=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
       if(submission.user_id!==user.id)await sendPushToUser(env,submission.user_id,{title:"💬 Nuevo comentario en Espíritu",body:(author?.name||"Un participante")+" ha comentado tu publicación.",tag:"spirit-comment-"+id,url:"/?tab=spirit"},url.origin);
       return json({ok:true,id});
@@ -592,10 +628,13 @@ async function handleApi(request, env, url) {
     const shareMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/share$/);
     if(request.method==="POST"&&shareMatch){
       const submission=await env.DB.prepare("SELECT id,user_id FROM spirit_submissions WHERE id=? AND edition_id=?").bind(shareMatch[1],member.edition_id).first();
-      if(!submission)return json({error:"No encontramos esta publicación."},404);
-      if(submission.user_id!==user.id){
+      const bonusSubmission=submission?null:await env.DB.prepare("SELECT id,user_id FROM spirit_extra_submissions WHERE id=? AND edition_id=? AND status='approved'").bind(shareMatch[1],member.edition_id).first();
+      const sharedPost=submission||bonusSubmission;
+      if(!sharedPost)return json({error:"No encontramos esta publicación."},404);
+      await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_share",5,"Logro diario: compartir una publicación (+5 puntos)");
+      if(sharedPost.user_id!==user.id){
         const sharer=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
-        await sendPushToUser(env,submission.user_id,{title:"📲 ¡Compartieron tu publicación!",body:(sharer?.name||"Un participante")+" ha compartido tu publicación.",tag:"spirit-share-"+crypto.randomUUID(),url:"/?tab=spirit"},url.origin);
+        await sendPushToUser(env,sharedPost.user_id,{title:"📲 ¡Compartieron tu publicación!",body:(sharer?.name||"Un participante")+" ha compartido tu publicación.",tag:"spirit-share-"+crypto.randomUUID(),url:"/?tab=spirit"},url.origin);
       }
       return json({ok:true});
     }
@@ -661,6 +700,7 @@ async function handleApi(request, env, url) {
       const voteId=crypto.randomUUID();
       const inserted=await env.DB.prepare("INSERT INTO spirit_votes (id,submission_id,voter_user_id) SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM spirit_votes v JOIN spirit_submissions liked ON liked.id=v.submission_id WHERE v.voter_user_id=? AND liked.challenge_id=? AND liked.user_id=?)").bind(voteId,submission.id,user.id,user.id,challenge.id,submission.user_id).run();
       if(!(inserted.meta?.changes>0))return json({error:"Ya diste Me gusta a una publicación de este participante en el reto."},409);
+      await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_like",5,"Logro diario: dar Me gusta a una publicación (+5 puntos)");
       await env.DB.batch([
         env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(member.edition_id,challenge.id,submission.user_id),
         env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(challenge.id,submission.user_id)
@@ -1141,6 +1181,7 @@ async function handleApi(request, env, url) {
       if(!assignment)return json({error:"No encontramos la asignación de esta conversación."},409);
       const id=crypto.randomUUID();
       await env.DB.prepare("INSERT INTO anonymous_chat_messages (id,edition_id,run_number,sender_user_id,recipient_user_id,message) VALUES (?,?,?,?,?,?)").bind(id,member.edition_id,assignment.run_number,user.id,assignment.partner,message).run();
+      await awardSpiritDailyAction(env,member.edition_id,user.id,"secret_message",10,"Logro diario: enviar mensaje a tu amigo secreto (+10 puntos)");
       await sendPushToUser(env,assignment.partner,{title:"💌 Nuevo mensaje de tu amigo secreto",body:message.slice(0,100),url:"/?tab=community",tag:"secret-chat-"+id},url.origin);
       return json({ok:true,id});
     }
@@ -1165,6 +1206,7 @@ async function handleApi(request, env, url) {
       const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM anonymous_clues WHERE edition_id=? AND giver_user_id=? AND run_number=?").bind(member.edition_id, user.id, assignment.run_number).first();
       const clueId = crypto.randomUUID();
       await env.DB.prepare("INSERT INTO anonymous_clues (id, edition_id, giver_user_id, recipient_user_id, run_number, message) VALUES (?, ?, ?, ?, ?, ?)").bind(clueId,member.edition_id,user.id,assignment.recipient_user_id,assignment.run_number,message).run();
+      await awardSpiritDailyAction(env,member.edition_id,user.id,"secret_message",10,"Logro diario: enviar mensaje a tu amigo secreto (+10 puntos)");
       await sendPushToUser(env,assignment.recipient_user_id,{title:"¡Tienes un mensaje! 🎁",body:"Tu amigo secreto te envio un mensaje",url:"/?tab=community",tag:"clue-"+clueId},url.origin);
       return json({ ok: true, sentCount: count.total + 1 });
     }
