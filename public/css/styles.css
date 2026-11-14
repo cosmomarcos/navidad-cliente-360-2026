@@ -925,9 +925,8 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 
 
 /* v2.0.21 · Colección de logros */
-.bottom-nav{justify-content:flex-start;overflow-x:auto;scrollbar-width:none}
-.bottom-nav::-webkit-scrollbar{display:none}
-.bottom-nav button{flex:1 0 62px;min-width:0;white-space:nowrap}
+.bottom-nav{justify-content:space-around;overflow:visible}
+.bottom-nav button{flex:1 1 0;min-width:0;padding:4px 2px;white-space:normal;font-size:9px;text-align:center}
 .achievements-heading{margin:8px 0 18px}
 .achievements-heading h2{font-family:'Playfair Display',serif;color:#19372d;font-size:30px;margin:4px 0 7px}
 .achievements-heading>p:last-child{color:#64766b;font-size:13px;line-height:1.5;margin:0}
