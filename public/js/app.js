@@ -507,7 +507,7 @@ async function renderSpiritTab(dataOverride=null){
     const record=ev.target.closest("[data-spirit-record]");if(record){const status=$("#spirit-record-status"),preview=$("#spirit-audio-preview");try{if(!spiritRecorder||spiritRecorder.state==="inactive"){if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw Error("La grabación necesita abrirse desde el enlace seguro de la aplicación (https://) en Chrome o Safari.");if(!window.MediaRecorder)throw Error("Este navegador no es compatible con la grabación de audio. Abre la aplicación en Chrome actualizado.");let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}catch(firstError){if(firstError?.name==="OverconstrainedError"||firstError?.name==="ConstraintNotSatisfiedError")stream=await navigator.mediaDevices.getUserMedia({audio:true});else throw firstError;}window.__spiritAudioBlob=null;preview.pause();preview.removeAttribute("src");preview.classList.add("hidden");spiritAudioChunks=[];const supportedAudioType=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/mp4"].find(type=>window.MediaRecorder.isTypeSupported?.(type));const recorderOptions={audioBitsPerSecond:32000};if(supportedAudioType)recorderOptions.mimeType=supportedAudioType;const recorder=new MediaRecorder(stream,recorderOptions);spiritRecorder=recorder;recorder.ondataavailable=e=>{if(e.data&&e.data.size)spiritAudioChunks.push(e.data);};recorder.onerror=()=>{window.__spiritAudioBlob=null;status.textContent="No se pudo procesar la grabación. Inténtalo nuevamente.";stream.getTracks().forEach(t=>t.stop());};recorder.onstop=()=>{const mimeType=recorder.mimeType||spiritAudioChunks.find(chunk=>chunk.type)?.type||"audio/webm";const audioBlob=new Blob(spiritAudioChunks,{type:mimeType});if(audioBlob.size>0){window.__spiritAudioBlob=audioBlob;preview.src=URL.createObjectURL(audioBlob);preview.classList.remove("hidden");status.textContent="Audio listo para enviar ("+Math.round(audioBlob.size/1024)+" KB).";}else{window.__spiritAudioBlob=null;status.textContent="No se capturó audio. Graba nuevamente.";preview.classList.add("hidden");}stream.getTracks().forEach(t=>t.stop());record.textContent="🎙️ Grabar nuevamente";};recorder.start(1000);record.textContent="⏹ Detener grabación";status.textContent="Grabando… máximo 30 segundos.";window.__spiritVoiceLimit=setTimeout(()=>{if(spiritRecorder?.state==="recording")spiritRecorder.stop();},30000);}else if(spiritRecorder.state==="recording"){clearTimeout(window.__spiritVoiceLimit);spiritRecorder.stop();}}catch(error){const name=error?.name||"";if(name==="NotAllowedError"||name==="PermissionDeniedError"||/permission denied|not allowed/i.test(error?.message||"")){status.textContent="No se concedió acceso al micrófono. En Android: abre los ajustes del sitio desde el candado junto a la dirección, entra en Permisos y activa Micrófono. Si está bloqueado en el teléfono, ve a Ajustes > Aplicaciones > Chrome > Permisos > Micrófono. Después vuelve a cargar esta página e inténtalo otra vez.";}else if(name==="NotFoundError"||name==="DevicesNotFoundError"){status.textContent="No encontramos un micrófono disponible en este dispositivo.";}else if(name==="NotReadableError"||name==="TrackStartError"){status.textContent="El micrófono está siendo usado por otra aplicación. Ciérrala e inténtalo nuevamente.";}else if(name==="SecurityError"){status.textContent="El navegador bloqueó el micrófono. Abre la aplicación directamente en Chrome y permite el acceso al micrófono.";}else{status.textContent=error?.message||"No se pudo iniciar la grabación. Revisa el permiso del micrófono.";}console.warn("Error de grabación de Espíritu:",name,error?.message||error);}return;}
     const adminPostDel=ev.target.closest("[data-admin-spirit-delete]");if(adminPostDel){if(!confirm("¿Eliminar esta publicación por contenido potencialmente peligroso? También se eliminarán sus comentarios, votos y puntos asociados."))return;adminPostDel.disabled=true;adminPostDel.textContent="Eliminando…";try{await api("/api/admin/spirit/submissions/"+encodeURIComponent(adminPostDel.dataset.adminSpiritDelete),{method:"DELETE"});await renderSpiritTab();}catch(error){adminPostDel.disabled=false;adminPostDel.textContent=error.message;}return;}
     const commentDel=ev.target.closest("[data-spirit-comment-delete]");if(commentDel){const commentId=commentDel.dataset.spiritCommentDelete;commentDel.disabled=true;try{await api("/api/spirit/comments/"+encodeURIComponent(commentId),{method:"DELETE"});const panel=commentDel.closest(".spirit-comments-panel"),postId=panel?.dataset.spiritCommentsPanel;await refreshSpiritComments(postId);const countButton=home.querySelector('[data-spirit-comments="'+CSS.escape(postId)+'"] span');if(countButton)countButton.textContent=String(Math.max(0,Number(countButton.textContent||0)-1));}catch(error){commentDel.disabled=false;alert(error.message);}return;}const del=ev.target.closest("[data-spirit-delete]");if(del){if(!confirm("¿Eliminar tu participación y los puntos asociados?"))return;del.disabled=true;del.textContent="Eliminando…";try{await api("/api/spirit/submissions/"+encodeURIComponent(del.dataset.spiritDelete),{method:"DELETE"});await renderSpiritTab();}catch(error){del.disabled=false;del.textContent=error.message;}return;}
-    const unvote=ev.target.closest("[data-spirit-unvote]");if(unvote){unvote.disabled=true;try{await api("/api/spirit/submissions/"+encodeURIComponent(unvote.dataset.spiritUnvote)+"/vote",{method:"DELETE"});await renderSpiritTab();}catch(error){unvote.disabled=false;unvote.textContent=error.message;}return;}const vote=ev.target.closest("[data-spirit-vote]");if(!vote)return;vote.disabled=true;vote.textContent="Enviando…";try{await api("/api/spirit/submissions/"+encodeURIComponent(vote.dataset.spiritVote)+"/vote",{method:"POST",body:JSON.stringify({})});await renderSpiritTab();}catch(error){vote.disabled=false;vote.textContent=error.message;}
+    const unvote=ev.target.closest("[data-spirit-unvote]");if(unvote){const postId=unvote.dataset.spiritUnvote;unvote.disabled=true;const oldText=unvote.textContent;try{const result=await api("/api/spirit/submissions/"+encodeURIComponent(postId)+"/vote",{method:"DELETE"});unvote.removeAttribute("data-spirit-unvote");unvote.setAttribute("data-spirit-vote",postId);unvote.textContent="Me gusta ❤️";const post=home.querySelector('[data-spirit-post="'+CSS.escape(postId)+'"]');const countButton=post?.querySelector("[data-spirit-likes]");if(countButton)countButton.textContent="❤️ "+Number(result.votes||0)+" Me gusta · Ver quiénes";const item=submissions.find(x=>x.id===postId);if(item){item.voted=false;item.my_vote_submission_id=null;item.votes=Number(result.votes||0);}}catch(error){unvote.disabled=false;unvote.textContent=error.message||oldText;}return;}const vote=ev.target.closest("[data-spirit-vote]");if(!vote)return;const postId=vote.dataset.spiritVote;vote.disabled=true;const oldText=vote.textContent;vote.textContent="Enviando…";try{const result=await api("/api/spirit/submissions/"+encodeURIComponent(postId)+"/vote",{method:"POST",body:JSON.stringify({})});vote.removeAttribute("data-spirit-vote");vote.setAttribute("data-spirit-unvote",postId);vote.textContent="Quitar Me gusta ✓";const post=home.querySelector('[data-spirit-post="'+CSS.escape(postId)+'"]');const countButton=post?.querySelector("[data-spirit-likes]");if(countButton)countButton.textContent="❤️ "+Number(result.votes||0)+" Me gusta · Ver quiénes";const item=submissions.find(x=>x.id===postId);if(item){item.voted=true;item.my_vote_submission_id=postId;item.votes=Number(result.votes||0);}if(result.dailyActionAwarded){const score=home.querySelector(".spirit-score-card strong");if(score){const current=Number(String(score.textContent||"").replace(/[^0-9.-]/g,""))||0;score.textContent=(current+5)+" pts";}}}catch(error){vote.disabled=false;vote.textContent=error.message||oldText;}
    });
   }
   if(cachedBoard&&!dataOverride){
@@ -756,36 +756,31 @@ async function loadWishImage(img,wishId,editionId=selectedEditionId){
 }
 
 async function compressSpiritPhoto(file){
- if(!file||!String(file.type||"").startsWith("image/"))throw new Error("Selecciona una foto de tu cámara o galería.");
- if(file.size>15*1024*1024)throw new Error("La foto original supera 15 MB. Elige una imagen más pequeña.");
+ if(!file||(!String(file.type||"").startsWith("image/")&&!/\\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||"")))throw new Error("Selecciona una foto válida de tu cámara o galería.");
+ if(file.size>20*1024*1024)throw new Error("La foto original supera 20 MB. Elige una imagen más pequeña.");
  const objectUrl=URL.createObjectURL(file);
- let image=null,bitmap=null;
+ let source=null,bitmap=null;
  try{
-  image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Tu navegador no pudo interpretar esta foto. Guarda una copia como JPG e inténtalo nuevamente."));img.src=objectUrl;});
-  if(!image.naturalWidth||!image.naturalHeight)throw new Error("La foto no contiene dimensiones válidas.");
-  const render=async source=>{
-   const sw=source.width||source.naturalWidth,sh=source.height||source.naturalHeight;
-   const scale=Math.min(1,1280/Math.max(sw,sh)),canvas=document.createElement("canvas");
+  if(window.createImageBitmap){try{bitmap=await createImageBitmap(file,{imageOrientation:"from-image"});if(bitmap.width&&bitmap.height)source=bitmap;}catch{}}
+  if(!source)source=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Este navegador no pudo abrir la foto. Guarda una copia como JPG o PNG desde tu galería e inténtalo nuevamente."));img.src=objectUrl;});
+  const sw=source.width||source.naturalWidth,sh=source.height||source.naturalHeight;
+  if(!sw||!sh)throw new Error("La foto no contiene dimensiones válidas.");
+  let blob=null;
+  for(const maxSide of [1280,1120,960,820,700]){
+   const scale=Math.min(1,maxSide/Math.max(sw,sh)),canvas=document.createElement("canvas");
    canvas.width=Math.max(1,Math.round(sw*scale));canvas.height=Math.max(1,Math.round(sh*scale));
-   const ctx=canvas.getContext("2d",{alpha:false});if(!ctx)throw new Error("No se pudo preparar la foto.");
+   const ctx=canvas.getContext("2d",{alpha:false});if(!ctx)throw new Error("No se pudo preparar la foto en este dispositivo.");
    ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(source,0,0,canvas.width,canvas.height);
-   const sample=document.createElement("canvas");sample.width=10;sample.height=10;
-   const sampleCtx=sample.getContext("2d",{willReadFrequently:true});sampleCtx.drawImage(canvas,0,0,10,10);
-   const pixels=sampleCtx.getImageData(0,0,10,10).data;let min=255,max=0;
-   for(let i=0;i<pixels.length;i+=4){const lum=(pixels[i]+pixels[i+1]+pixels[i+2])/3;min=Math.min(min,lum);max=Math.max(max,lum);}
-   return {canvas,flat:max-min<3&&min>245};
-  };
-  let rendered=await render(image);
-  if(rendered.flat&&window.createImageBitmap){
-   try{bitmap=await createImageBitmap(file);const alternate=await render(bitmap);if(!alternate.flat)rendered=alternate;}catch{}
-   finally{bitmap?.close?.();bitmap=null;}
+   for(const quality of [.78,.66,.54,.42]){
+    blob=await new Promise(resolve=>{try{canvas.toBlob(result=>resolve(result||null),"image/jpeg",quality);}catch{resolve(null);}});
+    if(!blob){try{const dataUrl=canvas.toDataURL("image/jpeg",quality);blob=await (await fetch(dataUrl)).blob();}catch{blob=null;}}
+    if(blob&&blob.size<=205*1024)break;
+   }
+   if(blob&&blob.size<=205*1024)break;
   }
-  if(rendered.flat)throw new Error("La cámara entregó una imagen vacía o completamente blanca. Toma otra foto o selecciona la imagen desde Galería.");
-  let blob=await new Promise(resolve=>rendered.canvas.toBlob(resolve,"image/jpeg",.82));
-  for(const quality of [.76,.68,.60,.52]){if(blob&&blob.size<=190*1024)break;blob=await new Promise(resolve=>rendered.canvas.toBlob(resolve,"image/jpeg",quality));}
-  if(!blob||blob.size>210*1024)throw new Error("No se pudo comprimir la foto. Prueba con otra imagen.");
+  if(!blob||blob.size>205*1024)throw new Error("No se pudo reducir esta foto al tamaño permitido. Prueba recortarla desde tu galería e inténtalo nuevamente.");
   const data=await blobToDataUrl(blob);
-  if(!data.startsWith("data:image/jpeg;base64,")||data.length>300000)throw new Error("La foto procesada no es un JPG válido. Inténtalo nuevamente.");
+  if(!data.startsWith("data:image/jpeg;base64,")||data.length>300000)throw new Error("La foto procesada supera el límite permitido. Prueba con una imagen más pequeña.");
   return data;
  }finally{URL.revokeObjectURL(objectUrl);bitmap?.close?.();}
 }
