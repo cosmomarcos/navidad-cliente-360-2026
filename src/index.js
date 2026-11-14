@@ -516,7 +516,7 @@ async function handleApi(request, env, url) {
       const dailyDefinitions=[
         {id:"secret_message",icon:"💌",title:"Un mensajito secreto",description:"Envía un mensaje a tu amigo secreto.",reward:10},
         {id:"daily_like",icon:"❤️",title:"Reparte cariño",description:"Dale Me gusta a una publicación.",reward:5},
-        {id:"daily_share",icon:"📲",title:"Comparte la magia",description:"Comparte una publicación.",reward:5},
+        {id:"daily_share",icon:"📲",title:"Comparte la magia",description:"Publica o comparte una publicación.",reward:5},
         {id:"daily_comment",icon:"💬",title:"No te quedes callado",description:"Comenta una publicación.",reward:5}
       ].map(item=>({...item,daily:true,unlocked:dailyEarnedMap.has(item.id),earnedPoints:dailyEarnedMap.get(item.id)||0,progress:dailyEarnedMap.has(item.id)?1:0,target:1}));
       return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0),dailyAchievements:dailyDefinitions,dailyPoints:dailyDefinitions.reduce((sum,x)=>sum+x.earnedPoints,0),dailyCycle});
@@ -667,8 +667,9 @@ async function handleApi(request, env, url) {
       await env.DB.batch([
         env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),null,mediaData||null,mediaType||null),
       ]);
+      await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_share",5,"Logro diario: publicar o compartir una publicación (+5 puntos)");
       await notifySpiritParticipants(env, member.edition_id, user.id, id, user.display_name, url.origin);
-      return json({ok:true,points:0,correct});
+      return json({ok:true,points:0,correct,dailyShareCompleted:true});
     }
     const deleteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&deleteMatch){
