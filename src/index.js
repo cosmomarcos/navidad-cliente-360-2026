@@ -110,7 +110,7 @@ function shuffled(values) {
   return result;
 }
 async function sign(value, secret) { const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return base64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)))); }
-async function createSession(user, secret) { const payload = base64url(new TextEncoder().encode(JSON.stringify({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 604800 }))); return `${payload}.${await sign(payload, secret)}`; }
+async function createSession(user, secret) { const payload = base64url(new TextEncoder().encode(JSON.stringify({ sub: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 2592000 }))); return `${payload}.${await sign(payload, secret)}`; }
 async function readSession(request, secret) {
   const cookieHeader = request.headers.get("Cookie") || "";
   const raw = cookieHeader.split(";").map(x => x.trim()).find(x => x.startsWith("nc360_session="))?.slice(14);
@@ -119,7 +119,7 @@ async function readSession(request, secret) {
   if (!payload || !signature || signature !== await sign(payload, secret)) return null;
   try { const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)))); return data.exp >= Math.floor(Date.now()/1000) ? data : null; } catch { return null; }
 }
-function cookie(value, maxAge = 604800) { return `nc360_session=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`; }
+function cookie(value, maxAge = 2592000) { return `nc360_session=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`; }
 async function googleUser(idToken, clientId) {
   if (!idToken || !clientId) throw new Error("Google OAuth no está configurado.");
   const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
@@ -362,7 +362,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.27" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.42" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -435,7 +435,7 @@ async function handleApi(request, env, url) {
     const memberships=membershipsResult.results||[];
     const membership=requestedId?memberships.find(x=>x.edition_id===requestedId)||null:memberships[memberships.length-1]||null;
     const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
-    return json({ authenticated:true,user,isPrimaryAdmin:admin,membership,memberships,participantProfile:profile||null });
+    return json({ authenticated:true,user,isPrimaryAdmin:admin,membership,memberships,participantProfile:profile||null }, 200, { "set-cookie": cookie(await createSession(user, env.SESSION_SECRET)) });
   }
   if (request.method === "GET" && url.pathname === "/api/participants") {
     const user = await currentUser(request, env);
