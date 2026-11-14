@@ -680,10 +680,10 @@ async function handleApi(request, env, url) {
       const usedKeys=new Set((used.results||[]).map(x=>x.bonus_key)),dailyTitles=new Set((dailyChallenges.results||[]).map(x=>String(x.title||'').trim().toLocaleLowerCase('es'))),dailyDescriptions=new Set((dailyChallenges.results||[]).map(x=>String(x.description||'').trim().toLocaleLowerCase('es'))),available=catalog.filter(x=>!usedKeys.has(x[0])&&!dailyTitles.has(x[1].trim().toLocaleLowerCase('es'))&&!dailyDescriptions.has(x[2].trim().toLocaleLowerCase('es')));
       if(!available.length)return json({error:"Se agotó el catálogo único de retos bonus. Ninguno se repetirá."},409);
       const item=available[Math.floor(Math.random()*available.length)],now=new Date(),end=new Date(now.getTime()+24*60*60*1000),startSql=now.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," "),id=crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,3,0,?,?,?,?, 'extra')").bind(id,edition.id,item[1],item[2],item[3],startSql,endSql,user.id).run();
+      await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,10,0,?,?,?,?, 'extra')").bind(id,edition.id,item[1],item[2],item[3],startSql,endSql,user.id).run();
       const reservation=await env.DB.prepare("INSERT OR IGNORE INTO spirit_bonus_history (edition_id,bonus_key,challenge_id) VALUES (?,?,?)").bind(edition.id,item[0],id).run();
       if(!reservation.meta?.changes){await env.DB.prepare("DELETE FROM spirit_challenges WHERE id=?").bind(id).run();return json({error:"El reto ya fue reservado. Vuelve a intentar."},409);}
-      return json({ok:true,title:item[1],points:3,endsAt:endSql});
+      return json({ok:true,title:item[1],points:10,endsAt:endSql});
     }
     if(url.pathname.startsWith("/api/admin/spirit/bonus/submissions/")&&request.method==="PATCH"){
       const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
@@ -695,9 +695,9 @@ async function handleApi(request, env, url) {
       if(submission.status!=="pending")return json({error:"Esta participación ya fue revisada."},409);
       const changed=await env.DB.prepare("UPDATE spirit_extra_submissions SET status=?,reviewed_at=datetime('now'),reviewed_by=? WHERE id=? AND status='pending'").bind(status,user.id,id).run();
       if(!changed.meta?.changes)return json({error:"Esta participación ya fue revisada."},409);
-      if(status==="approved")await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),edition.id,submission.user_id,"bonus_approved",id,3,"Reto bonus aprobado").run();
-      await sendPushToUser(env,submission.user_id,{title:status==="approved"?"🎁 ¡Bonus aprobado!":"Reto bonus revisado",body:status==="approved"?"Tu participación fue aprobada y recibiste 3 puntos extra.":"Tu evidencia fue revisada y no recibió puntos.",tag:"spirit-bonus-"+id,url:"/?tab=spirit"},url.origin);
-      return json({ok:true,status,points:status==="approved"?3:0});
+      if(status==="approved")await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),edition.id,submission.user_id,"bonus_approved",id,10,"Reto bonus aprobado").run();
+      await sendPushToUser(env,submission.user_id,{title:status==="approved"?"🎁 ¡Bonus aprobado!":"Reto bonus revisado",body:status==="approved"?"Tu participación fue aprobada y recibiste 10 puntos extra.":"Tu evidencia fue revisada y no recibió puntos.",tag:"spirit-bonus-"+id,url:"/?tab=spirit"},url.origin);
+      return json({ok:true,status,points:status==="approved"?10:0});
     }
     if (url.pathname === "/api/admin/spirit/activities") {
       const edition = await getAdminEdition(env, url);
