@@ -339,7 +339,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.21" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.27" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -429,15 +429,6 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
-    // La lectura de Espíritu no debe ejecutar migraciones estructurales.
-    // Las tablas del módulo se crean desde las rutas administrativas/de configuración.
-    // En la navegación normal solo garantizamos el perfil, que usa el ranking.
-    try {
-      await ensureParticipantProfilesSchema(env);
-    } catch (error) {
-      console.error("Spirit participant profile schema unavailable", { message:error?.message||String(error) });
-      return json({ error:"No se pudo preparar el perfil de participantes. Intenta nuevamente.", code:"SPIRIT_PROFILE_SCHEMA_UNAVAILABLE", retryable:true },503,{"retry-after":"5"});
-    }
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       await ensureSpiritSchema(env);
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
@@ -490,6 +481,15 @@ async function handleApi(request, env, url) {
       const earnedMap=new Map((earned.results||[]).map(row=>[row.source_id,row]));
       const achievements=definitions.map(item=>{const row=earnedMap.get(item.id);return {...item,progress:Math.min(item.progress,item.target),unlocked:!!row,earnedPoints:Number(row?.points||0),unlockedAt:row?.created_at||null};});
       return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0)});
+    }
+    // La lectura de Espíritu no debe ejecutar migraciones estructurales.
+    // Las tablas del módulo se crean desde las rutas administrativas/de configuración.
+    // En la navegación normal solo garantizamos el perfil, que usa el ranking.
+    try {
+      await ensureParticipantProfilesSchema(env);
+    } catch (error) {
+      console.error("Spirit participant profile schema unavailable", { message:error?.message||String(error) });
+      return json({ error:"No se pudo preparar el perfil de participantes. Intenta nuevamente.", code:"SPIRIT_PROFILE_SCHEMA_UNAVAILABLE", retryable:true },503,{"retry-after":"5"});
     }
     const spiritMediaMatch=url.pathname.match(/^\/api\/spirit\/media\/([A-Za-z0-9-]+)$/);
     if(request.method==="GET"&&spiritMediaMatch){
