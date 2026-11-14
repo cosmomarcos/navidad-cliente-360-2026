@@ -928,7 +928,7 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .bottom-nav{justify-content:space-around;overflow:visible}
 .bottom-nav button{flex:1 1 0;min-width:0;padding:4px 2px;white-space:normal;font-size:9px;text-align:center}
 .achievements-heading{margin:8px 0 18px}
-.achievements-heading h2{font-family:'Playfair Display',serif;color:#19372d;font-size:30px;margin:4px 0 7px}
+.achievements-heading h2{font-family:'Playfair Display',serif;color:#fff5dc;font-size:34px;font-weight:800;letter-spacing:.2px;text-shadow:0 2px 12px #0008;margin:4px 0 7px}
 .achievements-heading>p:last-child{color:#64766b;font-size:13px;line-height:1.5;margin:0}
 .achievements-summary{background:linear-gradient(135deg,#174536,#0f342a);color:#fff8e8;border-radius:18px;padding:18px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;box-shadow:0 8px 20px #173c3020}
 .achievements-summary>div:not(.achievements-progress){display:grid;gap:5px}
