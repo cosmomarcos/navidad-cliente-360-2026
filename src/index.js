@@ -150,6 +150,8 @@ async function ensureSpiritSchema(env) {
   return ensureSchemaOnce("spirit", async () => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenges (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 10, bonus_points INTEGER NOT NULL DEFAULT 5, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+      try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN edited_at TEXT").run(); } catch {}
+      try { await env.DB.prepare("ALTER TABLE spirit_comments ADD COLUMN edited_at TEXT").run(); } catch {}
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_activity_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     try { await env.DB.prepare("ALTER TABLE spirit_activity_settings ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN challenge_type TEXT NOT NULL DEFAULT 'text'").run(); } catch {}
@@ -362,7 +364,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.43" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.45" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -605,7 +607,7 @@ async function handleApi(request, env, url) {
       let submissions=[];
       const feedChallenge=challenge;
       const feedCorrectAnswer=challengeCorrectAnswer;
-      const feedPromise=feedChallenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted,(SELECT liked.id FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id ORDER BY mine.created_at LIMIT 1) AS my_vote_submission_id FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,user.id,feedChallenge.id).all().catch(error=>{console.error("Spirit feed query failed",{message:error?.message||String(error)});return {results:[]};}):Promise.resolve({results:[]});
+      const feedPromise=feedChallenge?env.DB.prepare("SELECT s.id,s.user_id,s.caption,s.edited_at,s.media_type,CASE WHEN s.media_data IS NOT NULL OR s.image_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,s.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),'') ,u.display_name) AS display_name,u.avatar_url,(SELECT COUNT(*) FROM spirit_comments sc WHERE sc.submission_id=s.id) AS comment_count,(SELECT COUNT(*) FROM spirit_votes v WHERE v.submission_id=s.id) AS votes,CASE WHEN EXISTS(SELECT 1 FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id) THEN 1 ELSE 0 END AS voted,(SELECT liked.id FROM spirit_votes mine JOIN spirit_submissions liked ON liked.id=mine.submission_id WHERE mine.voter_user_id=? AND liked.challenge_id=s.challenge_id AND liked.user_id=s.user_id ORDER BY mine.created_at LIMIT 1) AS my_vote_submission_id FROM spirit_submissions s JOIN users u ON u.id=s.user_id LEFT JOIN participant_profiles p ON p.user_id=s.user_id WHERE s.challenge_id=? ORDER BY s.created_at DESC").bind(user.id,user.id,feedChallenge.id).all().catch(error=>{console.error("Spirit feed query failed",{message:error?.message||String(error)});return {results:[]};}):Promise.resolve({results:[]});
       const bonusFeedPromise=env.DB.prepare("SELECT x.id,x.user_id,x.caption,x.media_type,CASE WHEN x.media_data IS NOT NULL THEN 1 ELSE 0 END AS has_media,x.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,c.title AS challenge_title,x.status FROM spirit_extra_submissions x JOIN users u ON u.id=x.user_id JOIN spirit_challenges c ON c.id=x.challenge_id LEFT JOIN participant_profiles p ON p.user_id=x.user_id WHERE x.edition_id=? AND c.challenge_kind='extra' AND c.starts_at<=datetime('now') AND c.ends_at>datetime('now') AND (x.status='approved' OR x.user_id=?) ORDER BY x.created_at DESC LIMIT 50").bind(member.edition_id,user.id).all().catch(error=>{console.error("Spirit bonus feed query failed",{message:error?.message||String(error)});return {results:[]};});
       const readPromise=env.DB.prepare("INSERT INTO spirit_submission_reads (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(member.edition_id,user.id).run().catch(error=>console.error("Spirit read marker update failed",{message:error?.message||String(error)}));
       const [feed,bonusFeed]=await Promise.all([feedPromise,bonusFeedPromise,readPromise]).then(([regular,bonus])=>[regular,bonus]);
@@ -613,12 +615,21 @@ async function handleApi(request, env, url) {
       const bonusSubmissions=(bonusFeed.results||[]).map(item=>({...item,mediaUrl:item.has_media?"/api/spirit/media/"+encodeURIComponent(item.id):null,isBonus:true}));
       return json({activitiesEnabled:!!challenge,manualOverride,challenge:challenge||null,submissions,bonusSubmissions,ranking:allRows,myPoints:mine>=0?allRows[mine].points:0,myRank,mySubmissionCount:challenge?submissions.filter(x=>x.user_id===user.id).length:0,mySubmission:challenge?submissions.find(x=>x.user_id===user.id)||null:null,partial:!rawChallenge||!ranking.results});
     }
+    const postEditMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
+    if(request.method==="PUT"&&postEditMatch){
+      const body=await request.json(),caption=String(body.caption||"").trim();
+      const unsafeCaption=rejectUnsafePayload(caption);if(unsafeCaption)return unsafeCaption;
+      if(caption.length<2||caption.length>500)return json({error:"El texto debe tener entre 2 y 500 caracteres."},400);
+      const result=await env.DB.prepare("UPDATE spirit_submissions SET caption=?,edited_at=datetime('now') WHERE id=? AND edition_id=? AND user_id=?").bind(caption,postEditMatch[1],member.edition_id,user.id).run();
+      if(!result.meta?.changes)return json({error:"No puedes editar esta publicación o ya no existe."},404);
+      return json({ok:true});
+    }
     const commentsMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)\/comments$/);
     if(commentsMatch&&(request.method==="GET"||request.method==="POST")){
       const submission=await env.DB.prepare("SELECT id,user_id FROM spirit_submissions WHERE id=? AND edition_id=?").bind(commentsMatch[1],member.edition_id).first();
       if(!submission)return json({error:"No encontramos esta publicación."},404);
       if(request.method==="GET"){
-        const rows=await env.DB.prepare("SELECT c.id,c.user_id,c.comment,c.created_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url FROM spirit_comments c JOIN users u ON u.id=c.user_id LEFT JOIN participant_profiles p ON p.user_id=c.user_id WHERE c.submission_id=? AND c.edition_id=? ORDER BY c.created_at ASC LIMIT 100").bind(submission.id,member.edition_id).all();
+        const rows=await env.DB.prepare("SELECT c.id,c.user_id,c.comment,c.created_at,c.edited_at,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url FROM spirit_comments c JOIN users u ON u.id=c.user_id LEFT JOIN participant_profiles p ON p.user_id=c.user_id WHERE c.submission_id=? AND c.edition_id=? ORDER BY c.created_at ASC LIMIT 100").bind(submission.id,member.edition_id).all();
         return json({comments:rows.results||[]});
       }
       const body=await request.json(),comment=String(body.comment||"").trim();
@@ -642,6 +653,15 @@ async function handleApi(request, env, url) {
         const sharer=await env.DB.prepare("SELECT COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
         await sendPushToUser(env,sharedPost.user_id,{title:"📲 ¡Compartieron tu publicación!",body:(sharer?.name||"Un participante")+" ha compartido tu publicación.",tag:"spirit-share-"+crypto.randomUUID(),url:"/?tab=spirit"},url.origin);
       }
+      return json({ok:true});
+    }
+    const commentEditMatch=url.pathname.match(/^\/api\/spirit\/comments\/([A-Za-z0-9-]+)$/);
+    if(request.method==="PUT"&&commentEditMatch){
+      const body=await request.json(),comment=String(body.comment||"").trim();
+      const unsafeComment=rejectUnsafePayload(comment);if(unsafeComment)return unsafeComment;
+      if(comment.length<1||comment.length>500)return json({error:"El comentario debe tener entre 1 y 500 caracteres."},400);
+      const result=await env.DB.prepare("UPDATE spirit_comments SET comment=?,edited_at=datetime('now') WHERE id=? AND edition_id=? AND user_id=?").bind(comment,commentEditMatch[1],member.edition_id,user.id).run();
+      if(!result.meta?.changes)return json({error:"No puedes editar este comentario o ya no existe."},404);
       return json({ok:true});
     }
     const commentDeleteMatch=url.pathname.match(/^\/api\/spirit\/comments\/([A-Za-z0-9-]+)$/);
