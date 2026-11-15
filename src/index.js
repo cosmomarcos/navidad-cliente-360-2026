@@ -151,7 +151,6 @@ async function ensureSpiritSchema(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenges (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, title TEXT NOT NULL, description TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 10, bonus_points INTEGER NOT NULL DEFAULT 5, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submissions (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES spirit_challenges(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, caption TEXT NOT NULL, image_data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN edited_at TEXT").run(); } catch {}
-      try { await env.DB.prepare("ALTER TABLE spirit_comments ADD COLUMN edited_at TEXT").run(); } catch {}
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_activity_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
     try { await env.DB.prepare("ALTER TABLE spirit_activity_settings ADD COLUMN manual_override INTEGER NOT NULL DEFAULT 0").run(); } catch {}
       try { await env.DB.prepare("ALTER TABLE spirit_challenges ADD COLUMN challenge_type TEXT NOT NULL DEFAULT 'text'").run(); } catch {}
@@ -175,6 +174,7 @@ async function ensureSpiritSchema(env) {
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_results (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, processed_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submission_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_comments (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, comment TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+      try { await env.DB.prepare("ALTER TABLE spirit_comments ADD COLUMN edited_at TEXT").run(); } catch {}
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_comments_submission ON spirit_comments(submission_id,created_at)").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       const multiPostMigration=await env.DB.prepare("SELECT name FROM spirit_schema_migrations WHERE name='multiple_submissions_v1'").first();
@@ -364,7 +364,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.45" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.46" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -595,6 +595,7 @@ async function handleApi(request, env, url) {
     }
 
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
+      await ensureSpiritSchema(env);
       let ranking={results:[]},rawChallenge=null;
       const rankingPromise=env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id).all().catch(error=>{console.error("Spirit ranking query failed",{message:error?.message||String(error)});return {results:[]};});
       const challengeSafe=challengePromise.catch(error=>{console.error("Spirit challenge query failed",{message:error?.message||String(error)});return null;});
