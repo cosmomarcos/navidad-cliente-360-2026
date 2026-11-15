@@ -1018,3 +1018,11 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .spirit-comment-meta .spirit-comment-actions .spirit-comment-delete-button{color:#a15e55}
 .spirit-comment-meta .spirit-comment-actions button:active{transform:scale(.96)}
 @media(max-width:420px){.spirit-comment-meta{align-items:center}.spirit-comment-meta b{max-width:100%;overflow-wrap:anywhere}.spirit-comment-actions{margin-left:auto}}
+
+/* v2.0.49 · Acciones compactas estilo Facebook */
+.spirit-comment-meta{column-gap:6px;row-gap:2px}
+.spirit-comment-actions{display:inline-flex;align-items:center;gap:5px;margin-left:4px;flex:none;white-space:nowrap}
+.spirit-comment-meta .spirit-comment-actions button{display:inline!important;width:auto!important;height:auto!important;min-width:0!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:#718075!important;font:500 10px/1.2 'DM Sans',sans-serif!important;text-decoration:none;cursor:pointer}
+.spirit-comment-meta .spirit-comment-actions .spirit-comment-delete-button{color:#9a7770!important}
+.spirit-comment-actions>span{font-size:10px;color:#b8b1a4}
+.spirit-comment-meta .spirit-comment-actions button:active{transform:none;opacity:.65}
