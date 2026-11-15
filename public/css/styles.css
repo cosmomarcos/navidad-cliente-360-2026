@@ -992,3 +992,6 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 /* v2.0.31 · Carriles separados para Bonus y retos diarios */
 .spirit-feed-lane{margin:22px 0 26px}.spirit-feed-lane .spirit-section-title{align-items:center}.spirit-feed-lane .spirit-section-title>div{display:grid;gap:4px;min-width:0}.spirit-feed-lane .spirit-section-title small{display:block;max-width:100%;text-align:left;color:#788477;font-size:11px;line-height:1.45}.spirit-feed-count{display:grid;place-items:center;flex:none;min-width:30px;height:30px;padding:0 8px;border-radius:999px;background:#f0eadb;color:#315444;font-size:12px;font-weight:800}.spirit-feed-bonus .spirit-section-title h3{color:#8a6725}.spirit-feed-daily .spirit-section-title h3{color:#285342}
 @media(max-width:520px){.spirit-feed-lane .spirit-section-title{gap:10px}.spirit-feed-lane .spirit-section-title h3{font-size:18px}.spirit-feed-lane .spirit-section-title small{font-size:10px}}
+
+/* Marca discreta de edición estilo chat. */
+.spirit-edited-label{display:inline-block;margin:2px 0 5px;color:var(--muted,#8a8a8a);font-size:.72rem;font-style:italic;line-height:1.2}
