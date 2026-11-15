@@ -197,6 +197,11 @@ async function ensureSpiritSchema(env) {
           env.DB.prepare("INSERT INTO spirit_schema_migrations (name) VALUES ('multiple_submissions_v1')")
         ]);
       }
+      // La migración multiple_submissions_v1 recrea estas tablas; asegurar
+      // las columnas de edición DESPUÉS de recrearlas para evitar que el feed
+      // falle al seleccionar edited_at.
+      try { await env.DB.prepare("ALTER TABLE spirit_submissions ADD COLUMN edited_at TEXT").run(); } catch {}
+      try { await env.DB.prepare("ALTER TABLE spirit_comments ADD COLUMN edited_at TEXT").run(); } catch {}
   });
 }
 
