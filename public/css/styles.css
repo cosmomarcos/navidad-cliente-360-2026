@@ -1009,3 +1009,12 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .spirit-inline-footer button:disabled{opacity:.6}
 .spirit-inline-feedback:empty{display:none}
 @media(max-width:420px){.spirit-inline-editor{padding:11px}.spirit-inline-footer{align-items:flex-start}.spirit-inline-footer>span{width:100%}.spirit-inline-footer button{flex:1}}
+
+/* v2.0.48 · Metadatos de edición junto a la fecha y acciones ordenadas */
+.spirit-edited-label{display:inline!important;margin:0 0 0 2px!important;font-size:9px!important;font-style:italic;color:#8a8d7d!important;white-space:nowrap}
+.spirit-comment-meta{column-gap:6px;row-gap:3px}
+.spirit-comment-actions{display:inline-flex;align-items:center;gap:5px;margin-left:auto;flex:none}
+.spirit-comment-meta .spirit-comment-actions button{display:grid;place-items:center;width:27px;height:27px;min-width:27px;margin:0;padding:0;border:1px solid #e6ddcf;border-radius:50%;background:#faf7ef;color:#526b5b;font-size:14px;line-height:1;cursor:pointer}
+.spirit-comment-meta .spirit-comment-actions .spirit-comment-delete-button{color:#a15e55}
+.spirit-comment-meta .spirit-comment-actions button:active{transform:scale(.96)}
+@media(max-width:420px){.spirit-comment-meta{align-items:center}.spirit-comment-meta b{max-width:100%;overflow-wrap:anywhere}.spirit-comment-actions{margin-left:auto}}
