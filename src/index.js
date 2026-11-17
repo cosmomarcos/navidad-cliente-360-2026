@@ -645,7 +645,16 @@ async function handleApi(request, env, url) {
     }
 
     if (request.method === "GET" && url.pathname === "/api/spirit/board") {
-      await ensureSpiritSchema(env);
+      // La lectura del tablero no debe quedar bloqueada por una migración de esquema
+      // secundaria. Las consultas individuales ya tienen degradación controlada.
+      try {
+        await ensureSpiritSchema(env);
+      } catch (error) {
+        console.error("Spirit board schema initialization failed; continuing with available data", {
+          editionId: member.edition_id,
+          message: error?.message || String(error)
+        });
+      }
       let ranking={results:[]},rawChallenge=null;
       const rankingPromise=env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,u.avatar_url,COALESCE(pts.points,0) AS points,COALESCE(st.current_streak,0) AS first_place_streak FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=em.user_id LEFT JOIN (SELECT user_id,SUM(points) AS points FROM spirit_points WHERE edition_id=? GROUP BY user_id) pts ON pts.user_id=em.user_id LEFT JOIN spirit_leader_streaks st ON st.edition_id=em.edition_id AND st.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' ORDER BY points DESC,display_name COLLATE NOCASE").bind(member.edition_id,member.edition_id).all().catch(error=>{console.error("Spirit ranking query failed",{message:error?.message||String(error)});return {results:[]};});
       const challengeSafe=challengePromise.catch(error=>{console.error("Spirit challenge query failed",{message:error?.message||String(error)});return null;});
