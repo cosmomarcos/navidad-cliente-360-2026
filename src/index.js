@@ -1003,7 +1003,9 @@ async function handleApi(request, env, url) {
       const result=await createAutomaticSpiritDailyChallenge(env,edition.id,{force:true,createdBy:user.id});
       if(!result.created)return json({error:"Ya existe un reto diario activo. Finalízalo antes de activar otro."},409);
       const recipients=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).all();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_open_notifications (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, notified_at TEXT NOT NULL DEFAULT (datetime('now')))" ).run();
       await Promise.all((recipients.results||[]).map(row=>sendPushToUser(env,row.user_id,{title:"🎄 ¡Reto diario activado!",body:"«"+result.challenge.title+"» ya está disponible. ¡Participa en Espíritu Navideño!",tag:"spirit-open-"+result.challenge.id,url:"/?tab=spirit"},url.origin)));
+      await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenge_open_notifications (challenge_id,edition_id) VALUES (?,?)").bind(result.challenge.id,edition.id).run();
       return json({ok:true,challenge:result.challenge});
     }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
@@ -1494,6 +1496,8 @@ export default {
             if(result.created){
               const recipients=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).all();
               await Promise.all((recipients.results||[]).map(row=>sendPushToUser(env,row.user_id,{title:"🎄 ¡Reto diario automático!",body:"Hoy toca: «"+result.challenge.title+"». ¡Participa en Espíritu Navideño!",tag:"spirit-open-"+result.challenge.id,url:"/?tab=spirit"},"https://navidad-cliente-360-2026.torresmarcos16.workers.dev")));
+              await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_open_notifications (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, notified_at TEXT NOT NULL DEFAULT (datetime('now')))" ).run();
+              await env.DB.prepare("INSERT OR IGNORE INTO spirit_challenge_open_notifications (challenge_id,edition_id) VALUES (?,?)").bind(result.challenge.id,edition.id).run();
             }
           }catch(error){console.error("Automatic daily challenge failed",edition.id,error?.message||String(error));}
         }
