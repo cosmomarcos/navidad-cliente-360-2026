@@ -274,7 +274,7 @@ const SPIRIT_DAILY_CATALOG = [
 async function createAutomaticSpiritDailyChallenge(env, editionId, {force=false, createdBy=null}={}) {
   await ensureSpiritSchema(env);
   const active=await env.DB.prepare("SELECT id,title FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(editionId).first();
-  if(active&&!force)return {created:false,reason:"active",challenge:active};
+  if(active)return {created:false,reason:"active",challenge:active};
   const limaDate=spiritLimaDay(new Date());
   const existing=await env.DB.prepare("SELECT id,title FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND date(starts_at,'-5 hours')=? LIMIT 1").bind(editionId,limaDate).first();
   if(existing&&!force)return {created:false,reason:"already-created",challenge:existing};
