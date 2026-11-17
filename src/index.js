@@ -242,6 +242,51 @@ async function awardSpiritDailyAction(env,editionId,userId,actionKey,points,desc
 function spiritLimaDay(value) {
   return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(value);
 }
+const SPIRIT_DAILY_CATALOG = [
+  {title:"La oficina en modo Navidad",description:"Comparte una foto de un rincón de tu espacio de trabajo transformado con un detalle navideño.",type:"photo"},
+  {title:"El meme del equipo",description:"Crea o comparte una frase tipo meme que describa cómo vive el equipo esta Navidad.",type:"text"},
+  {title:"Villancico en versión express",description:"Graba hasta 30 segundos de un villancico interpretado a tu propio estilo.",type:"voice"},
+  {title:"El regalo más inesperado",description:"Describe el regalo más extraño o divertido que podría aparecer bajo el árbol.",type:"text"},
+  {title:"Postal con lo que tengas",description:"Arma una mini postal navideña usando tres objetos que tengas cerca y comparte una foto.",type:"photo"},
+  {title:"Doblaje de película navideña",description:"Graba una frase de una película navideña con una voz o emoción completamente distinta.",type:"voice"},
+  {title:"Mi deseo para el equipo",description:"Escribe un deseo concreto y positivo que te gustaría que se cumpla para el equipo.",type:"text"},
+  {title:"Detective navideño",description:"Fotografía un objeto rojo, uno verde y uno dorado. ¡Que aparezcan juntos en una sola imagen!",type:"photo"},
+  {title:"Titular del día",description:"Inventa el titular de un periódico que cuente la noticia navideña más absurda de la oficina.",type:"text"},
+  {title:"Mensaje desde el Polo Norte",description:"Graba un audio de máximo 30 segundos como corresponsal que informa desde el taller de Santa.",type:"voice"},
+  {title:"Árbol alternativo",description:"Dibuja o construye un árbol navideño con materiales improvisados y comparte una foto.",type:"photo"},
+  {title:"Confesión de duende",description:"Completa la frase: «Este año casi me despiden del taller de Santa porque…».",type:"text"},
+  {title:"La risa del Grinch",description:"Graba tu mejor imitación de la risa del Grinch en un audio de hasta 15 segundos.",type:"voice"},
+  {title:"Navidad en cinco emojis",description:"Cuenta cómo va tu Navidad usando exactamente cinco emojis y explica tu combinación.",type:"text"},
+  {title:"Caza del detalle festivo",description:"Encuentra y fotografía un detalle navideño que probablemente los demás no hayan notado.",type:"photo"},
+  {title:"El comercial imposible",description:"Graba un anuncio de radio de máximo 30 segundos para vender un producto navideño inventado.",type:"voice"},
+  {title:"Premio al compañero",description:"Escribe una nominación divertida y amable para una categoría navideña del equipo.",type:"text"},
+  {title:"¿Quién soy? edición navideña",description:"Describe un personaje navideño sin decir su nombre para que los demás adivinen.",type:"text"},
+  {title:"La decoración más creativa",description:"Comparte una foto de una decoración navideña hecha por ti o que encuentres a tu alrededor.",type:"photo"},
+  {title:"Pronóstico del Polo Norte",description:"Graba el pronóstico del tiempo más disparatado para la noche de Navidad.",type:"voice"},
+  {title:"Cadena de buenos deseos",description:"Deja un mensaje breve que anime a otro participante a sumarse a las actividades.",type:"text"},
+  {title:"El objeto con historia",description:"Fotografía un objeto cotidiano y cuéntale a la comunidad qué historia navideña podría tener.",type:"photo"},
+  {title:"Reto trabalenguas",description:"Graba un trabalenguas navideño inventado o conocido intentando decirlo tres veces.",type:"voice"},
+  {title:"La tradición que inventaría",description:"Inventa una tradición navideña nueva para que todo el equipo la celebre cada año.",type:"text"},
+  {title:"Trivia: renos de Santa",description:"¿Cuál de estos renos es conocido por su nariz roja?",type:"trivia",config:{question:"¿Cuál de estos renos es conocido por su nariz roja?",options:["Rudolph","Comet","Dasher","Blitzen"],correctAnswer:"Rudolph"}},
+  {title:"Trivia: clásico navideño",description:"Responde correctamente esta pregunta sobre una película navideña.",type:"trivia",config:{question:"En Mi pobre angelito, ¿cómo se llama el niño protagonista?",options:["Kevin","Charlie","Buddy","George"],correctAnswer:"Kevin"}},
+  {title:"Trivia: el Grinch",description:"Demuestra cuánto recuerdas del clásico personaje verde.",type:"trivia",config:{question:"¿De qué color es el Grinch?",options:["Verde","Azul","Rojo","Morado"],correctAnswer:"Verde"}}
+];
+async function createAutomaticSpiritDailyChallenge(env, editionId, {force=false, createdBy=null}={}) {
+  await ensureSpiritSchema(env);
+  const active=await env.DB.prepare("SELECT id,title FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(editionId).first();
+  if(active&&!force)return {created:false,reason:"active",challenge:active};
+  const limaDate=spiritLimaDay(new Date());
+  const existing=await env.DB.prepare("SELECT id,title FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' AND date(starts_at,'-5 hours')=? LIMIT 1").bind(editionId,limaDate).first();
+  if(existing&&!force)return {created:false,reason:"already-created",challenge:existing};
+  const recent=await env.DB.prepare("SELECT title FROM spirit_challenges WHERE edition_id=? AND challenge_kind='daily' ORDER BY starts_at DESC LIMIT 12").bind(editionId).all();
+  const recentTitles=new Set((recent.results||[]).map(x=>String(x.title||"").trim().toLocaleLowerCase("es")));
+  const candidates=SPIRIT_DAILY_CATALOG.filter(x=>!recentTitles.has(x.title.toLocaleLowerCase("es")));
+  const item=(candidates.length?candidates:SPIRIT_DAILY_CATALOG)[secureRandomInt(candidates.length||SPIRIT_DAILY_CATALOG.length)];
+  const start=new Date(),end=new Date(start.getTime()+12*60*60*1000);
+  const startSql=start.toISOString().slice(0,19).replace("T"," "),endSql=end.toISOString().slice(0,19).replace("T"," "),id=crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO spirit_challenges (id,edition_id,title,description,points,bonus_points,challenge_type,config_json,starts_at,ends_at,created_by,challenge_kind) VALUES (?,?,?,?,10,5,?,?,?,?,?,'daily')").bind(id,editionId,item.title,item.description,item.type,JSON.stringify(item.config||{}),startSql,endSql,createdBy).run();
+  return {created:true,challenge:{id,title:item.title,challenge_type:item.type,starts_at:startSql,ends_at:endSql}};
+}
 async function processSpiritChallengeClosures(env, { runClosures = false, runOpenings = false } = {}) {
   await ensureSpiritSchema(env);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_open_notifications (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, notified_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
@@ -952,6 +997,15 @@ async function handleApi(request, env, url) {
     }
 
 
+    if (url.pathname === "/api/admin/spirit/challenges/activate" && request.method === "POST") {
+      const edition=await getAdminEdition(env,url);
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      const result=await createAutomaticSpiritDailyChallenge(env,edition.id,{force:true,createdBy:user.id});
+      if(!result.created)return json({error:"Ya existe un reto diario activo. Finalízalo antes de activar otro."},409);
+      const recipients=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).all();
+      await Promise.all((recipients.results||[]).map(row=>sendPushToUser(env,row.user_id,{title:"🎄 ¡Reto diario activado!",body:"«"+result.challenge.title+"» ya está disponible. ¡Participa en Espíritu Navideño!",tag:"spirit-open-"+result.challenge.id,url:"/?tab=spirit"},url.origin)));
+      return json({ok:true,challenge:result.challenge});
+    }
     if (url.pathname === "/api/admin/spirit/challenges" && request.method === "GET") {
       await ensureSpiritSchema(env);
       const edition=await getAdminEdition(env, url);
@@ -1428,7 +1482,29 @@ async function handleApi(request, env, url) {
   return json({ error: "Ruta no encontrada." }, 404);
 }
 export default {
-  async scheduled(event, env, ctx) { const cron=event.cron; const runClosures=cron==="0 11 * * *"; const runOpenings=cron==="0 23 * * *"; if(!runClosures&&!runOpenings){console.warn("Unknown scheduled trigger",cron);return;} ctx.waitUntil(Promise.all([processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error))),env.DB.prepare("DELETE FROM anonymous_chat_messages WHERE created_at<datetime('now','-7 days')").run().catch(error=>console.error("Chat cleanup failed",error?.message||String(error))),env.DB.prepare("DELETE FROM anonymous_clues WHERE created_at<datetime('now','-7 days')").run().catch(error=>console.error("Old clue cleanup failed",error?.message||String(error)))])); },
+  async scheduled(event, env, ctx) {
+    const cron=event.cron,runClosures=cron==="0 11 * * *",runOpenings=cron==="0 23 * * *";
+    if(!runClosures&&!runOpenings){console.warn("Unknown scheduled trigger",cron);return;}
+    ctx.waitUntil((async()=>{
+      if(runOpenings){
+        const editions=await env.DB.prepare("SELECT id FROM editions WHERE status<>'completed'").all();
+        for(const edition of editions.results||[]){
+          try{
+            const result=await createAutomaticSpiritDailyChallenge(env,edition.id);
+            if(result.created){
+              const recipients=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND status='confirmed'").bind(edition.id).all();
+              await Promise.all((recipients.results||[]).map(row=>sendPushToUser(env,row.user_id,{title:"🎄 ¡Reto diario automático!",body:"Hoy toca: «"+result.challenge.title+"». ¡Participa en Espíritu Navideño!",tag:"spirit-open-"+result.challenge.id,url:"/?tab=spirit"},"https://navidad-cliente-360-2026.torresmarcos16.workers.dev")));
+            }
+          }catch(error){console.error("Automatic daily challenge failed",edition.id,error?.message||String(error));}
+        }
+      }
+      await processSpiritChallengeClosures(env,{runClosures,runOpenings}).catch(error=>console.error("Spirit scheduled task failed",cron,error?.message||String(error)));
+      await Promise.all([
+        env.DB.prepare("DELETE FROM anonymous_chat_messages WHERE created_at<datetime('now','-7 days')").run().catch(error=>console.error("Chat cleanup failed",error?.message||String(error))),
+        env.DB.prepare("DELETE FROM anonymous_clues WHERE created_at<datetime('now','-7 days')").run().catch(error=>console.error("Old clue cleanup failed",error?.message||String(error)))
+      ]);
+    })());
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
