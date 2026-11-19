@@ -414,7 +414,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.54" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.1.0" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -556,6 +556,19 @@ async function handleApi(request, env, url) {
         {id:"multitalented_artist",icon:"🎨",title:"Artista multifacético",description:"Publica al menos 3 fotos y 3 audios.",reward:40,progress:Math.min(Math.floor(metrics.photoCount/3),Math.floor(metrics.voiceCount/3)),target:1,detail:metrics.photoCount+" foto(s) · "+metrics.voiceCount+" audio(s)"},
         {id:"icebreaker",icon:"🧊",title:"El rompehielo",description:"Sé la primera persona en publicar en 3 retos diferentes.",reward:15,progress:metrics.icebreaker,target:3}
       ];
+      if(member.team_name==="Onboarding Digital"){
+        const standardTitles={
+          first_post:"Primera participación",wishes_full:"Lista de deseos completa",son_webadas:"Tiempo de descanso",
+          three_posts:"Participante activo",five_posts:"Estrella navideña",community_star:"Popularidad",
+          frequent:"Participante frecuente",multimedia:"Talento multimedia",kind_companion:"Buen compañero",
+          star_commenter:"Comentarista",early_bird:"Madrugador",unstoppable_days:"Constancia semanal",
+          challenge_marathon:"Maratón de retos",spirit_unstoppable:"Espíritu imparable",good_neighbor:"Compañerismo",
+          kindness_giver:"Generosidad",official_motivator:"Motivador del equipo",christmas_voice:"Voz navideña",
+          sopranos:"Voz destacada",multitalented_artist:"Artista multifacético",icebreaker:"Rompehielo",
+          christmas_legend:"Leyenda de Navidad"
+        };
+        for(const item of definitions)if(standardTitles[item.id])item.title=standardTitles[item.id];
+      }
       const completedCount=definitions.filter(item=>item.progress>=item.target).length;
       definitions.push({id:"christmas_legend",icon:"👑",title:"Leyenda de Navidad",description:"Desbloquea todos los demás logros de esta colección.",reward:100,progress:completedCount,target:definitions.length,detail:completedCount+" de "+definitions.length+" logros"});
       for(const achievement of definitions){
@@ -1399,6 +1412,7 @@ async function handleApi(request, env, url) {
     const participant = await currentUser(request, env);
     if (!participant) return json({ error: "Inicia sesión primero." }, 401);
     await ensureDrawSchema(env);
+    await ensureParticipantProfilesSchema(env);
     const membership=await getParticipantEdition(env,participant,url);
     if (!membership || membership.status !== "confirmed") return json({ state: "not_participating" });
     const state = await env.DB.prepare("SELECT state FROM edition_draw_state WHERE edition_id=?").bind(membership.edition_id).first();
