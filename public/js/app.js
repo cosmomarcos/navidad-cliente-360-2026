@@ -183,7 +183,7 @@ function showProfileForm(profile=null){
  });
 }
 function renderEmptyEditionTab(title,icon="🎄"){const section=$("#member-app .member-home");if(!section)return;section.innerHTML=`<div class="member-section-heading"><p class="kicker">ONBOARDING DIGITAL · NAVIDAD PYME</p><h2>${title}</h2></div><section class="edition-empty-state"><span>${icon}</span><h3>Próximamente</h3><p>Este espacio está listo. La información de este intercambio se agregará cuando esté definida.</p></section>`;}
-async function loadClient360HomePhoto(){try{const d=await api("/api/edition/home",{noMemoryCache:true}),c=d.config||{},im=$("#member-app .home-team-photo");if(im&&c.showHomePhoto!==false&&/^data:image\/webp;base64,/.test(c.homePhotoData||"")){im.src=c.homePhotoData;im.alt="Foto del intercambio";}}catch{}}
+async function loadClient360HomePhoto(){try{const d=await api("/api/edition/home",{noMemoryCache:true}),c=d.config||{},im=$("#member-app .home-team-photo"),figure=im?.closest(".home-team-photo-wrap");if(figure&&c.showHomePhoto===false)figure.classList.add("hidden");else if(im&&c.showHomePhoto!==false&&String(c.homePhotoData||"").startsWith("data:image/webp;base64,")){figure?.classList.remove("hidden");im.src=c.homePhotoData;im.alt="Foto del intercambio";}}catch{}}
 async function loadOnboardingHome(){
  const host=$("#onboarding-home-content");if(!host)return;
  try{
