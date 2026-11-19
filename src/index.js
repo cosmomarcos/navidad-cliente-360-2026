@@ -414,7 +414,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.52" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.0.54" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -948,10 +948,11 @@ async function handleApi(request, env, url) {
     }
     if (request.method === "PATCH" && url.pathname === "/api/admin/edition/home") {
       const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
-      if(edition.status!=="registration")return json({error:"La información se bloquea después del sorteo."},409);
-      const body=await request.json(),keys=["placeName","address","schedule","breakfast","grillFee","extraInfo","mapUrl","shareMessage","welcomeText"],flags=["showDate","showPlace","showAddress","showSchedule","showBreakfast","showGrillFee","showExtraInfo","showMap"],config={};
-      for(const key of keys)config[key]=String(body[key]||"").trim().slice(0,key==="extraInfo"||key==="shareMessage"?1500:300);
-      for(const key of flags)config[key]=body[key]!==false;
+      const body=await request.json(),keys=["placeName","address","schedule","breakfast","grillFee","extraInfo","mapUrl","shareMessage","welcomeText"],flags=["showDate","showPlace","showAddress","showSchedule","showBreakfast","showGrillFee","showExtraInfo","showMap","showHomePhoto"];
+      const existing=await env.DB.prepare("SELECT config_json FROM edition_home_settings WHERE edition_id=?").bind(edition.id).first();let config={};try{config=JSON.parse(existing?.config_json||"{}");}catch{}
+      for(const key of keys)if(Object.prototype.hasOwnProperty.call(body,key))config[key]=String(body[key]||"").trim().slice(0,key==="extraInfo"||key==="shareMessage"?1500:300);
+      for(const key of flags)if(Object.prototype.hasOwnProperty.call(body,key))config[key]=body[key]!==false;
+      if(Object.prototype.hasOwnProperty.call(body,"homePhotoData")){const photo=String(body.homePhotoData||"");if(photo&&(photo.length>1200000||!/^data:image\/webp;base64,[A-Za-z0-9+/=]+$/.test(photo)))return json({error:"La foto no es válida o supera el tamaño permitido."},400);config.homePhotoData=photo;}
       await ensureEditionHomeSettingsSchema(env);
       await env.DB.prepare("INSERT INTO edition_home_settings (edition_id,config_json) VALUES (?,?) ON CONFLICT(edition_id) DO UPDATE SET config_json=excluded.config_json,updated_at=datetime('now')").bind(edition.id,JSON.stringify(config)).run();
       return json({ok:true,config});
@@ -1060,7 +1061,6 @@ async function handleApi(request, env, url) {
       const body = await request.json();
       const edition = await getAdminEdition(env, url);
       if (!edition) return json({ error: "No hay una edición configurada." }, 404);
-      if (edition.status !== "registration") return json({ error: "Los ajustes están bloqueados porque el sorteo ya fue realizado o la edición terminó." }, 409);
       const title = String(body.title || "").trim();
       const eventDate = body.eventDate ? String(body.eventDate) : null;
       const budget = body.budgetAmount === "" || body.budgetAmount == null ? null : Number(body.budgetAmount);
