@@ -414,7 +414,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.1.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.1.1" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -585,7 +585,7 @@ async function handleApi(request, env, url) {
         {id:"daily_share",icon:"📲",title:"Comparte la magia",description:"Publica o comparte una publicación.",reward:5},
         {id:"daily_comment",icon:"💬",title:"No te quedes callado",description:"Comenta una publicación.",reward:5}
       ].map(item=>({...item,daily:true,unlocked:dailyEarnedMap.has(item.id),earnedPoints:dailyEarnedMap.get(item.id)||0,progress:dailyEarnedMap.has(item.id)?1:0,target:1}));
-      return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0),dailyAchievements:dailyDefinitions,dailyPoints:dailyDefinitions.reduce((sum,x)=>sum+x.earnedPoints,0),dailyCycle});
+      return json({achievements,unlockedCount:achievements.filter(x=>x.unlocked).length,totalCount:achievements.length,earnedPoints:achievements.reduce((sum,x)=>sum+x.earnedPoints,0),dailyAchievements:dailyDefinitions,dailyPoints:dailyDefinitions.reduce((sum,x)=>sum+x.earnedPoints,0),dailyCycle,editionId:member.edition_id,teamName:member.team_name});
     }
     // La lectura de Espíritu no debe ejecutar migraciones estructurales.
     // Las tablas del módulo se crean desde las rutas administrativas/de configuración.
@@ -628,9 +628,10 @@ async function handleApi(request, env, url) {
       await env.DB.prepare("UPDATE spirit_challenges AS extra SET ends_at=datetime('now') WHERE extra.edition_id=? AND extra.challenge_kind='extra' AND extra.starts_at<=datetime('now') AND extra.ends_at>datetime('now') AND EXISTS (SELECT 1 FROM spirit_challenges daily WHERE daily.edition_id=extra.edition_id AND daily.challenge_kind='daily' AND (lower(trim(daily.title))=lower(trim(extra.title)) OR lower(trim(daily.description))=lower(trim(extra.description))))").bind(member.edition_id).run();
       const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
       const eligible=!rankRow||Number(rankRow.rank)>1;
-      const challenge=eligible?await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first():null;
+      const activeChallenge=await env.DB.prepare("SELECT id,title,description,challenge_type,starts_at,ends_at FROM spirit_challenges WHERE edition_id=? AND challenge_kind='extra' AND starts_at<=datetime('now') AND ends_at>datetime('now') ORDER BY starts_at DESC LIMIT 1").bind(member.edition_id).first();
+      const challenge=eligible?activeChallenge:null;
       const submission=challenge?await env.DB.prepare("SELECT id,status,caption,created_at FROM spirit_extra_submissions WHERE challenge_id=? AND user_id=?").bind(challenge.id,user.id).first():null;
-      return json({challenge:challenge||null,submission:submission||null,eligible,rank:rankRow?.rank||null});
+      return json({challenge:challenge||null,active:!!activeChallenge,submission:submission||null,eligible,rank:rankRow?.rank||null,editionId:member.edition_id,teamName:member.team_name});
     }
     if(request.method==="POST"&&url.pathname==="/api/spirit/extra/submissions"){
       const rankRow=await env.DB.prepare("WITH scores AS (SELECT em.user_id,COALESCE(SUM(sp.points),0) AS points FROM edition_members em LEFT JOIN spirit_points sp ON sp.edition_id=em.edition_id AND sp.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY em.user_id), ranked AS (SELECT user_id,RANK() OVER (ORDER BY points DESC) AS rank FROM scores) SELECT rank FROM ranked WHERE user_id=?").bind(member.edition_id,user.id).first();
@@ -961,12 +962,12 @@ async function handleApi(request, env, url) {
     }
     if (request.method === "PATCH" && url.pathname === "/api/admin/edition/home") {
       const edition=await getAdminEdition(env,url);if(!edition)return json({error:"No hay una edición configurada."},404);
+      await ensureEditionHomeSettingsSchema(env);
       const body=await request.json(),keys=["placeName","address","schedule","breakfast","grillFee","extraInfo","mapUrl","shareMessage","welcomeText"],flags=["showDate","showPlace","showAddress","showSchedule","showBreakfast","showGrillFee","showExtraInfo","showMap","showHomePhoto"];
       const existing=await env.DB.prepare("SELECT config_json FROM edition_home_settings WHERE edition_id=?").bind(edition.id).first();let config={};try{config=JSON.parse(existing?.config_json||"{}");}catch{}
       for(const key of keys)if(Object.prototype.hasOwnProperty.call(body,key))config[key]=String(body[key]||"").trim().slice(0,key==="extraInfo"||key==="shareMessage"?1500:300);
       for(const key of flags)if(Object.prototype.hasOwnProperty.call(body,key))config[key]=body[key]!==false;
       if(Object.prototype.hasOwnProperty.call(body,"homePhotoData")){const photo=String(body.homePhotoData||"");if(photo&&(photo.length>1200000||!/^data:image\/webp;base64,[A-Za-z0-9+/=]+$/.test(photo)))return json({error:"La foto no es válida o supera el tamaño permitido."},400);config.homePhotoData=photo;}
-      await ensureEditionHomeSettingsSchema(env);
       await env.DB.prepare("INSERT INTO edition_home_settings (edition_id,config_json) VALUES (?,?) ON CONFLICT(edition_id) DO UPDATE SET config_json=excluded.config_json,updated_at=datetime('now')").bind(edition.id,JSON.stringify(config)).run();
       return json({ok:true,config});
     }
