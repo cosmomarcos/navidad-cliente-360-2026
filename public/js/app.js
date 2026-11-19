@@ -1,3 +1,35 @@
+
+/* Reproductor musical global: vive fuera de las vistas e intercambios. */
+function initGlobalBackgroundMusic(){
+ if(document.getElementById("global-background-music"))return;
+ const audio=document.createElement("audio");
+ audio.id="global-background-music";audio.src="/media/navidad-background.mp3";audio.loop=true;audio.preload="auto";audio.volume=.42;
+ audio.setAttribute("playsinline","");
+ const saved=(()=>{try{return JSON.parse(localStorage.getItem("navidad_global_music")||"{}");}catch{return {};}})();
+ let enabled=saved.enabled!==false,restored=false,saveTimer=0;
+ const wrap=document.createElement("div");wrap.id="global-music-control";wrap.className="global-music-control";
+ wrap.innerHTML='<button type="button" id="global-music-toggle" aria-label="Activar música navideña" title="Música navideña"><span aria-hidden="true">🎵</span><span id="global-music-label">Activar música</span></button><label class="global-music-volume" title="Volumen">🔉 <input id="global-music-volume" type="range" min="0" max="1" step="0.05" value="0.42" aria-label="Volumen de la música"></label>';
+ document.body.append(audio,wrap);
+ const toggle=wrap.querySelector("#global-music-toggle"),label=wrap.querySelector("#global-music-label"),volume=wrap.querySelector("#global-music-volume");
+ const persist=()=>{try{localStorage.setItem("navidad_global_music",JSON.stringify({enabled,time:Number.isFinite(audio.currentTime)?audio.currentTime:0,volume:audio.volume}));}catch{}};
+ const paint=()=>{const playing=!audio.paused&&!audio.ended;toggle.classList.toggle("is-playing",playing);toggle.setAttribute("aria-label",playing?"Pausar música navideña":"Reproducir música navideña");label.textContent=playing?"Pausar música":"Activar música";};
+ const play=async()=>{if(!enabled)return;try{if(!restored){const t=Number(saved.time);if(Number.isFinite(t)&&t>0){const restore=()=>{if(!restored){audio.currentTime=Math.min(t,Math.max(0,(audio.duration||t)-.5));restored=true;}};if(audio.readyState>=1)restore();else audio.addEventListener("loadedmetadata",restore,{once:true});}restored=true;}await audio.play();paint();persist();}catch(error){paint();}};
+ audio.addEventListener("timeupdate",()=>{if(!saveTimer){saveTimer=window.setTimeout(()=>{saveTimer=0;persist();},1500);}});
+ audio.addEventListener("play",paint);audio.addEventListener("pause",()=>{persist();paint();});audio.addEventListener("volumechange",persist);
+ toggle.addEventListener("click",async()=>{if(audio.paused){enabled=true;await play();}else{enabled=false;audio.pause();}persist();paint();});
+ volume.value=String(saved.volume??.42);audio.volume=Number(volume.value);
+ volume.addEventListener("input",()=>{audio.volume=Number(volume.value);persist();});
+ const unlock=()=>{if(enabled&&audio.paused)play();};
+ document.addEventListener("pointerdown",unlock,{once:true,capture:true});
+ document.addEventListener("keydown",unlock,{once:true,capture:true});
+ window.addEventListener("pagehide",persist);
+ document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&enabled&&audio.paused)play();});
+ audio.addEventListener("error",()=>{wrap.classList.add("music-unavailable");label.textContent="Audio no disponible";toggle.disabled=true;});
+ if(enabled){audio.addEventListener("canplay",()=>{if(audio.paused)play();},{once:true});play();}
+ paint();
+}
+initGlobalBackgroundMusic();
+
 const $ = selector => document.querySelector(selector);
 const setClass = (selector, className, enabled) => { const el=$(selector); if(el) el.classList.toggle(className, !!enabled); return el; };
 const params = new URLSearchParams(location.search);
