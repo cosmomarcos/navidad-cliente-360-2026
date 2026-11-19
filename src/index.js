@@ -431,7 +431,7 @@ async function handleApi(request, env, url) {
     if (request.method === "HEAD") return new Response(null, { headers });
     const range = request.headers.get("range");
     if (range) {
-      const match = range.match(/^bytes=(\\d*)-(\\d*)$/);
+      const match = range.match(/^bytes=(\d*)-(\d*)$/);
       if (!match || (!match[1] && !match[2])) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + object.size } });
       let start, end;
       if (!match[1]) { const suffix = Number(match[2]); start = Math.max(0, object.size - suffix); end = object.size - 1; }
@@ -888,7 +888,7 @@ async function handleApi(request, env, url) {
       if (file.size > 15 * 1024 * 1024) return json({ error: "El archivo supera el límite de 15 MB." }, 413);
       const allowed = new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]);
       if (!allowed.has(String(file.type).toLowerCase())) return json({ error: "Formato no compatible. Usa MP3, M4A, AAC, OGG, WAV o WEBM." }, 400);
-      const fileName = String(file.name || "musica").replace(/[\\r\\n"]/g, "").slice(0, 120);
+      const fileName = String(file.name || "musica").replace(/[\r\n"]/g, "").slice(0, 120);
       await env.MEDIA.put("background-music/current", await file.arrayBuffer(), { httpMetadata: { contentType: file.type || "audio/mpeg", cacheControl: "public, max-age=300" }, customMetadata: { fileName, uploadedAt: new Date().toISOString(), uploadedBy: user.email } });
       return json({ ok: true, fileName, size: file.size, uploadedAt: new Date().toISOString() });
     }
