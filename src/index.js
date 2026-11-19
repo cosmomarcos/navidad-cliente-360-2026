@@ -414,7 +414,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.1.1" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.2.0" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -423,6 +423,27 @@ async function handleApi(request, env, url) {
     return json({config,edition:{title:member.title,year:member.year,event_date:member.event_date,budget_amount:member.budget_amount,currency:member.currency,team_name:member.team_name}});
   }
 
+  if (url.pathname === "/api/music/current" && (request.method === "GET" || request.method === "HEAD")) {
+    if (!env.MEDIA) return json({ error: "Almacenamiento de música no configurado." }, 503);
+    const object = await env.MEDIA.get("background-music/current");
+    if (!object) return json({ error: "Todavía no hay música de fondo configurada." }, 404);
+    const headers = new Headers({ "content-type": object.httpMetadata?.contentType || "audio/mpeg", "cache-control": "public, max-age=300", "accept-ranges": "bytes", "etag": object.httpEtag, "x-content-type-options": "nosniff" });
+    if (request.method === "HEAD") return new Response(null, { headers });
+    const range = request.headers.get("range");
+    if (range) {
+      const match = range.match(/^bytes=(\d*)-(\d*)$/);
+      if (!match || (!match[1] && !match[2])) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + object.size } });
+      let start, end;
+      if (!match[1]) { const suffix = Number(match[2]); start = Math.max(0, object.size - suffix); end = object.size - 1; }
+      else { start = Number(match[1]); end = match[2] ? Math.min(Number(match[2]), object.size - 1) : object.size - 1; }
+      if (start >= object.size || end < start) return new Response(null, { status: 416, headers: { "content-range": "bytes */" + object.size } });
+      const part = await env.MEDIA.get("background-music/current", { range: { offset: start, length: end - start + 1 } });
+      headers.set("content-range", "bytes " + start + "-" + end + "/" + object.size); headers.set("content-length", String(end - start + 1));
+      return new Response(part.body, { status: 206, headers });
+    }
+    headers.set("content-length", String(object.size));
+    return new Response(object.body, { headers });
+  }
   if (request.method === "GET" && url.pathname === "/api/config") return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
   if (request.method === "GET" && url.pathname === "/api/push/public-key") {
     const user = await currentUser(request, env);
@@ -853,6 +874,24 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if (url.pathname === "/api/admin/music" && request.method === "GET") {
+      if (!env.MEDIA) return json({ error: "El bucket R2 no está vinculado al Worker." }, 503);
+      const object = await env.MEDIA.head("background-music/current");
+      return json({ configured: !!object, fileName: object?.customMetadata?.fileName || null, size: object?.size || 0, uploadedAt: object?.customMetadata?.uploadedAt || null });
+    }
+    if (url.pathname === "/api/admin/music" && request.method === "POST") {
+      if (!env.MEDIA) return json({ error: "El bucket R2 no está vinculado al Worker." }, 503);
+      const length = Number(request.headers.get("content-length") || 0);
+      if (length > 16 * 1024 * 1024) return json({ error: "El archivo supera el límite de 15 MB." }, 413);
+      const form = await request.formData(), file = form.get("file");
+      if (!file || typeof file.arrayBuffer !== "function" || !file.size) return json({ error: "Selecciona un archivo de audio." }, 400);
+      if (file.size > 15 * 1024 * 1024) return json({ error: "El archivo supera el límite de 15 MB." }, 413);
+      const allowed = new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]);
+      if (!allowed.has(String(file.type).toLowerCase())) return json({ error: "Formato no compatible. Usa MP3, M4A, AAC, OGG, WAV o WEBM." }, 400);
+      const fileName = String(file.name || "musica").replace(/[\r\n"]/g, "").slice(0, 120);
+      await env.MEDIA.put("background-music/current", await file.arrayBuffer(), { httpMetadata: { contentType: file.type || "audio/mpeg", cacheControl: "public, max-age=300" }, customMetadata: { fileName, uploadedAt: new Date().toISOString(), uploadedBy: user.email } });
+      return json({ ok: true, fileName, size: file.size, uploadedAt: new Date().toISOString() });
+    }
     if(request.method==="GET"&&url.pathname==="/api/admin/spirit/points-analysis"){
       const edition=await getAdminEdition(env,url);
       if(!edition)return json({error:"No hay una edición configurada."},404);
