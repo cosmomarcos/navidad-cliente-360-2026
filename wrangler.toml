@@ -31,3 +31,11 @@ database_id = "9377aecc-706c-4632-b679-39a88db40e1f"
 
 [triggers]
 crons = ["0 11 * * *", "0 23 * * *"]
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "navidad-pyme-media"
+
+[[previews.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "navidad-pyme-media"
