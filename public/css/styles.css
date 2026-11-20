@@ -1027,14 +1027,18 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .spirit-comment-actions>span{font-size:10px;color:#b8b1a4}
 .spirit-comment-meta .spirit-comment-actions button:active{transform:none;opacity:.65}
 \n.home-photo-admin-form{display:grid;gap:12px;margin-top:18px;padding:16px;border:1px solid #ded4bf;border-radius:14px;background:#fffaf0}.home-photo-admin-form h3{margin:0;color:#19372d}.home-photo-admin-form p{margin:0;color:#64766b;font-size:13px}.home-photo-admin-form label{display:grid;gap:7px;font-size:12px;font-weight:700}.home-photo-admin-form input[type=file]{width:100%;padding:10px;border:1px solid #d8cfbb;border-radius:9px;background:#fffdf7}.home-photo-admin-form .home-photo-toggle{display:flex;align-items:center;gap:8px}.home-photo-preview{width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#e9e1d2}.home-photo-actions{display:flex;gap:10px;flex-wrap:wrap}.home-photo-actions button{flex:1}.home-team-photo-wrap-custom{margin:0 0 18px}@media(max-width:520px){.home-photo-actions{flex-direction:column}.home-photo-actions button{width:100%}}\n
-/* Reproductor musical integrado en la parte superior de Inicio. */
-#member-tab-content>.global-music-control{position:relative;z-index:1;display:flex!important;align-items:center;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box;margin:0 0 18px;padding:11px 13px;border:1px solid #c9b77d;border-radius:16px;background:#f7f0df;box-shadow:0 5px 18px #0002;color:#174536}
-#member-tab-content>.global-music-control button{display:flex;align-items:center;gap:8px;flex:0 0 auto;border:0;border-radius:999px;background:#174536;color:#fff7e7;padding:10px 15px;font:600 13px inherit;cursor:pointer}
-#member-tab-content>.global-music-control button.is-playing{background:#b69b53;color:#173b30}
-#member-tab-content>.global-music-control button:disabled{opacity:.55;cursor:not-allowed}
-#member-tab-content>.global-music-control .global-music-volume{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;white-space:nowrap}
-#member-tab-content>.global-music-control .global-music-volume input{width:110px;max-width:30vw;accent-color:#174536}
-@media(max-width:600px){#member-tab-content>.global-music-control{gap:8px;padding:9px 10px}#member-tab-content>.global-music-control button{padding:9px 11px;font-size:12px}#member-tab-content>.global-music-control .global-music-volume input{width:76px;max-width:24vw}}
+/* El reproductor global permanece fuera del contenido de pestañas; los controles viven en Mi perfil. */
+#global-music-control{display:none!important}
+.profile-music-settings{max-width:820px;margin:18px auto;padding:17px 18px;border:1px solid #d8c99f;border-radius:16px;background:#f7f0df;color:#19372d;box-shadow:0 5px 18px #00000012}
+.profile-music-heading{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.profile-music-heading>span{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#e7dfc9;font-size:22px}
+.profile-music-heading h3{margin:0;font:700 17px 'Playfair Display',serif}
+.profile-music-heading p{margin:4px 0 0;font-size:12px;color:#667368}
+.profile-music-controls{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px 16px}
+.profile-music-controls button{background:#174536;color:#fff8e8;border-color:#174536;min-width:150px}
+.profile-music-controls label{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700}
+.profile-music-controls input{grid-column:2;width:100%;accent-color:#174536}
+@media(max-width:520px){.profile-music-settings{margin:15px 0;padding:15px}.profile-music-controls{grid-template-columns:1fr}.profile-music-controls button{width:100%}.profile-music-controls input{grid-column:1}}
 
 /* Historial de puntos: reversión puntual y compacta. */
 .admin-points-history-actions{display:flex;align-items:center;gap:9px;flex:none}
