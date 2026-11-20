@@ -904,6 +904,20 @@ async function handleApi(request, env, url) {
       const entries=ledger.results||[];
       return json({participant:{userId:member.user_id,displayName:member.display_name,status:member.status},totalPoints:entries.reduce((sum,row)=>sum+Number(row.points||0),0),entries});
     }
+    if(request.method==="POST"&&url.pathname==="/api/admin/spirit/points-adjust"){
+      const edition=await getAdminEdition(env,url);
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      const body=await request.json(),targetUserId=String(body.userId||"").trim(),points=Number(body.points),reason=String(body.reason||"").trim();
+      if(!targetUserId)return json({error:"Selecciona un participante."},400);
+      if(!Number.isInteger(points)||points<1||points>1000)return json({error:"Los puntos deben ser un número entero entre 1 y 1000."},400);
+      if(reason.length<3||reason.length>180)return json({error:"Indica un motivo de entre 3 y 180 caracteres."},400);
+      const member=await env.DB.prepare("SELECT em.user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.user_id=? AND em.status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
+      if(!member)return json({error:"El participante no pertenece a esta edición."},404);
+      await ensureSpiritSchema(env);
+      const id=crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(id,edition.id,targetUserId,"admin_adjustment",id,points,"Ajuste manual: "+reason).run();
+      return json({ok:true,points,displayName:member.display_name,message:"Puntos agregados correctamente."});
+    }
 
     const adminSpiritDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&adminSpiritDeleteMatch){

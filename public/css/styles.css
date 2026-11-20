@@ -1035,3 +1035,7 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .global-music-volume{display:flex;align-items:center;gap:4px;font-size:12px}
 .global-music-volume input{width:68px;accent-color:#174536}
 @media(max-width:600px){.global-music-control{right:9px;bottom:calc(82px + env(safe-area-inset-bottom));padding:6px 7px}.global-music-control button{padding:8px 10px;font-size:11px}.global-music-volume input{width:48px}}
+
+
+/* v2.2.1 · El reproductor global permanece oculto; la música sigue activa. */
+.global-music-control{display:none!important}
