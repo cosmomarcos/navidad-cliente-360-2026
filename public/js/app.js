@@ -11,6 +11,18 @@ function initGlobalBackgroundMusic(){
  const wrap=document.createElement("div");wrap.id="global-music-control";wrap.className="global-music-control";
  wrap.innerHTML='<button type="button" id="global-music-toggle" aria-label="Activar música navideña" title="Música navideña"><span aria-hidden="true">🎵</span><span id="global-music-label">Activar música</span></button><label class="global-music-volume" title="Volumen">🔉 <input id="global-music-volume" type="range" min="0" max="1" step="0.05" value="0.42" aria-label="Volumen de la música"></label>';
  document.body.append(audio,wrap);
+ // El control visual antiguo nunca debe mostrarse: los controles viven en Mi perfil.
+ wrap.hidden=true;
+ wrap.style.setProperty("display","none","important");
+ window.setNavidadMusicEnabled=async value=>{
+  enabled=!!value;
+  if(enabled){await play();}else{resumeBackgroundAfterContentAudio=false;audio.pause();}
+  persist();paint();return !audio.paused;
+ };
+ window.setNavidadMusicVolume=value=>{
+  const next=Math.max(0,Math.min(1,Number(value)||0));
+  audio.volume=next;persist();return audio.volume;
+ };
  const activeContentAudios=new Set();
  const toggle=wrap.querySelector("#global-music-toggle"),label=wrap.querySelector("#global-music-label"),volume=wrap.querySelector("#global-music-volume");
  const persist=()=>{try{localStorage.setItem("navidad_global_music",JSON.stringify({enabled,time:Number.isFinite(audio.currentTime)?audio.currentTime:0,volume:audio.volume}));}catch{}};
@@ -1128,8 +1140,8 @@ function showProfileSettings(){
  loadProfileParticipants();
  const musicAudio=$("#global-background-music"),musicToggle=$("#profile-music-toggle"),musicVolume=$("#profile-music-volume"),musicVolumeValue=$("#profile-music-volume-value"),globalToggle=$("#global-music-toggle"),globalVolume=$("#global-music-volume");
  const syncProfileMusic=()=>{if(!musicAudio||!musicToggle)return;const active=!musicAudio.paused&&!musicAudio.ended;musicToggle.textContent=active?"⏸ Desactivar música":"▶ Activar música";musicToggle.setAttribute("aria-pressed",String(active));const vol=Math.round(musicAudio.volume*100);musicVolume.value=String(vol);musicVolumeValue.textContent=vol+"%";};
- musicToggle?.addEventListener("click",()=>{globalToggle?.click();setTimeout(syncProfileMusic,0);});
- musicVolume?.addEventListener("input",()=>{const value=Number(musicVolume.value)/100;if(musicAudio)musicAudio.volume=value;if(globalVolume){globalVolume.value=String(value);globalVolume.dispatchEvent(new Event("input",{bubbles:true}));}musicVolumeValue.textContent=Math.round(value*100)+"%";});
+ musicToggle?.addEventListener("click",async()=>{await window.setNavidadMusicEnabled?.(musicAudio?.paused??true);syncProfileMusic();});
+ musicVolume?.addEventListener("input",()=>{const value=Number(musicVolume.value)/100;window.setNavidadMusicVolume?.(value);musicVolumeValue.textContent=Math.round(value*100)+"%";});
  if(musicAudio){["play","pause","ended","volumechange"].forEach(event=>musicAudio.addEventListener(event,syncProfileMusic));}
  syncProfileMusic();
  $("#edit-profile").addEventListener("click",()=>showProfileForm(currentUser.participantProfile));
