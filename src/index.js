@@ -170,6 +170,8 @@ async function ensureSpiritSchema(env) {
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_votes (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES spirit_submissions(id) ON DELETE CASCADE, voter_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(submission_id,voter_user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_points (id TEXT PRIMARY KEY, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, points INTEGER NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(edition_id,user_id,source_type,source_id))").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_spirit_points_ranking ON spirit_points(edition_id,user_id)").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_achievement_progress_resets (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, achievement_id TEXT NOT NULL, baseline_progress INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id,achievement_id))").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_point_revocations (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, source_type TEXT NOT NULL, source_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(edition_id,user_id,source_type,source_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_leader_streaks (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, current_streak INTEGER NOT NULL DEFAULT 0, last_first_date TEXT, PRIMARY KEY(edition_id,user_id))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_challenge_results (challenge_id TEXT PRIMARY KEY REFERENCES spirit_challenges(id) ON DELETE CASCADE, edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, processed_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_submission_reads (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, last_seen_at TEXT NOT NULL DEFAULT '1970-01-01 00:00:00', PRIMARY KEY(edition_id,user_id))").run();
@@ -210,7 +212,8 @@ async function finalizeExpiredSpiritChallenges(env, editionId) {
   for (const challenge of expired.results || []) {
     const winners = await env.DB.prepare("WITH participant_votes AS (SELECT s.user_id,COUNT(v.id) AS votes FROM spirit_submissions s LEFT JOIN spirit_votes v ON v.submission_id=s.id WHERE s.challenge_id=? GROUP BY s.user_id), max_votes AS (SELECT MAX(votes) AS votes FROM participant_votes) SELECT pv.user_id,pv.votes FROM participant_votes pv,max_votes mv WHERE pv.votes>0 AND pv.votes=mv.votes").bind(challenge.id).all();
     for (const winner of winners.results || []) {
-      await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,Math.max(0,Number(challenge.bonus_points||0)),"Publicación más votada del día (+"+Math.max(0,Number(challenge.bonus_points||0))+" puntos de bonificación)").run();
+      const revoked=await env.DB.prepare("SELECT 1 AS revoked FROM spirit_point_revocations WHERE edition_id=? AND user_id=? AND source_type='daily_winner' AND source_id=?").bind(editionId,winner.user_id,challenge.id).first();
+      if(!revoked)await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,winner.user_id,"daily_winner",challenge.id,Math.max(0,Number(challenge.bonus_points||0)),"Publicación más votada del día (+"+Math.max(0,Number(challenge.bonus_points||0))+" puntos de bonificación)").run();
     }
   }
 }
@@ -238,6 +241,54 @@ async function awardSpiritDailyAction(env,editionId,userId,actionKey,points,desc
   const cycle=await spiritDailyCycleKey(env,editionId);
   const result=await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),editionId,userId,"daily_action",cycle+":"+actionKey,points,description).run();
   return {cycle,awarded:result.meta?.changes>0};
+}
+
+async function getSpiritAchievementMetrics(env,editionId,userId){
+  const achievementStart="2026-11-13 05:00:00";
+  const [activity,wishesCount,likes,commentsGiven,votesGiven,commentTargets,earlyDays,challengeRows,icebreaker]=await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count,COUNT(DISTINCT challenge_id) AS distinct_challenges FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(editionId,userId,achievementStart).first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM participant_wishes WHERE edition_id=? AND user_id=?").bind(editionId,userId).first(),
+    env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=? AND v.created_at>=?").bind(editionId,userId,achievementStart).first(),
+    env.DB.prepare("SELECT COUNT(*) AS comments FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>? AND c.created_at>=?").bind(editionId,userId,userId,achievementStart).first(),
+    env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND v.voter_user_id=? AND s.user_id<>? AND v.created_at>=?").bind(editionId,userId,userId,achievementStart).first(),
+    env.DB.prepare("SELECT COUNT(DISTINCT s.user_id) AS people FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>? AND c.created_at>=?").bind(editionId,userId,userId,achievementStart).first(),
+    env.DB.prepare("SELECT COUNT(DISTINCT date(created_at,'-5 hours')) AS days FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=? AND CAST(strftime('%H',created_at,'-5 hours') AS INTEGER)<8").bind(editionId,userId,achievementStart).first(),
+    env.DB.prepare("SELECT c.id,c.starts_at,CASE WHEN EXISTS(SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=c.id AND s.user_id=? AND s.created_at>=?) THEN 1 ELSE 0 END AS participated FROM spirit_challenges c WHERE c.edition_id=? AND c.challenge_kind='daily' AND c.starts_at>=? ORDER BY c.starts_at,c.id").bind(userId,achievementStart,editionId,achievementStart).all(),
+    env.DB.prepare("SELECT COUNT(DISTINCT s.challenge_id) AS count FROM spirit_submissions s WHERE s.edition_id=? AND s.user_id=? AND s.created_at>=? AND s.id=(SELECT s2.id FROM spirit_submissions s2 WHERE s2.challenge_id=s.challenge_id ORDER BY s2.created_at,s2.id LIMIT 1)").bind(editionId,userId,achievementStart).first()
+  ]);
+  const rows=challengeRows.results||[];
+  let challengeStreak=0,maxChallengeStreak=0;
+  for(const row of rows){challengeStreak=Number(row.participated)?challengeStreak+1:0;maxChallengeStreak=Math.max(maxChallengeStreak,challengeStreak);}
+  return {
+    submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),
+    voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),
+    distinctChallenges:Number(activity?.distinct_challenges||0),wishCount:Number(wishesCount?.total||0),
+    likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),
+    likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),
+    earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,
+    icebreaker:Number(icebreaker?.count||0)
+  };
+}
+async function getSpiritAchievementProgress(env,editionId,userId,achievementId){
+  const metrics=await getSpiritAchievementMetrics(env,editionId,userId);
+  const progress={
+    first_post:metrics.submissions,wishes_full:metrics.wishCount,son_webadas:0,
+    three_posts:metrics.submissions,five_posts:metrics.submissions,community_star:metrics.likes,
+    frequent:metrics.activeDays,multimedia:Math.min(metrics.voiceCount,metrics.photoCount),
+    kind_companion:metrics.likesGiven,star_commenter:metrics.commentsGiven,
+    early_bird:metrics.earlyDays,unstoppable_days:metrics.activeDays,
+    challenge_marathon:metrics.maxChallengeStreak,spirit_unstoppable:metrics.distinctChallenges,
+    good_neighbor:metrics.commentsGiven,kindness_giver:metrics.likesGiven,
+    official_motivator:metrics.peopleMotivated,christmas_voice:metrics.voiceCount,
+    sopranos:metrics.voiceCount,
+    multitalented_artist:Math.min(Math.floor(metrics.photoCount/3),Math.floor(metrics.voiceCount/3)),
+    icebreaker:metrics.icebreaker
+  };
+  if(achievementId==="christmas_legend"){
+    const earned=await env.DB.prepare("SELECT COUNT(*) AS total FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='achievement' AND source_id<>'christmas_legend'").bind(editionId,userId).first();
+    return Number(earned?.total||0);
+  }
+  return Number(progress[achievementId]||0);
 }
 function spiritLimaDay(value) {
   return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(value);
@@ -414,7 +465,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.2.0" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.2.2" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -538,22 +589,12 @@ async function handleApi(request, env, url) {
       // El logro de deseos es la única excepción retroactiva: premiar a todos los participantes que ya tengan al menos 3 deseos.
       const wishQualifiers=await env.DB.prepare("SELECT user_id,COUNT(*) AS total FROM participant_wishes WHERE edition_id=? GROUP BY user_id HAVING COUNT(*)>=3").bind(member.edition_id).all();
       for(const participant of (wishQualifiers.results||[])){
-        await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,participant.user_id,"achievement","wishes_full",30,"Logro desbloqueado: Besitos o Paciencias").run();
+        const reset=await env.DB.prepare("SELECT baseline_progress FROM spirit_achievement_progress_resets WHERE edition_id=? AND user_id=? AND achievement_id='wishes_full'").bind(member.edition_id,participant.user_id).first();
+        if(!reset||Number(participant.total)>=Number(reset.baseline_progress||0)+3){
+          await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,participant.user_id,"achievement","wishes_full",30,"Logro desbloqueado: Besitos o Paciencias").run();
+        }
       }
-      const [activity,likes,commentsGiven,votesGiven,commentTargets,earlyDays,challengeRows,icebreaker]=await Promise.all([
-        env.DB.prepare("SELECT COUNT(*) AS submissions,COUNT(DISTINCT date(created_at,'-5 hours')) AS active_days,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'audio/%' THEN 1 ELSE 0 END) AS voice_count,SUM(CASE WHEN lower(COALESCE(media_type,'')) LIKE 'image/%' THEN 1 ELSE 0 END) AS photo_count,COUNT(DISTINCT challenge_id) AS distinct_challenges FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND s.user_id=? AND v.created_at>=?").bind(member.edition_id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT COUNT(*) AS comments FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>? AND c.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT COUNT(*) AS likes FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.edition_id=? AND v.voter_user_id=? AND s.user_id<>? AND v.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT COUNT(DISTINCT s.user_id) AS people FROM spirit_comments c JOIN spirit_submissions s ON s.id=c.submission_id WHERE c.edition_id=? AND c.user_id=? AND s.user_id<>? AND c.created_at>=?").bind(member.edition_id,user.id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT COUNT(DISTINCT date(created_at,'-5 hours')) AS days FROM spirit_submissions WHERE edition_id=? AND user_id=? AND created_at>=? AND CAST(strftime('%H',created_at,'-5 hours') AS INTEGER)<8").bind(member.edition_id,user.id,achievementStart).first(),
-        env.DB.prepare("SELECT c.id,c.starts_at,CASE WHEN EXISTS(SELECT 1 FROM spirit_submissions s WHERE s.challenge_id=c.id AND s.user_id=? AND s.created_at>=?) THEN 1 ELSE 0 END AS participated FROM spirit_challenges c WHERE c.edition_id=? AND c.challenge_kind='daily' AND c.starts_at>=? ORDER BY c.starts_at,c.id").bind(user.id,achievementStart,member.edition_id,achievementStart).all(),
-        env.DB.prepare("SELECT COUNT(DISTINCT s.challenge_id) AS count FROM spirit_submissions s WHERE s.edition_id=? AND s.user_id=? AND s.created_at>=? AND s.id=(SELECT s2.id FROM spirit_submissions s2 WHERE s2.challenge_id=s.challenge_id ORDER BY s2.created_at,s2.id LIMIT 1)").bind(member.edition_id,user.id,achievementStart).first()
-      ]);
-      const rows=challengeRows.results||[];
-      let challengeStreak=0,maxChallengeStreak=0;
-      for(const row of rows){challengeStreak=Number(row.participated)?challengeStreak+1:0;maxChallengeStreak=Math.max(maxChallengeStreak,challengeStreak);}
-      const metrics={submissions:Number(activity?.submissions||0),activeDays:Number(activity?.active_days||0),voiceCount:Number(activity?.voice_count||0),photoCount:Number(activity?.photo_count||0),distinctChallenges:Number(activity?.distinct_challenges||0),wishCount:Number(wishesCount?.total||0),likes:Number(likes?.likes||0),commentsGiven:Number(commentsGiven?.comments||0),likesGiven:Number(votesGiven?.likes||0),peopleMotivated:Number(commentTargets?.people||0),earlyDays:Number(earlyDays?.days||0),challengeStreak,maxChallengeStreak,icebreaker:Number(icebreaker?.count||0)};
+      const metrics=await getSpiritAchievementMetrics(env,member.edition_id,user.id);
       const definitions=[
         {id:"first_post",icon:"🎄",title:"¿Qué así va ser?",description:"Publica tu primera participación en Espíritu.",reward:5,progress:metrics.submissions,target:1},
         {id:"wishes_full",icon:"💋",title:"Besitos o Paciencias",description:"Registra al menos 3 deseos en tu lista.",reward:30,progress:metrics.wishCount,target:3},
@@ -589,6 +630,11 @@ async function handleApi(request, env, url) {
           christmas_legend:"Leyenda de Navidad"
         };
         for(const item of definitions)if(standardTitles[item.id])item.title=standardTitles[item.id];
+      }
+      const achievementResets=await env.DB.prepare("SELECT achievement_id,baseline_progress FROM spirit_achievement_progress_resets WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).all();
+      const resetMap=new Map((achievementResets.results||[]).map(row=>[row.achievement_id,Number(row.baseline_progress||0)]));
+      for(const item of definitions){
+        if(resetMap.has(item.id)&&item.id!=="son_webadas")item.progress=Math.max(0,Number(item.progress||0)-resetMap.get(item.id));
       }
       const completedCount=definitions.filter(item=>item.progress>=item.target).length;
       definitions.push({id:"christmas_legend",icon:"👑",title:"Leyenda de Navidad",description:"Desbloquea todos los demás logros de esta colección.",reward:100,progress:completedCount,target:definitions.length,detail:completedCount+" de "+definitions.length+" logros"});
@@ -862,7 +908,12 @@ async function handleApi(request, env, url) {
       const idle=await env.DB.prepare("SELECT CASE WHEN datetime(?)<=datetime('now','-1 day') THEN 1 ELSE 0 END AS eligible").bind(previousActivity.last_seen_at).first();
       if(Number(idle?.eligible)===1){
         await ensureSpiritSchema(env);
-        await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),membership.edition_id,user.id,"achievement","son_webadas",20,"Logro desbloqueado: Son Webadas").run();
+        const reset=await env.DB.prepare("SELECT created_at FROM spirit_achievement_progress_resets WHERE edition_id=? AND user_id=? AND achievement_id='son_webadas'").bind(membership.edition_id,user.id).first();
+        const resetAllowsReward=!reset||String(previousActivity.last_seen_at)>String(reset.created_at);
+        if(resetAllowsReward){
+          await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),membership.edition_id,user.id,"achievement","son_webadas",20,"Logro desbloqueado: Son Webadas").run();
+          await env.DB.prepare("DELETE FROM spirit_achievement_progress_resets WHERE edition_id=? AND user_id=? AND achievement_id='son_webadas'").bind(membership.edition_id,user.id).run();
+        }
       }
     }
     await env.DB.prepare("INSERT INTO app_activity (edition_id,user_id,last_seen_at) VALUES (?,?,datetime('now')) ON CONFLICT(edition_id,user_id) DO UPDATE SET last_seen_at=datetime('now')").bind(membership.edition_id,user.id).run();
@@ -900,23 +951,72 @@ async function handleApi(request, env, url) {
       const member=await env.DB.prepare("SELECT em.user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,em.status FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.user_id=? AND em.status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
       if(!member)return json({error:"El participante no pertenece a esta edición."},404);
       await ensureSpiritSchema(env);
-      const ledger=await env.DB.prepare("SELECT source_type,source_id,points,description,created_at FROM spirit_points WHERE edition_id=? AND user_id=? ORDER BY created_at ASC,id ASC").bind(edition.id,targetUserId).all();
+      const ledger=await env.DB.prepare("SELECT id,source_type,source_id,points,description,created_at FROM spirit_points WHERE edition_id=? AND user_id=? ORDER BY created_at ASC,id ASC").bind(edition.id,targetUserId).all();
       const entries=ledger.results||[];
       return json({participant:{userId:member.user_id,displayName:member.display_name,status:member.status},totalPoints:entries.reduce((sum,row)=>sum+Number(row.points||0),0),entries});
     }
-    if(request.method==="POST"&&url.pathname==="/api/admin/spirit/points-adjust"){
+
+    const adminPointDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/points\/([A-Za-z0-9-]+)$/);
+    if(request.method==="DELETE"&&adminPointDeleteMatch){
       const edition=await getAdminEdition(env,url);
       if(!edition)return json({error:"No hay una edición configurada."},404);
-      const body=await request.json(),targetUserId=String(body.userId||"").trim(),points=Number(body.points),reason=String(body.reason||"").trim();
+      const body=await request.json().catch(()=>({}));
+      const targetUserId=String(body.userId||"").trim();
       if(!targetUserId)return json({error:"Selecciona un participante."},400);
-      if(!Number.isInteger(points)||points<1||points>1000)return json({error:"Los puntos deben ser un número entero entre 1 y 1000."},400);
-      if(reason.length<3||reason.length>180)return json({error:"Indica un motivo de entre 3 y 180 caracteres."},400);
-      const member=await env.DB.prepare("SELECT em.user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE em.edition_id=? AND em.user_id=? AND em.status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
+      const member=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND user_id=? AND status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
       if(!member)return json({error:"El participante no pertenece a esta edición."},404);
       await ensureSpiritSchema(env);
-      const id=crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(id,edition.id,targetUserId,"admin_adjustment",id,points,"Ajuste manual: "+reason).run();
-      return json({ok:true,points,displayName:member.display_name,message:"Puntos agregados correctamente."});
+      const point=await env.DB.prepare("SELECT id,source_type,source_id,points FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(adminPointDeleteMatch[1],edition.id,targetUserId).first();
+      if(!point)return json({error:"El movimiento ya no existe o pertenece a otro participante."},404);
+      const sourceType=String(point.source_type||""),sourceId=String(point.source_id||"");
+      if(sourceType==="achievement"){
+        const baseline=await getSpiritAchievementProgress(env,edition.id,targetUserId,sourceId);
+        await env.DB.batch([
+          env.DB.prepare("INSERT INTO spirit_achievement_progress_resets (edition_id,user_id,achievement_id,baseline_progress,created_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(edition_id,user_id,achievement_id) DO UPDATE SET baseline_progress=excluded.baseline_progress,created_at=datetime('now')").bind(edition.id,targetUserId,sourceId,baseline),
+          env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId)
+        ]);
+      }else if(sourceType==="daily_winner"){
+        await env.DB.batch([
+          env.DB.prepare("INSERT OR REPLACE INTO spirit_point_revocations (edition_id,user_id,source_type,source_id,created_at) VALUES (?,?,?, ?,datetime('now'))").bind(edition.id,targetUserId,sourceType,sourceId),
+          env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId)
+        ]);
+      }else if(sourceType==="like"){
+        const vote=await env.DB.prepare("SELECT v.id,s.challenge_id,s.user_id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE v.id=? AND s.edition_id=?").bind(sourceId,edition.id).first();
+        if(vote){
+          await env.DB.batch([
+            env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(edition.id,vote.challenge_id,vote.user_id),
+            env.DB.prepare("DELETE FROM spirit_votes WHERE id=?").bind(vote.id),
+            env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(vote.challenge_id,vote.user_id),
+            env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId)
+          ]);
+        }else{
+          await env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId).run();
+        }
+      }else if(sourceType==="submission"||sourceType==="community_bonus"){
+        const submission=await env.DB.prepare("SELECT id,challenge_id,user_id FROM spirit_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(sourceId,edition.id,targetUserId).first();
+        if(submission){
+          await env.DB.batch([
+            env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_id=? AND source_type IN ('submission','community_bonus')").bind(edition.id,sourceId),
+            env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT id FROM spirit_votes WHERE submission_id=?)").bind(edition.id,sourceId),
+            env.DB.prepare("DELETE FROM spirit_comments WHERE submission_id=? AND edition_id=?").bind(sourceId,edition.id),
+            env.DB.prepare("DELETE FROM spirit_votes WHERE submission_id=?").bind(sourceId),
+            env.DB.prepare("DELETE FROM spirit_submissions WHERE id=? AND edition_id=?").bind(sourceId,edition.id),
+            env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND source_type='like' AND source_id IN (SELECT v.id FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=?)").bind(edition.id,submission.challenge_id,submission.user_id),
+            env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) SELECT lower(hex(randomblob(16))),s.edition_id,s.user_id,'like',v.id,1,'Me gusta recibido' FROM spirit_votes v JOIN spirit_submissions s ON s.id=v.submission_id WHERE s.challenge_id=? AND s.user_id=? ORDER BY v.created_at,v.id LIMIT 10").bind(submission.challenge_id,submission.user_id)
+          ]);
+        }else{
+          await env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId).run();
+        }
+      }else if(sourceType==="bonus_approved"){
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM spirit_extra_submissions WHERE id=? AND edition_id=? AND user_id=?").bind(sourceId,edition.id,targetUserId),
+          env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId)
+        ]);
+      }else{
+        // daily_action: borrar el registro permite recuperar esos puntos al repetir la acción.
+        await env.DB.prepare("DELETE FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(point.id,edition.id,targetUserId).run();
+      }
+      return json({ok:true,sourceType,pointsRemoved:Number(point.points||0),message:"Puntos eliminados y acción asociada reiniciada cuando corresponde."});
     }
 
     const adminSpiritDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
