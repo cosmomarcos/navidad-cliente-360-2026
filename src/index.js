@@ -966,6 +966,7 @@ async function handleApi(request, env, url) {
       const member=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND user_id=? AND status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
       if(!member)return json({error:"El participante no pertenece a esta edición."},404);
       await ensureSpiritSchema(env);
+      await ensureWishesSchema(env);
       const point=await env.DB.prepare("SELECT id,source_type,source_id,points FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(adminPointDeleteMatch[1],edition.id,targetUserId).first();
       if(!point)return json({error:"El movimiento ya no existe o pertenece a otro participante."},404);
       const sourceType=String(point.source_type||""),sourceId=String(point.source_id||"");
