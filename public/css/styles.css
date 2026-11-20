@@ -1040,9 +1040,9 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 /* v2.2.1 · El reproductor global permanece oculto; la música sigue activa. */
 .global-music-control{display:none!important}
 
-/* Formulario de ajustes manuales de puntaje. */
-#admin-points-adjust-form{display:grid;gap:10px;padding:16px;border:1px solid #e3dac8;border-radius:16px;background:#fffdf7}
-#admin-points-adjust-form h4{margin:0 0 3px;color:#244536;font-size:15px}
-#admin-points-adjust-form label{font-size:12px;font-weight:800;color:#294839}
-#admin-points-adjust-form input,#admin-points-adjust-form select{width:100%;min-height:45px;padding:10px 12px;border:1px solid #d7cebb;border-radius:10px;background:#fff;color:#263f34;font:inherit;box-sizing:border-box}
-#admin-points-adjust-form button{width:100%}
+/* Historial de puntos: reversión puntual y compacta. */
+.admin-points-history-actions{display:flex;align-items:center;gap:9px;flex:none}
+.admin-points-history-actions>b{white-space:nowrap;color:#2d6749;font-size:13px}
+.admin-points-history-delete{border:1px solid #e2c9c3;border-radius:8px;background:#fff8f6;color:#9a5148;padding:7px 10px;font:700 10px inherit;cursor:pointer}
+.admin-points-history-delete:disabled{opacity:.55;cursor:wait}
+@media(max-width:520px){.admin-points-history-row{align-items:flex-start}.admin-points-history-actions{flex-direction:column;align-items:flex-end;gap:6px}}
