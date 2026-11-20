@@ -1,35 +1,76 @@
 
 /* Reproductor musical global: vive fuera de las vistas e intercambios. */
+
 function initGlobalBackgroundMusic(){
  if(document.getElementById("global-background-music"))return;
  const audio=document.createElement("audio");
  audio.id="global-background-music";audio.src="/api/music/current";audio.loop=true;audio.preload="auto";audio.volume=.42;
  audio.setAttribute("playsinline","");
  const saved=(()=>{try{return JSON.parse(localStorage.getItem("navidad_global_music")||"{}");}catch{return {};}})();
- let enabled=saved.enabled!==false,restored=false,saveTimer=0;
+ let enabled=saved.enabled!==false,restored=false,saveTimer=0,resumeBackgroundAfterContentAudio=false;
  const wrap=document.createElement("div");wrap.id="global-music-control";wrap.className="global-music-control";
  wrap.innerHTML='<button type="button" id="global-music-toggle" aria-label="Activar música navideña" title="Música navideña"><span aria-hidden="true">🎵</span><span id="global-music-label">Activar música</span></button><label class="global-music-volume" title="Volumen">🔉 <input id="global-music-volume" type="range" min="0" max="1" step="0.05" value="0.42" aria-label="Volumen de la música"></label>';
  document.body.append(audio,wrap);
- const activeContentAudios=new Set();let resumeBackgroundAfterContentAudio=false;
- const resumeBackground=()=>{if(activeContentAudios.size===0&&resumeBackgroundAfterContentAudio){resumeBackgroundAfterContentAudio=false;if(enabled)play();}};
- document.addEventListener("play",event=>{const media=event.target;if(media?.tagName!=="AUDIO"||media.id==="global-background-music")return;activeContentAudios.add(media);if(activeContentAudios.size===1){resumeBackgroundAfterContentAudio=!audio.paused;if(resumeBackgroundAfterContentAudio)audio.pause();}},true);
- ["pause","ended","error"].forEach(type=>document.addEventListener(type,event=>{const media=event.target;if(media?.tagName!=="AUDIO"||media.id==="global-background-music")return;activeContentAudios.delete(media);resumeBackground();},true));
+ const activeContentAudios=new Set();
  const toggle=wrap.querySelector("#global-music-toggle"),label=wrap.querySelector("#global-music-label"),volume=wrap.querySelector("#global-music-volume");
  const persist=()=>{try{localStorage.setItem("navidad_global_music",JSON.stringify({enabled,time:Number.isFinite(audio.currentTime)?audio.currentTime:0,volume:audio.volume}));}catch{}};
  const paint=()=>{const playing=!audio.paused&&!audio.ended;toggle.classList.toggle("is-playing",playing);toggle.setAttribute("aria-label",playing?"Pausar música navideña":"Reproducir música navideña");label.textContent=playing?"Pausar música":"Activar música";};
- const play=async()=>{if(!enabled)return;try{if(!restored){const t=Number(saved.time);if(Number.isFinite(t)&&t>0){const restore=()=>{if(restored)return;audio.currentTime=Math.min(t,Math.max(0,(audio.duration||t)-.5));restored=true;};if(audio.readyState>=1)restore();else audio.addEventListener("loadedmetadata",restore,{once:true});}else restored=true;}await audio.play();paint();persist();}catch(error){paint();}};
+ const play=async()=>{
+  if(!enabled||activeContentAudios.size)return;
+  try{
+   if(!restored){
+    const t=Number(saved.time);
+    if(Number.isFinite(t)&&t>0){
+     const restore=()=>{if(restored)return;try{audio.currentTime=Math.min(t,Math.max(0,(audio.duration||t)-.5));}catch{}restored=true;};
+     if(audio.readyState>=1)restore();else audio.addEventListener("loadedmetadata",restore,{once:true});
+    }else restored=true;
+   }
+   await audio.play();paint();persist();
+  }catch(error){paint();}
+ };
+ const resumeIfReady=()=>{
+  for(const media of [...activeContentAudios]){
+   if(!media.isConnected||media.paused||media.ended)activeContentAudios.delete(media);
+  }
+  if(activeContentAudios.size===0&&resumeBackgroundAfterContentAudio){
+   resumeBackgroundAfterContentAudio=false;
+   if(enabled)play();
+  }
+ };
+ const onContentPlay=event=>{
+  const media=event.target;
+  if(media?.tagName!=="AUDIO"||media.id==="global-background-music")return;
+  const wasEmpty=activeContentAudios.size===0;
+  activeContentAudios.add(media);
+  if(wasEmpty){resumeBackgroundAfterContentAudio=enabled;if(!audio.paused)audio.pause();}
+ };
+ document.addEventListener("play",onContentPlay,true);
+ ["pause","ended","error"].forEach(type=>document.addEventListener(type,event=>{
+  const media=event.target;
+  if(media?.tagName!=="AUDIO"||media.id==="global-background-music")return;
+  Promise.resolve().then(()=>{
+   if(type==="error"||!media.isConnected||media.paused||media.ended)activeContentAudios.delete(media);
+   resumeIfReady();
+  });
+ },true));
+ if(window.MutationObserver){
+  const observer=new MutationObserver(()=>resumeIfReady());
+  observer.observe(document.body,{childList:true,subtree:true});
+ }
+ const stopUnlock=()=>{document.removeEventListener("pointerdown",unlock,true);document.removeEventListener("keydown",unlock,true);};
+ const unlock=()=>{if(enabled&&!activeContentAudios.size&&audio.paused)play();};
+ audio.addEventListener("playing",()=>{paint();stopUnlock();});
  audio.addEventListener("timeupdate",()=>{if(!saveTimer){saveTimer=window.setTimeout(()=>{saveTimer=0;persist();},1500);}});
  audio.addEventListener("play",paint);audio.addEventListener("pause",()=>{persist();paint();});audio.addEventListener("volumechange",persist);
- toggle.addEventListener("click",async()=>{if(audio.paused){enabled=true;await play();}else{enabled=false;audio.pause();}persist();paint();});
+ toggle.addEventListener("click",async()=>{if(audio.paused){enabled=true;await play();}else{enabled=false;resumeBackgroundAfterContentAudio=false;audio.pause();}persist();paint();});
  volume.value=String(saved.volume??.42);audio.volume=Number(volume.value);
  volume.addEventListener("input",()=>{audio.volume=Number(volume.value);persist();});
- const unlock=()=>{if(enabled&&audio.paused)play();};
- document.addEventListener("pointerdown",unlock,{once:true,capture:true});
- document.addEventListener("keydown",unlock,{once:true,capture:true});
+ document.addEventListener("pointerdown",unlock,true);
+ document.addEventListener("keydown",unlock,true);
  window.addEventListener("pagehide",persist);
- document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&enabled&&audio.paused)play();});
- audio.addEventListener("error",()=>{wrap.classList.add("music-unavailable");label.textContent="Audio no disponible";toggle.disabled=true;});
- if(enabled){audio.addEventListener("canplay",()=>{if(audio.paused)play();},{once:true});play();}
+ document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&enabled&&audio.paused&&!activeContentAudios.size)play();});
+ audio.addEventListener("error",()=>{paint();});
+ if(enabled)play();
  paint();
 }
 initGlobalBackgroundMusic();
@@ -684,17 +725,28 @@ async function loadProfileParticipants(){
   list.innerHTML='<p class="participants-empty">No se pudo cargar la lista. Vuelve a intentarlo más tarde.</p>';
  }
 }
+
 async function loadAdminPointsAnalysis(){
  const host=$("#admin-points-analysis-panel");if(!host||!currentUser?.isPrimaryAdmin)return;
- host.innerHTML='<div class="admin-points-audit"><div class="admin-points-audit-heading"><span>🧮</span><div><h3>Análisis de puntajes</h3><p>Consulta de dónde proviene cada punto de un participante en esta edición.</p></div></div><form id="admin-points-adjust-form" class="admin-points-adjust-form"><h4>➕ Agregar puntos manualmente</h4><label for="admin-points-adjust-user">Participante</label><select id="admin-points-adjust-user" name="userId" required><option value="">Cargando participantes…</option></select><label for="admin-points-adjust-value">Puntos a agregar</label><input id="admin-points-adjust-value" name="points" type="number" min="1" max="1000" step="1" inputmode="numeric" placeholder="Ej. 10" required><label for="admin-points-adjust-reason">Motivo del ajuste</label><input id="admin-points-adjust-reason" name="reason" maxlength="180" placeholder="Ej. Premio por dinámica navideña" required><button class="primary-button" type="submit">Agregar puntos</button><p id="admin-points-adjust-feedback" class="status hidden" role="status"></p></form><form id="admin-points-audit-form"><label for="admin-points-participant">Participante</label><select id="admin-points-participant" name="userId" required><option value="">Cargando participantes…</option></select><button class="primary-button" type="submit">Analizar puntaje</button></form><div id="admin-points-audit-result" aria-live="polite"></div></div>';
- const select=$("#admin-points-participant"),form=$("#admin-points-audit-form"),result=$("#admin-points-audit-result"),adjustForm=$("#admin-points-adjust-form"),adjustSelect=$("#admin-points-adjust-user"),adjustFeedback=$("#admin-points-adjust-feedback");
+ host.innerHTML='<div class="admin-points-audit"><div class="admin-points-audit-heading"><span>🧮</span><div><h3>Análisis de puntajes</h3><p>Consulta el origen de los puntos y revierte movimientos individuales cuando sea necesario.</p></div></div><form id="admin-points-audit-form"><label for="admin-points-participant">Participante</label><select id="admin-points-participant" name="userId" required><option value="">Cargando participantes…</option></select><button class="primary-button" type="submit">Analizar puntaje</button></form><div id="admin-points-audit-result" aria-live="polite"></div></div>';
+ const select=$("#admin-points-participant"),form=$("#admin-points-audit-form"),result=$("#admin-points-audit-result");
  try{
   const data=await api("/api/admin/participants",{noMemoryCache:true}),people=data.participants||[];
   const options=people.map(person=>'<option value="'+esc(person.user_id)+'">'+esc(person.display_name)+(person.status==="inactive"?" · Inactivo":"")+'</option>').join("");
-  select.innerHTML='<option value="">Selecciona un participante</option>'+options;adjustSelect.innerHTML='<option value="">Selecciona un participante</option>'+options;
-  if(!people.length){select.innerHTML='<option value="">No hay participantes en esta edición</option>';adjustSelect.innerHTML=select.innerHTML;}
- }catch(error){select.innerHTML='<option value="">No se pudieron cargar los participantes</option>';adjustSelect.innerHTML=select.innerHTML;result.innerHTML='<p class="status error">'+esc(error.message)+'</p>';return;}
- adjustForm.addEventListener("submit",async event=>{event.preventDefault();const userId=adjustSelect.value,points=Number(adjustForm.elements.points.value),reason=String(adjustForm.elements.reason.value||"").trim(),button=adjustForm.querySelector("button[type=submit]");if(!userId||!Number.isInteger(points)||points<1||points>1000||reason.length<3)return;button.disabled=true;button.textContent="Agregando…";adjustFeedback.classList.add("hidden");try{const resultData=await api("/api/admin/spirit/points-adjust",{method:"POST",body:JSON.stringify({userId,points,reason})});adjustFeedback.textContent="Se agregaron "+resultData.points+" puntos a "+resultData.displayName+" correctamente.";adjustFeedback.classList.remove("hidden","error");adjustForm.elements.points.value="";adjustForm.elements.reason.value="";if(select.value===userId)form.requestSubmit();}catch(error){adjustFeedback.textContent=error.message||"No se pudieron agregar los puntos.";adjustFeedback.classList.remove("hidden");adjustFeedback.classList.add("error");}finally{button.disabled=false;button.textContent="Agregar puntos";}});
+  select.innerHTML='<option value="">Selecciona un participante</option>'+options;
+  if(!people.length)select.innerHTML='<option value="">No hay participantes en esta edición</option>';
+ }catch(error){select.innerHTML='<option value="">No se pudieron cargar los participantes</option>';result.innerHTML='<p class="status error">'+esc(error.message)+'</p>';return;}
+ result.addEventListener("click",async event=>{
+  const button=event.target.closest("[data-delete-point]");if(!button)return;
+  const pointId=button.dataset.deletePoint,userId=select.value;
+  if(!pointId||!userId)return;
+  if(!window.confirm("¿Eliminar estos puntos y reiniciar la acción que los generó para este participante?"))return;
+  button.disabled=true;button.textContent="Eliminando…";
+  try{
+   await api("/api/admin/spirit/points/"+encodeURIComponent(pointId),{method:"DELETE",body:JSON.stringify({userId})});
+   form.requestSubmit();
+  }catch(error){button.disabled=false;button.textContent="Eliminar";window.alert(error.message||"No se pudo revertir el movimiento.");}
+ });
  form.addEventListener("submit",async event=>{
   event.preventDefault();const userId=select.value;if(!userId)return;
   const button=form.querySelector("button");button.disabled=true;button.textContent="Analizando…";result.innerHTML='<p class="muted">Calculando el detalle del puntaje…</p>';
@@ -703,8 +755,8 @@ async function loadAdminPointsAnalysis(){
    const entries=data.entries||[],groups=new Map();
    for(const entry of entries){const key=entry.source_type+"|"+entry.description;const group=groups.get(key)||{sourceType:entry.source_type,description:entry.description,points:0,count:0};group.points+=Number(entry.points||0);group.count++;groups.set(key,group);}
    const items=[...groups.values()].sort((x,y)=>y.points-x.points);
-   const typeLabel={like:"Me gusta recibidos",submission:"Participación",achievement:"Logros",bonus_approved:"Bonus aprobado",community_bonus:"Bonus de comunidad",admin_adjustment:"Ajuste manual"};
-   result.innerHTML='<section class="admin-points-audit-summary"><div><span>PARTICIPANTE</span><b>'+esc(data.participant.displayName)+'</b></div><div><span>PUNTAJE TOTAL</span><strong>'+Number(data.totalPoints||0)+' <small>pts</small></strong></div></section>'+(items.length?'<div class="admin-points-audit-list"><h4>Desglose de puntos</h4>'+items.map(item=>'<article class="admin-points-audit-row"><div><b>'+esc(item.description||typeLabel[item.sourceType]||item.sourceType)+'</b><small>'+esc(typeLabel[item.sourceType]||item.sourceType)+(item.count>1?' · '+item.count+' registros':'')+'</small></div><strong>'+(item.points>0?'+':'')+item.points+' pts</strong></article>').join("")+'</div><details class="admin-points-audit-history"><summary>Ver movimientos individuales ('+entries.length+')</summary>'+entries.map(entry=>'<div class="admin-points-history-row"><span>'+esc(entry.description||entry.source_type)+'<small>'+esc(entry.created_at||"")+'</small></span><b>'+(Number(entry.points)>0?'+':'')+Number(entry.points)+' pts</b></div>').join("")+'</details>':'<p class="muted">Este participante todavía no tiene movimientos de puntaje registrados.</p>');
+   const typeLabel={like:"Me gusta recibidos",submission:"Participación",achievement:"Logros",daily_action:"Acciones diarias",daily_winner:"Reto diario ganador",bonus_approved:"Bonus aprobado",community_bonus:"Bonus de comunidad",admin_adjustment:"Ajuste manual"};
+   result.innerHTML='<section class="admin-points-audit-summary"><div><span>PARTICIPANTE</span><b>'+esc(data.participant.displayName)+'</b></div><div><span>PUNTAJE TOTAL</span><strong>'+Number(data.totalPoints||0)+' <small>pts</small></strong></div></section>'+(items.length?'<div class="admin-points-audit-list"><h4>Desglose de puntos</h4>'+items.map(item=>'<article class="admin-points-audit-row"><div><b>'+esc(item.description||typeLabel[item.sourceType]||item.sourceType)+'</b><small>'+esc(typeLabel[item.sourceType]||item.sourceType)+(item.count>1?' · '+item.count+' registros':'')+'</small></div><strong>'+(item.points>0?'+':'')+item.points+' pts</strong></article>').join("")+'</div><details class="admin-points-audit-history" open><summary>Historial individual ('+entries.length+')</summary>'+entries.map(entry=>'<div class="admin-points-history-row"><span>'+esc(entry.description||typeLabel[entry.source_type]||entry.source_type)+'<small>'+esc(typeLabel[entry.source_type]||entry.source_type)+' · '+esc(entry.created_at||"")+'</small></span><div class="admin-points-history-actions"><b>'+(Number(entry.points)>0?'+':'')+Number(entry.points)+' pts</b><button type="button" class="admin-points-history-delete" data-delete-point="'+esc(entry.id)+'">Eliminar</button></div></div>').join("")+'</details>':'<p class="muted">Este participante todavía no tiene movimientos de puntaje registrados.</p>');
   }catch(error){result.innerHTML='<p class="status error">'+esc(error.message||"No se pudo analizar el puntaje.")+'</p>';}
   finally{button.disabled=false;button.textContent="Analizar puntaje";}
  });
