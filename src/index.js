@@ -970,7 +970,28 @@ async function handleApi(request, env, url) {
       const point=await env.DB.prepare("SELECT id,source_type,source_id,points FROM spirit_points WHERE id=? AND edition_id=? AND user_id=?").bind(adminPointDeleteMatch[1],edition.id,targetUserId).first();
       if(!point)return json({error:"El movimiento ya no existe o pertenece a otro participante."},404);
       const sourceType=String(point.source_type||""),sourceId=String(point.source_id||"");
-      if(sourceType==="achievement"){
+      if(sourceType==="achievement"&&sourceId==="christmas_legend"){
+        const m=await getSpiritAchievementMetrics(env,edition.id,targetUserId);
+        const baselines={
+          first_post:m.submissions,wishes_full:m.wishCount,son_webadas:0,
+          three_posts:m.submissions,five_posts:m.submissions,community_star:m.likes,
+          frequent:m.activeDays,multimedia:Math.min(m.voiceCount,m.photoCount),
+          kind_companion:m.likesGiven,star_commenter:m.commentsGiven,early_bird:m.earlyDays,
+          unstoppable_days:m.activeDays,challenge_marathon:m.maxChallengeStreak,
+          spirit_unstoppable:m.distinctChallenges,good_neighbor:m.commentsGiven,
+          kindness_giver:m.likesGiven,official_motivator:m.peopleMotivated,
+          christmas_voice:m.voiceCount,sopranos:m.voiceCount,
+          multitalented_artist:Math.min(Math.floor(m.photoCount/3),Math.floor(m.voiceCount/3)),
+          icebreaker:m.icebreaker,christmas_legend:0
+        };
+        const resetStatements=Object.entries(baselines).map(([achievementId,baseline])=>
+          env.DB.prepare("INSERT INTO spirit_achievement_progress_resets (edition_id,user_id,achievement_id,baseline_progress,created_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(edition_id,user_id,achievement_id) DO UPDATE SET baseline_progress=excluded.baseline_progress,created_at=datetime('now')").bind(edition.id,targetUserId,achievementId,baseline)
+        );
+        await env.DB.batch([
+          ...resetStatements,
+          env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='achievement'").bind(edition.id,targetUserId)
+        ]);
+      }else if(sourceType==="achievement"){
         const baseline=await getSpiritAchievementProgress(env,edition.id,targetUserId,sourceId);
         await env.DB.batch([
           env.DB.prepare("INSERT INTO spirit_achievement_progress_resets (edition_id,user_id,achievement_id,baseline_progress,created_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(edition_id,user_id,achievement_id) DO UPDATE SET baseline_progress=excluded.baseline_progress,created_at=datetime('now')").bind(edition.id,targetUserId,sourceId,baseline),
