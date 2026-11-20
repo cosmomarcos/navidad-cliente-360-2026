@@ -1039,3 +1039,10 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 
 /* v2.2.1 · El reproductor global permanece oculto; la música sigue activa. */
 .global-music-control{display:none!important}
+
+/* Formulario de ajustes manuales de puntaje. */
+#admin-points-adjust-form{display:grid;gap:10px;padding:16px;border:1px solid #e3dac8;border-radius:16px;background:#fffdf7}
+#admin-points-adjust-form h4{margin:0 0 3px;color:#244536;font-size:15px}
+#admin-points-adjust-form label{font-size:12px;font-weight:800;color:#294839}
+#admin-points-adjust-form input,#admin-points-adjust-form select{width:100%;min-height:45px;padding:10px 12px;border:1px solid #d7cebb;border-radius:10px;background:#fff;color:#263f34;font:inherit;box-sizing:border-box}
+#admin-points-adjust-form button{width:100%}
