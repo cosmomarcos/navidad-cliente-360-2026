@@ -819,7 +819,7 @@ async function handleApi(request, env, url) {
       const challengeType=challenge.challenge_type||"text";
       if(challengeType==="text"&&(caption.length<2||caption.length>500))return json({error:"Tu participación debe tener entre 2 y 500 caracteres."},400);
       if(challengeType==="photo"&&(!mediaData.startsWith("data:image/jpeg;base64,")||mediaData.length>300000))return json({error:"Debes adjuntar una foto JPG válida."},400);
-      if(challengeType==="voice"&&(!/^data:audio\/(webm|ogg|mp4)(?:;[^,]*)?;base64,/i.test(mediaData)||mediaData.length>500000))return json({error:"Graba un audio válido de máximo 30 segundos."},400);
+      if(challengeType==="voice"){const audioHeader=mediaData.match(/^data:(audio\/[a-z0-9.+-]+)(?:;[^,]*)?;base64,/i);const audioMime=String(audioHeader?.[1]||"").toLowerCase();const allowedVoiceTypes=new Set(["audio/webm","audio/ogg","audio/mp4","audio/x-m4a","audio/m4a"]);if(!audioHeader||!allowedVoiceTypes.has(audioMime)||mediaData.length>500000)return json({error:"Graba un audio válido de máximo 30 segundos en formato compatible."},400);}
       if(challengeType==="trivia"&&(caption.length<1||caption.length>120))return json({error:"Selecciona una respuesta para la trivia."},400);
       if(challengeType==="photo"||challengeType==="voice"){if(caption.length>500)return json({error:"El texto complementario es demasiado largo."},400);}
       const configRaw=await env.DB.prepare("SELECT config_json FROM spirit_challenges WHERE id=?").bind(challenge.id).first();
