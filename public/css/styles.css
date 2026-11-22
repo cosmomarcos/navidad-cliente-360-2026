@@ -1104,3 +1104,11 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
   .member-home .spirit-trivia-options legend { max-width: 100%; line-height: 1.45; }
   .member-home .spirit-trivia-options label { min-height: 60px; padding: 14px; font-size: 14px; }
 }
+
+
+/* v2.2.8 · Feedback visible para respuestas de trivia */
+.spirit-trivia-result{display:flex;flex-direction:column;gap:6px;margin:14px 0;padding:15px 16px;border:1px solid;border-radius:13px;font-size:13px;line-height:1.55}
+.spirit-trivia-result strong{font-size:15px}
+.spirit-trivia-result.is-correct{background:#e1eadb;border-color:#b9d0ad;color:#28543d}
+.spirit-trivia-result.is-incorrect{background:#f8e6e2;border-color:#e6bcb4;color:#913f35}
+.spirit-trivia-result span{display:block}

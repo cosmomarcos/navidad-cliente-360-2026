@@ -829,9 +829,9 @@ async function handleApi(request, env, url) {
       await env.DB.batch([
         env.DB.prepare("INSERT INTO spirit_submissions (id,edition_id,challenge_id,user_id,caption,image_data,media_data,media_type) VALUES (?,?,?,?,?,?,?,?)").bind(id,member.edition_id,challenge.id,user.id,caption||((challengeType==="photo")?"Participación con foto":(challengeType==="voice")?"Participación con voz":caption),null,mediaData||null,mediaType||null),
       ]);
-      await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_share",5,"Logro diario: publicar o compartir una publicación (+5 puntos)");
+      if(correct)await awardSpiritDailyAction(env,member.edition_id,user.id,"daily_share",5,"Logro diario: publicar o compartir una publicación (+5 puntos)");
       await notifySpiritParticipants(env, member.edition_id, user.id, id, user.display_name, url.origin);
-      return json({ok:true,points:0,correct,dailyShareCompleted:true});
+      return json({ok:true,points:0,correct,correctAnswer:challengeType==="trivia"?String(challengeConfig.correctAnswer||""):null,dailyShareCompleted:correct});
     }
     const deleteMatch=url.pathname.match(/^\/api\/spirit\/submissions\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&deleteMatch){
