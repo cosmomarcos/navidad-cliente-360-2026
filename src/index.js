@@ -1766,8 +1766,8 @@ export default {
       if(runOpenings){
         // Las vidas se renuevan al abrir las actividades: 18:00 America/Lima (23:00 UTC).
         const gameDate=getRozviGameDate();
-        const editions=await env.DB.prepare("SELECT e.id FROM editions e JOIN workspace w ON w.id=e.workspace_id WHERE e.status<>'completed' AND w.name='Cliente 360'").all();
-        for(const edition of editions.results||[]){
+        const rozviEditions=await env.DB.prepare("SELECT e.id FROM editions e JOIN workspace w ON w.id=e.workspace_id WHERE e.status<>'completed' AND w.name='Cliente 360'").all();
+        for(const edition of rozviEditions.results||[]){
           try{
             await ensureRozviSettingsSchema(env);await ensureRozviDailyLivesSchema(env);
             const settings=await env.DB.prepare("SELECT config_json FROM rozvi_game_settings WHERE id='default'").first();
@@ -1778,6 +1778,7 @@ export default {
             }
           }catch(error){console.error("Rozvi daily lives refill failed",edition.id,error?.message||String(error));}
         }
+        const editions=await env.DB.prepare("SELECT id FROM editions WHERE status<>'completed'").all();
         for(const edition of editions.results||[]){
           try{
             const result=await createAutomaticSpiritDailyChallenge(env,edition.id);
