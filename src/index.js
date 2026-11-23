@@ -511,13 +511,6 @@ async function handleApi(request, env, url) {
    if(!(await isPrimaryAdmin(user,env)))return json({error:"Solo el administrador puede modificar las vidas."},403);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
    return json({livesRemaining:999,maxLives:999,unlimitedLives:true,gameDate:getRozviGameDate()});
-   await ensureDivorzhinhaSchema(env);const gameDate=getRozviGameDate();
-   await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
-   const body=await request.json().catch(()=>({}));
-   if(body.action!=="lose-life")return json({error:"Acción no válida."},400);
-   await env.DB.prepare("UPDATE divorzhinha_daily_lives SET lives_remaining=MAX(0,lives_remaining-1),updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).run();
-   const row=await env.DB.prepare("SELECT lives_remaining FROM divorzhinha_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
-   return json({livesRemaining:Number(row?.lives_remaining??0),maxLives:5,gameDate});
   }
   if(url.pathname==="/api/divorzhinha/score"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
