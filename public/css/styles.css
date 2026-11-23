@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Press+Start+2P&family=Rajdhani:wght@500;600;700&display=swap');
 :root{color-scheme:dark;--green:#123b31;--green2:#1b5142;--cream:#f7f0df;--gold:#d7b66c;--muted:#b8c8bd;--red:#a83e36}
 *{box-sizing:border-box}body{margin:0;background:#0b251f;color:var(--cream);font-family:'DM Sans',sans-serif;min-height:100vh;background-image:radial-gradient(ellipse at 50% 0%,#1b5142 0,transparent 55%)}
 .shell{max-width:1060px;margin:auto;padding:24px 28px 18px}.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}.brand{display:flex;gap:10px;align-items:center;color:var(--cream);text-decoration:none;font-size:12px;letter-spacing:2px;font-weight:600}.brand-mark{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--gold);border-radius:50%;color:var(--gold);font-size:19px}.edition-tag{font-size:10px;letter-spacing:1.8px;color:var(--gold);border:1px solid #947b4c;border-radius:30px;padding:8px 12px}
@@ -1201,3 +1201,28 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 @media(max-width:560px){.rozvi-overlay-card{width:min(360px,94%);padding:clamp(9px,2.2vw,14px);gap:5px}.rozvi-overlay-card h3{font-size:clamp(13px,3.5vw,19px);line-height:1.2;letter-spacing:0}.rozvi-overlay-card p{font-size:clamp(10px,2.6vw,13px);line-height:1.35;margin:2px auto 5px}.rozvi-overlay-card.is-intro .rozvi-start{min-height:40px}.rozvi-leaderboard{margin-top:5px;padding:7px 9px}.rozvi-leaderboard li{font-size:10px}}
 
 .rozvi-leaderboard-bottom{margin:12px auto 8px;width:calc(100% - 24px);max-width:560px;max-height:190px;overflow:auto}.rozvi-leaderboard-bottom ol{display:grid;gap:7px}.rozvi-game-shell{overflow-y:auto;max-height:calc(100dvh - 32px)}
+
+/* v2.8.7 · Rozvi arcade typography and compact result overlay */
+.rozvi-game-top h2,.rozvi-stage-topline,.rozvi-hud-score small,.rozvi-hud-time>span,.rozvi-pause,.rozvi-overlay-eyebrow,.rozvi-start,.rozvi-exit,.rozvi-game-instructions,.rozvi-game-footer{font-family:'Rajdhani','DM Sans',sans-serif;font-weight:700;letter-spacing:.8px}
+.rozvi-game-top h2{letter-spacing:1.3px}
+.rozvi-hud-score strong,.rozvi-hud-time strong{font-family:'Rajdhani',monospace;font-weight:700;font-size:30px}
+.rozvi-overlay-card{width:min(520px,94%);padding:clamp(12px,2.5vw,22px)}
+.rozvi-overlay-card h3{font-family:'Press Start 2P',monospace;font-size:clamp(12px,2.8vw,20px);line-height:1.65;letter-spacing:0;overflow-wrap:anywhere}
+.rozvi-overlay-card p{font-family:'Rajdhani',sans-serif;font-size:clamp(18px,4vw,27px);font-weight:700;line-height:1.2;letter-spacing:1.2px;margin:9px auto 16px;max-width:100%;overflow-wrap:anywhere}
+.rozvi-overlay-card.is-result{width:min(500px,94%);padding:clamp(12px,2.2vw,20px)}
+.rozvi-overlay-card.is-result h3{margin:8px 0 4px}
+.rozvi-overlay-card.is-result p{margin:4px auto 14px}
+.rozvi-overlay-card.is-result .rozvi-overlay-actions{gap:9px}
+.rozvi-overlay-card.is-result .rozvi-start,.rozvi-overlay-card.is-result .rozvi-exit{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px}
+@media(max-width:560px){
+ .rozvi-game-modal{padding:4px}
+ .rozvi-game-shell{max-height:calc(100dvh - 8px);padding:8px}
+ .rozvi-game-top{margin-bottom:6px}
+ .rozvi-game-stage{padding:5px}
+ .rozvi-stage-topline{margin-bottom:5px}
+ .rozvi-hud{margin-bottom:5px}
+ .rozvi-overlay-card.is-result{width:min(440px,96%);padding:10px}
+ .rozvi-overlay-card.is-result h3{font-size:clamp(10px,2.6vw,15px)}
+ .rozvi-overlay-card.is-result p{font-size:clamp(16px,4vw,22px);margin:3px auto 10px}
+ .rozvi-overlay-card.is-result .rozvi-start,.rozvi-overlay-card.is-result .rozvi-exit{min-height:38px;padding:7px 5px;font-size:13px}
+}
