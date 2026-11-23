@@ -1188,3 +1188,14 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 
 /* Rozvi · tabla de mejores puntajes */
 .rozvi-score-feedback{min-height:18px;margin:8px 0 2px;color:#f4d98b;font-size:12px;font-weight:700;text-align:center}.rozvi-leaderboard{margin:10px auto 0;padding:10px 12px;max-width:360px;max-height:150px;overflow:auto;border:1px solid rgba(244,217,139,.35);border-radius:12px;background:rgba(17,34,38,.78);text-align:left}.rozvi-leaderboard h4{margin:0 0 7px;color:#f4d98b;font-size:11px;letter-spacing:1px}.rozvi-leaderboard ol{display:grid;gap:5px;margin:0;padding:0;list-style:none}.rozvi-leaderboard li{display:flex;justify-content:space-between;gap:12px;color:#fff4d7;font-size:11px}.rozvi-leaderboard li b{color:#f4d98b;white-space:nowrap}
+
+/* v2.8.4 · corregir jerarquía tipográfica y evitar que el ranking invada la introducción */
+.rozvi-overlay-card{gap:8px;overflow-y:auto;overscroll-behavior:contain}
+.rozvi-overlay-card h3{display:block;width:100%;max-width:100%;flex:0 0 auto;white-space:normal;overflow-wrap:normal;word-break:normal;text-align:center;line-height:1.18}
+.rozvi-overlay-card.is-intro .rozvi-score-feedback,.rozvi-overlay-card.is-intro .rozvi-leaderboard{display:none}
+.rozvi-overlay-card.is-intro{justify-content:center}
+.rozvi-overlay-card.is-intro h3{font-size:clamp(14px,3vw,22px);letter-spacing:0}
+.rozvi-overlay-card.is-result .rozvi-leaderboard,.rozvi-overlay-card.is-paused .rozvi-leaderboard{max-height:100px}
+.rozvi-game-modal button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.rozvi-game-controls button,.rozvi-pause,.rozvi-start,.rozvi-exit{user-select:none;-webkit-user-select:none}
+@media(max-width:560px){.rozvi-overlay-card{width:min(360px,94%);padding:clamp(9px,2.2vw,14px);gap:5px}.rozvi-overlay-card h3{font-size:clamp(13px,3.5vw,19px);line-height:1.2;letter-spacing:0}.rozvi-overlay-card p{font-size:clamp(10px,2.6vw,13px);line-height:1.35;margin:2px auto 5px}.rozvi-overlay-card.is-intro .rozvi-start{min-height:40px}.rozvi-leaderboard{margin-top:5px;padding:7px 9px}.rozvi-leaderboard li{font-size:10px}}
