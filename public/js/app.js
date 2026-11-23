@@ -1492,7 +1492,7 @@ async function openDivorzhinhaGame(){
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
   if(paused){active=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.textContent="▶";showOverlay("PARTIDA EN PAUSA","TÓMATE UN RESPIRO","Tu progreso y tus vidas se mantienen.","▶ CONTINUAR",true);}
-  else{overlay.hidden=true;active=true;pauseBtn.textContent="Ⅱ";last=performance.now();raf=requestAnimationFrame(frame);}
+  else{overlay.hidden=true;gameAudio.play().catch(()=>{});active=true;pauseBtn.textContent="Ⅱ";last=performance.now();raf=requestAnimationFrame(frame);}
  }
  function close(){active=false;paused=false;gameAudio.pause();gameAudio.currentTime=0;cancelAnimationFrame(raf);if(score>0&&!submitted)void submit();window.removeEventListener("keydown",keyDown);modal.remove();const button=document.getElementById("divorzhinha-open-game");if(button){button.disabled=false;button.innerHTML=button.dataset.label||"JUGAR AHORA →";}}
  function keyDown(event){if(event.code==="Space"||event.key==="Enter"){if(active){event.preventDefault();shoot();}}}
