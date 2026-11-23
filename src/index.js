@@ -30,6 +30,7 @@ function ensureSchemaOnce(key, initialize) {
   return schemaInitPromises.get(key);
 }
 async function ensureRozviSettingsSchema(env) { return ensureSchemaOnce("rozvi-settings", async () => { await env.DB.prepare("CREATE TABLE IF NOT EXISTS rozvi_game_settings (id TEXT PRIMARY KEY, config_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run(); }); }
+async function ensureRozviDailyLivesSchema(env){return ensureSchemaOnce("rozvi-daily-lives",async()=>{await env.DB.prepare("CREATE TABLE IF NOT EXISTS rozvi_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();});}
 async function ensureEditionHomeSettingsSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS edition_home_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, config_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
 }
@@ -474,6 +475,8 @@ async function handleApi(request, env, url) {
     let config={}; try{config=JSON.parse(row?.config_json||"{}");}catch{}
     return json({config,edition:{title:member.title,year:member.year,event_date:member.event_date,budget_amount:member.budget_amount,currency:member.currency,team_name:member.team_name}});
   }
+
+  if(url.pathname==="/api/rozvi/lives"&&(request.method==="GET"||request.method==="POST")){const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);if(!(await isPrimaryAdmin(user,env)))return json({error:"El juego está en fase de pruebas."},403);const member=await getParticipantEdition(env,user,url);if(!member)return json({error:"No tienes una participación activa."},403);await ensureRozviSettingsSchema(env);await ensureRozviDailyLivesSchema(env);const settings=await env.DB.prepare("SELECT config_json FROM rozvi_game_settings WHERE id='default'").first();let config={lives:3};try{config={...config,...JSON.parse(settings?.config_json||"{}")};}catch{}const maxLives=Math.max(1,Math.min(10,Number(config.lives)||3));const gameDate=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());await env.DB.prepare("INSERT OR IGNORE INTO rozvi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,?)").bind(member.edition_id,user.id,gameDate,maxLives).run();if(request.method==="POST"){const body=await request.json().catch(()=>({}));if(body.action!=="lose-life")return json({error:"Acción no válida."},400);await env.DB.prepare("UPDATE rozvi_daily_lives SET lives_remaining=MAX(0,lives_remaining-1),updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).run();}const row=await env.DB.prepare("SELECT lives_remaining FROM rozvi_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();return json({livesRemaining:Number(row?.lives_remaining??0),maxLives,gameDate});}
 
   if (url.pathname === "/api/rozvi/music/current" && (request.method === "GET" || request.method === "HEAD")) { if (!env.MEDIA) return json({error:"Almacenamiento de audio no configurado."},503); const object=await env.MEDIA.get("rozvi-game/music"); if(!object)return json({error:"No hay canción configurada."},404); const headers={"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag,"x-content-type-options":"nosniff","content-length":String(object.size)}; return new Response(request.method==="HEAD"?null:object.body,{headers}); }
   if (url.pathname === "/api/music/current" && (request.method === "GET" || request.method === "HEAD")) {
@@ -960,18 +963,18 @@ async function handleApi(request, env, url) {
     if (url.pathname === "/api/admin/rozvi/settings" && request.method === "GET") {
       await ensureRozviSettingsSchema(env);
       const row=await env.DB.prepare("SELECT config_json FROM rozvi_game_settings WHERE id='default'").first();
-      let config={duration:40,beerPoints:1,waterPenalty:2};
+      let config={lives:3,beerPoints:1,waterPenalty:2};
       try { config={...config,...JSON.parse(row?.config_json||"{}")}; } catch {}
       const music=env.MEDIA?await env.MEDIA.head("rozvi-game/music"):null;
       return json({...config,musicConfigured:!!music});
     }
     if (url.pathname === "/api/admin/rozvi/settings" && request.method === "PUT") {
       await ensureRozviSettingsSchema(env);
-      const body=await request.json(),duration=Number(body.duration),beerPoints=Number(body.beerPoints),waterPenalty=Number(body.waterPenalty);
-      if(!Number.isInteger(duration)||duration<10||duration>180||duration%5!==0)return json({error:"La duración debe ser entre 10 y 180 segundos, en intervalos de 5."},400);
+      const body=await request.json(),lives=Number(body.lives),beerPoints=Number(body.beerPoints),waterPenalty=Number(body.waterPenalty);
+      if(!Number.isInteger(lives)||lives<1||lives>10)return json({error:"Las vidas deben estar entre 1 y 10."},400);
       if(!Number.isInteger(beerPoints)||beerPoints<1||beerPoints>20)return json({error:"Los puntos por botella deben estar entre 1 y 20."},400);
       if(!Number.isInteger(waterPenalty)||waterPenalty<0||waterPenalty>20)return json({error:"La resta por agua debe estar entre 0 y 20."},400);
-      const config={duration,beerPoints,waterPenalty};
+      const config={lives,beerPoints,waterPenalty};
       await env.DB.prepare("INSERT INTO rozvi_game_settings(id,config_json,updated_at) VALUES('default',?,datetime('now')) ON CONFLICT(id) DO UPDATE SET config_json=excluded.config_json,updated_at=datetime('now')").bind(JSON.stringify(config)).run();
       return json({ok:true,...config});
     }
