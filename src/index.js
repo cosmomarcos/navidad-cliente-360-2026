@@ -29,6 +29,7 @@ function ensureSchemaOnce(key, initialize) {
   }
   return schemaInitPromises.get(key);
 }
+async function ensureRozviSettingsSchema(env) { return ensureSchemaOnce("rozvi-settings", async () => { await env.DB.prepare("CREATE TABLE IF NOT EXISTS rozvi_game_settings (id TEXT PRIMARY KEY, config_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run(); }); }
 async function ensureEditionHomeSettingsSchema(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS edition_home_settings (edition_id TEXT PRIMARY KEY REFERENCES editions(id) ON DELETE CASCADE, config_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
 }
@@ -474,6 +475,7 @@ async function handleApi(request, env, url) {
     return json({config,edition:{title:member.title,year:member.year,event_date:member.event_date,budget_amount:member.budget_amount,currency:member.currency,team_name:member.team_name}});
   }
 
+  if (url.pathname === "/api/rozvi/music/current" && (request.method === "GET" || request.method === "HEAD")) { if (!env.MEDIA) return json({error:"Almacenamiento de audio no configurado."},503); const object=await env.MEDIA.get("rozvi-game/music"); if(!object)return json({error:"No hay canción configurada."},404); const headers={"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag,"x-content-type-options":"nosniff","content-length":String(object.size)}; return new Response(request.method==="HEAD"?null:object.body,{headers}); }
   if (url.pathname === "/api/music/current" && (request.method === "GET" || request.method === "HEAD")) {
     if (!env.MEDIA) return json({ error: "Almacenamiento de música no configurado." }, 503);
     const object = await env.MEDIA.get("background-music/current");
@@ -925,6 +927,42 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if (url.pathname === "/api/admin/rozvi/settings" && request.method === "GET") {
+      await ensureRozviSettingsSchema(env);
+      const row=await env.DB.prepare("SELECT config_json FROM rozvi_game_settings WHERE id='default'").first();
+      let config={duration:40,beerPoints:1,waterPenalty:2};
+      try { config={...config,...JSON.parse(row?.config_json||"{}")}; } catch {}
+      const music=env.MEDIA?await env.MEDIA.head("rozvi-game/music"):null;
+      return json({...config,musicConfigured:!!music});
+    }
+    if (url.pathname === "/api/admin/rozvi/settings" && request.method === "PUT") {
+      await ensureRozviSettingsSchema(env);
+      const body=await request.json(),duration=Number(body.duration),beerPoints=Number(body.beerPoints),waterPenalty=Number(body.waterPenalty);
+      if(!Number.isInteger(duration)||duration<10||duration>180||duration%5!==0)return json({error:"La duración debe ser entre 10 y 180 segundos, en intervalos de 5."},400);
+      if(!Number.isInteger(beerPoints)||beerPoints<1||beerPoints>20)return json({error:"Los puntos por botella deben estar entre 1 y 20."},400);
+      if(!Number.isInteger(waterPenalty)||waterPenalty<0||waterPenalty>20)return json({error:"La resta por agua debe estar entre 0 y 20."},400);
+      const config={duration,beerPoints,waterPenalty};
+      await env.DB.prepare("INSERT INTO rozvi_game_settings(id,config_json,updated_at) VALUES('default',?,datetime('now')) ON CONFLICT(id) DO UPDATE SET config_json=excluded.config_json,updated_at=datetime('now')").bind(JSON.stringify(config)).run();
+      return json({ok:true,...config});
+    }
+    if (url.pathname === "/api/admin/rozvi/music" && request.method === "GET") {
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
+      const object=await env.MEDIA.head("rozvi-game/music");
+      return json({configured:!!object,fileName:object?.customMetadata?.fileName||null,size:object?.size||0,uploadedAt:object?.customMetadata?.uploadedAt||null});
+    }
+    if (url.pathname === "/api/admin/rozvi/music" && request.method === "POST") {
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
+      const length=Number(request.headers.get("content-length")||0);
+      if(length>16*1024*1024)return json({error:"El archivo supera el límite de 15 MB."},413);
+      const form=await request.formData(),file=form.get("file");
+      if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una canción."},400);
+      if(file.size>15*1024*1024)return json({error:"El archivo supera el límite de 15 MB."},413);
+      const allowed=new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]);
+      if(!allowed.has(String(file.type).toLowerCase()))return json({error:"Formato no compatible. Usa MP3, M4A, AAC, OGG, WAV o WEBM."},400);
+      const fileName=String(file.name||"rozvi-audio").replace(/[\\r\\n"]/g,"").slice(0,120);
+      await env.MEDIA.put("rozvi-game/music",await file.arrayBuffer(),{httpMetadata:{contentType:file.type||"audio/mpeg",cacheControl:"no-store"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});
+      return json({ok:true,fileName,size:file.size});
+    }
     if (url.pathname === "/api/admin/music" && request.method === "GET") {
       if (!env.MEDIA) return json({ error: "El bucket R2 no está vinculado al Worker." }, 503);
       const object = await env.MEDIA.head("background-music/current");
