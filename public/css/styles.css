@@ -1185,27 +1185,3 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .rozvi-lives-hud strong{display:flex;gap:3px;align-items:center;font-family:system-ui,sans-serif;font-size:clamp(18px,4vw,25px);letter-spacing:1px;white-space:nowrap}.rozvi-overlay-card h3{font-size:clamp(16px,3.6vw,23px);line-height:1.12;letter-spacing:.2px;overflow-wrap:normal;word-break:normal}.rozvi-overlay-card p{max-width:300px}
 
 
-/* Rozvi Arcade: fallback apaisado para navegadores móviles sin bloqueo de orientación */
-@media (orientation:portrait) and (max-width:900px){
- .rozvi-game-modal.rozvi-landscape-fallback{position:fixed;inset:auto;top:50%;left:50%;width:100dvh;height:100vw;max-width:none;max-height:none;padding:4px;overflow:hidden;display:flex;align-items:stretch;justify-content:center;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-shell{display:flex;flex-direction:column;gap:5px;width:100%;height:100%;max-height:100%;overflow:hidden;padding:7px 12px;border-radius:10px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-top{flex:0 0 auto;margin-bottom:2px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-pixel-mark{width:32px;height:32px;font-size:18px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-top h2{font-size:clamp(17px,3.5vh,25px)}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-close{width:32px;height:32px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-stage{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;padding:6px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-stage-topline{flex:0 0 auto;margin-bottom:3px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-hud{flex:0 0 auto;margin-bottom:4px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-hud-score strong,.rozvi-game-modal.rozvi-landscape-fallback .rozvi-hud-time strong{font-size:20px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-canvas-frame{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-canvas-frame canvas{width:100%;height:100%;object-fit:contain}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-instructions{flex:0 0 auto;padding:5px 2px 0;gap:5px 10px;font-size:8px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-controls{flex:0 0 auto;width:min(48vw,430px);margin:5px auto 3px;gap:8px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-controls button{min-height:38px;font-size:17px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-controls #rozvi-jump{font-size:13px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-game-footer{flex:0 0 auto;padding-top:5px;font-size:7px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-overlay-card{width:min(420px,80%);padding:10px 14px}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-overlay-card h3{margin:5px 0;font-size:clamp(15px,3vh,22px)}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-overlay-card p{margin:4px auto 8px;font-size:10px;line-height:1.25}
- .rozvi-game-modal.rozvi-landscape-fallback .rozvi-start,.rozvi-game-modal.rozvi-landscape-fallback .rozvi-exit{min-height:34px;padding:7px 14px;font-size:9px}
-}
