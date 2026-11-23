@@ -1173,3 +1173,6 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
  .rozvi-overlay-card .rozvi-start,.rozvi-overlay-card .rozvi-exit{min-height:40px;padding:8px 5px;font-size:9px}
 }
 @media(max-height:700px){.rozvi-overlay-card{padding:8px 12px;gap:4px}.rozvi-overlay-card p{margin:2px auto 4px}.rozvi-overlay-card .rozvi-start,.rozvi-overlay-card .rozvi-exit{min-height:36px;padding:7px 5px}}
+
+/* v2.6.0 · Rozvi settings */
+.rozvi-admin-settings{display:grid;gap:16px}.rozvi-admin-settings .edition-settings-form,.rozvi-admin-settings .home-photo-admin-form{display:grid;gap:12px;padding:16px;border:1px solid #d8cfbb;border-radius:14px;background:#fffaf0}.rozvi-admin-settings label{display:grid;gap:6px;color:#52685b;font-size:12px;font-weight:800}.rozvi-admin-settings input[type=number],.rozvi-admin-settings input[type=file]{width:100%;min-height:42px;padding:9px;border:1px solid #d6c9aa;border-radius:9px;background:#fff;color:#19372d;font:inherit}.rozvi-admin-settings h3{margin:0;color:#174536;font-size:15px}.rozvi-admin-settings p{margin:5px 0;color:#6f7b6d;font-size:11px;line-height:1.5}.rozvi-admin-settings .settings-note{font-size:11px;color:#6b755f}
