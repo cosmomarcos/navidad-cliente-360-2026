@@ -922,11 +922,41 @@ async function handleApi(request, env, url) {
     return json({ ok: true, tracked: true });
   }
 
+  if (url.pathname === "/api/rozvi/home-background" && request.method === "GET") {
+    if(!env.MEDIA)return json({error:"Imagen no disponible."},404);
+    const object=await env.MEDIA.get("rozvi-game/home-background");
+    if(!object)return json({error:"Imagen no configurada."},404);
+    return new Response(object.body,{headers:{"Content-Type":object.httpMetadata?.contentType||"image/webp","Cache-Control":"public, max-age=300","ETag":object.httpEtag||"rozvi-art"}});
+  }
+
   if (url.pathname.startsWith("/api/admin/")) {
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if (url.pathname === "/api/admin/rozvi/art" && request.method === "GET") {
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
+      const object=await env.MEDIA.head("rozvi-game/home-background");
+      return json({configured:!!object,fileName:object?.customMetadata?.fileName||null,size:object?.size||0,uploadedAt:object?.customMetadata?.uploadedAt||null});
+    }
+    if (url.pathname === "/api/admin/rozvi/art" && request.method === "POST") {
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
+      const length=Number(request.headers.get("content-length")||0);
+      if(length>6*1024*1024)return json({error:"La imagen supera el límite de 5 MB."},413);
+      const form=await request.formData(),file=form.get("file");
+      if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una imagen."},400);
+      if(file.size>5*1024*1024)return json({error:"La imagen supera el límite de 5 MB."},413);
+      const allowed=new Set(["image/jpeg","image/png","image/webp"]);
+      if(!allowed.has(String(file.type).toLowerCase()))return json({error:"Formato no compatible. Usa JPG, PNG o WEBP."},400);
+      const fileName=String(file.name||"rozvi-portada").replace(/[\\r\\n"]/g,"").slice(0,120);
+      await env.MEDIA.put("rozvi-game/home-background",await file.arrayBuffer(),{httpMetadata:{contentType:file.type,cacheControl:"public, max-age=300"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});
+      return json({ok:true,fileName,size:file.size});
+    }
+    if (url.pathname === "/api/admin/rozvi/art" && request.method === "DELETE") {
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
+      await env.MEDIA.delete("rozvi-game/home-background");
+      return json({ok:true});
+    }
     if (url.pathname === "/api/admin/rozvi/settings" && request.method === "GET") {
       await ensureRozviSettingsSchema(env);
       const row=await env.DB.prepare("SELECT config_json FROM rozvi_game_settings WHERE id='default'").first();
