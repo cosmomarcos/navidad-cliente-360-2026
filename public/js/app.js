@@ -317,7 +317,9 @@ function renderMemberApp(){
  const exchangeShareText="🎄 *NAVIDAD PYME · 2026*\n\n📅 *Fecha:* "+exchangeDateLabel+"\n🎁 *Montos del intercambio:*\n• Amigo Secreto: mínimo S/ 100\n• Dirty Santa: mínimo S/ 20\n\n📍 *Lugar:* Casa de Marcos\nAv. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima\n🗺️ Google Maps: https://maps.app.goo.gl/rueCMQujUGvwxFoY9\n\n🥪 *Desayuno:* Chicharrón de El Chinito desde las 9:00 a. m.\n🍖 *Cuota para la parrilla:* Por definir.\n\n¡Nos vemos para compartir la magia de esta Navidad! 🎅";
  const budgetLabel=budgetAmount==null?"Por definir":new Intl.NumberFormat("es-PE",{style:"currency",currency:budgetCurrency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(budgetAmount));
  const homeMarkup=isOnboarding?`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · ${esc(currentUser.membership?.year||2026)}</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p id="onboarding-welcome-text">Bienvenido a tu intercambio.</p><div class="member-countdown" id="member-countdown"></div></section><div id="onboarding-home-content"><section class="edition-empty-state"><span>🎁</span><h2>Información del intercambio</h2><p>El organizador está completando los detalles de esta celebración.</p></section></div>`:`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><div class="exchange-minimum-list"><div><span>Amigo Secreto</span><strong>Mínimo S/ 100</strong></div><div><span>Dirty Santa</span><strong>Mínimo S/ 20</strong></div></div></div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📅</span><div><b>Fecha: ${esc(exchangeDateLabel)}</b></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🍖</span><div><b>Cuota para la parrilla</b><p>Por definir</p></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><a class="exchange-whatsapp-share" href="https://wa.me/?text=${encodeURIComponent(exchangeShareText)}" target="_blank" rel="noopener noreferrer" aria-label="Compartir información del intercambio por WhatsApp"><span aria-hidden="true">◉</span> Compartir información por WhatsApp</a></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
- app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
+ const rozviAnnouncement=currentUser.isPrimaryAdmin?'<section class="rozvi-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-art" aria-hidden="true"><span>🎄</span><span>🍺</span><span>🧑</span></div><div class="rozvi-announcement-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE</span><h2>¡VAMOS ROZVI!</h2><p>JUEGA AHORA Y GANA PUNTOS ESPÍRITU.</p><button type="button" id="rozvi-open-game" class="rozvi-play-button">Jugar ahora <span>→</span></button></div></section>':"";
+ app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
+ if(currentUser.isPrimaryAdmin) initRozviGame();
  if(isOnboarding)loadOnboardingHome();else loadClient360HomePhoto();
  startActivityHeartbeat();
  updateMemberCountdown(currentUser.membership?.event_date);
@@ -1281,4 +1283,57 @@ if("serviceWorker"in navigator){
    await registration.update();
   }catch(error){console.warn("No se pudo comprobar la actualización de la aplicación:",error);}
  });
+}
+
+
+/* v2.3.0 · ¡Vamos Rozvi! juego arcade navideño exclusivo para el administrador */
+function initRozviGame(){
+ const trigger=document.getElementById("rozvi-open-game");
+ if(!trigger||trigger.dataset.ready==="1")return;
+ trigger.dataset.ready="1";
+ trigger.addEventListener("click",openRozviGame);
+}
+function openRozviGame(){
+ if(document.getElementById("rozvi-game-modal"))return;
+ const modal=document.createElement("section");modal.id="rozvi-game-modal";modal.className="rozvi-game-modal";
+ modal.innerHTML='<div class="rozvi-game-shell" role="dialog" aria-modal="true" aria-labelledby="rozvi-game-title"><header class="rozvi-game-header"><div><span>🎄 ARCADE NAVIDEÑO</span><h2 id="rozvi-game-title">¡Vamos Rozvi!</h2></div><button type="button" class="rozvi-close" aria-label="Cerrar juego">✕</button></header><div class="rozvi-game-hud"><span>🍺 Pilsen: <b id="rozvi-score">0</b></span><span>⏱️ <b id="rozvi-time">60</b>s</span></div><canvas id="rozvi-canvas" width="900" height="420" aria-label="Juego de plataformas en una villa navideña"></canvas><div class="rozvi-game-message" id="rozvi-message">Recorre la villa, salta los montículos de nieve y recoge las botellas Pilsen. ¡Completa el recorrido!</div><div class="rozvi-game-controls"><button type="button" id="rozvi-left" aria-label="Mover a la izquierda">◀</button><button type="button" id="rozvi-jump">SALTAR ⬆</button><button type="button" id="rozvi-right" aria-label="Mover a la derecha">▶</button></div><button type="button" class="rozvi-start" id="rozvi-start">Comenzar partida</button><p class="rozvi-game-note">Juego ficticio. Las botellas son objetos coleccionables del arcade.</p></div>';
+ document.body.append(modal);
+ const canvas=modal.querySelector("#rozvi-canvas"),ctx=canvas.getContext("2d"),scoreEl=modal.querySelector("#rozvi-score"),timeEl=modal.querySelector("#rozvi-time"),message=modal.querySelector("#rozvi-message"),start=modal.querySelector("#rozvi-start");
+ let running=false,frame=0,last=0,elapsed=0,score=0,player={x:95,y:0,vy:0,ground:true},items=[],obstacles=[],keys={left:false,right:false},raf=0,finished=false;
+ const ground=345,gravity=.72;
+ function reset(){elapsed=0;score=0;player={x:95,y:ground-54,vy:0,ground:true};items=Array.from({length:14},(_,i)=>({x:360+i*190,y:ground-35-Math.random()*70,taken:false}));obstacles=Array.from({length:10},(_,i)=>({x:520+i*260,w:35+Math.random()*18}));scoreEl.textContent="0";timeEl.textContent="60";finished=false;}
+ function draw(){
+  const w=canvas.width,h=canvas.height;const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,"#173f43");sky.addColorStop(1,"#d6e7dc");ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+  ctx.fillStyle="#fff";for(let i=0;i<45;i++){const x=(i*137+frame*.25)%w,y=(i*71)%270;ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle="#214b3a";for(let i=0;i<7;i++){const x=i*155-(frame*.45%155);ctx.beginPath();ctx.moveTo(x,ground-25);ctx.lineTo(x+70,95+(i%3)*16);ctx.lineTo(x+140,ground-25);ctx.fill();}
+  ctx.fillStyle="#f7f2e6";ctx.fillRect(0,ground,w,h-ground);
+  ctx.fillStyle="#b7d7c9";for(let i=0;i<9;i++){const x=(i*130-frame*.8%130);ctx.fillRect(x,ground-5,65,5);}
+  for(let i=0;i<6;i++){const x=i*175-(frame*.65%175);ctx.fillStyle="#8a4438";ctx.fillRect(x+25,ground-100,58,75);ctx.fillStyle="#f4d68c";ctx.fillRect(x+44,ground-78,14,20);ctx.fillStyle="#315947";ctx.beginPath();ctx.moveTo(x+8,ground-98);ctx.lineTo(x+54,ground-150);ctx.lineTo(x+100,ground-98);ctx.fill();}
+  items.forEach(o=>{if(!o.taken){const x=o.x-(frame%3000),y=o.y-25;ctx.save();ctx.translate(x,y);ctx.fillStyle="#d6b45d";ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-8,-17);ctx.lineTo(-5,-23);ctx.lineTo(-5,-31);ctx.lineTo(5,-31);ctx.lineTo(5,-23);ctx.lineTo(8,-17);ctx.lineTo(8,0);ctx.quadraticCurveTo(0,7,-8,0);ctx.fill();ctx.fillStyle="#b51f2b";ctx.fillRect(-7,-17,14,10);ctx.fillStyle="#fff4d7";ctx.font="bold 6px sans-serif";ctx.textAlign="center";ctx.fillText("PILSEN",0,-10);ctx.restore();}});
+  obstacles.forEach(o=>{const x=o.x-(frame%2600);ctx.fillStyle="#d8e8f0";ctx.beginPath();ctx.ellipse(x,ground-4,o.w,17,0,0,Math.PI*2);ctx.fill();});
+  ctx.font="48px sans-serif";ctx.fillText("👨",player.x,player.y+48);
+  ctx.fillStyle="#b71c1c";ctx.fillRect(player.x+8,player.y+5,26,7);
+  ctx.fillStyle="#f0d58e";ctx.font="bold 16px sans-serif";ctx.fillText("VILLA NAVIDEÑA",20,30);
+ }
+ function finish(){running=false;finished=true;cancelAnimationFrame(raf);start.hidden=false;start.textContent="Jugar otra vez";message.textContent="¡Recorrido completado! Recogiste "+score+" botellas. Registrando tus puntos Espíritu…";api("/api/spirit/rozvi/claim",{method:"POST",body:JSON.stringify({score,durationSeconds:60})}).then(result=>{message.textContent=result.awarded?"¡Bien hecho, Rozvi! +"+result.points+" puntos Espíritu registrados.":"¡Buen recorrido! "+(result.message||"Ya reclamaste los puntos de hoy.");}).catch(error=>{message.textContent="Partida terminada. No se pudieron registrar los puntos: "+error.message;});}
+ function tick(now){if(!running)return;const dt=Math.min(32,now-last||16);last=now;elapsed+=dt;frame+=dt*.28;const speed=dt*.23;
+  if(keys.left)player.x=Math.max(18,player.x-speed);if(keys.right)player.x=Math.min(830,player.x+speed);
+  if(!player.ground){player.vy+=gravity;player.y+=player.vy;if(player.y>=ground-54){player.y=ground-54;player.vy=0;player.ground=true;}}
+  const world=frame%3000;
+  items.forEach(o=>{const x=o.x-world;if(!o.taken&&Math.abs(x-player.x)<42&&Math.abs(o.y-(player.y+30))<60){o.taken=true;score++;scoreEl.textContent=String(score);}});
+  obstacles.forEach(o=>{const x=o.x-world;if(x<player.x+32&&x+o.w>player.x&&player.ground){player.x=Math.max(18,player.x-12);}});
+  const remaining=Math.max(0,60-Math.floor(elapsed/1000));timeEl.textContent=String(remaining);
+  draw();if(elapsed>=60000){finish();return;}raf=requestAnimationFrame(tick);
+ }
+ function begin(){if(running)return;reset();running=true;last=performance.now();message.textContent="¡A correr por la villa! Usa las flechas o los controles y salta para alcanzar las botellas.";start.hidden=true;raf=requestAnimationFrame(tick);}
+ function bindHold(id,key){const el=modal.querySelector("#"+id);const down=e=>{e.preventDefault();keys[key]=true;},up=e=>{e.preventDefault();keys[key]=false;};el.addEventListener("pointerdown",down);["pointerup","pointercancel","pointerleave"].forEach(type=>el.addEventListener(type,up));}
+ bindHold("rozvi-left","left");bindHold("rozvi-right","right");
+ const jump=()=>{if(running&&player.ground){player.vy=-14;player.ground=false;}};
+ modal.querySelector("#rozvi-jump").addEventListener("pointerdown",e=>{e.preventDefault();jump();});
+ const keydown=e=>{if(e.key==="ArrowLeft")keys.left=true;if(e.key==="ArrowRight")keys.right=true;if(e.code==="Space"){e.preventDefault();jump();}};
+ const keyup=e=>{if(e.key==="ArrowLeft")keys.left=false;if(e.key==="ArrowRight")keys.right=false;};
+ window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);
+ function close(){running=false;cancelAnimationFrame(raf);window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);modal.remove();}
+ modal.querySelector(".rozvi-close").addEventListener("click",close);modal.addEventListener("click",e=>{if(e.target===modal)close();});start.addEventListener("click",begin);
+ draw();
 }
