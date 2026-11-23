@@ -318,8 +318,11 @@ function renderMemberApp(){
  const budgetLabel=budgetAmount==null?"Por definir":new Intl.NumberFormat("es-PE",{style:"currency",currency:budgetCurrency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(budgetAmount));
  const homeMarkup=isOnboarding?`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · ${esc(currentUser.membership?.year||2026)}</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p id="onboarding-welcome-text">Bienvenido a tu intercambio.</p><div class="member-countdown" id="member-countdown"></div></section><div id="onboarding-home-content"><section class="edition-empty-state"><span>🎁</span><h2>Información del intercambio</h2><p>El organizador está completando los detalles de esta celebración.</p></section></div>`:`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><div class="exchange-minimum-list"><div><span>Amigo Secreto</span><strong>Mínimo S/ 100</strong></div><div><span>Dirty Santa</span><strong>Mínimo S/ 20</strong></div></div></div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📅</span><div><b>Fecha: ${esc(exchangeDateLabel)}</b></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🍖</span><div><b>Cuota para la parrilla</b><p>Por definir</p></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><a class="exchange-whatsapp-share" href="https://wa.me/?text=${encodeURIComponent(exchangeShareText)}" target="_blank" rel="noopener noreferrer" aria-label="Compartir información del intercambio por WhatsApp"><span aria-hidden="true">◉</span> Compartir información por WhatsApp</a></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
  const rozviAnnouncement=currentUser.membership?.team_name==="Cliente 360"?'<section class="rozvi-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE</span><h2>¡VAMOS ROZVI!</h2><p>JUEGA AHORA Y GANA PUNTOS ESPÍRITU.</p><button type="button" id="rozvi-open-game" class="rozvi-play-button">Jugar ahora <span>→</span></button></div></section>':"";
- app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
+ const divorzhinhaAnnouncement=currentUser.isPrimaryAdmin&&currentUser.membership?.team_name==="Cliente 360"?'<section class="divorzhinha-announcement" aria-label="Juego exclusivo del administrador"><div class="divorzhinha-art" aria-hidden="true"><span>⚽</span><i>🧤</i></div><div class="divorzhinha-copy"><span class="divorzhinha-kicker">NUEVO RETO · EXCLUSIVO ADMIN</span><h2>DIVORZINHA</h2><p>¡PATEA, ENGAÑA AL ARQUERO Y SUMA ESPÍRITU!</p><button type="button" id="divorzhinha-open-game" class="divorzhinha-play-button">JUGAR AHORA <span>→</span></button></div></section>':"";
+
+ app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}${divorzhinhaAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
  if(currentUser.membership?.team_name==="Cliente 360") initRozviGame();
+ if(currentUser.isPrimaryAdmin&&currentUser.membership?.team_name==="Cliente 360") initDivorzhinhaGame();
  if(isOnboarding)loadOnboardingHome();else loadClient360HomePhoto();
  startActivityHeartbeat();
  updateMemberCountdown(currentUser.membership?.event_date);
@@ -1379,4 +1382,115 @@ async function openRozviGame(){
  const kd=e=>{if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")keys.left=true;if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")keys.right=true;if(e.code==="Space"||e.key==="ArrowUp"){e.preventDefault();jump();}},ku=e=>{if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")keys.left=false;if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")keys.right=false;};
  function close(){const abandoned=active&&!dead;active=false;paused=false;gameAudio.pause();gameAudio.currentTime=0;cancelAnimationFrame(raf);if(abandoned){api("/api/rozvi/lives",{method:"POST",body:JSON.stringify({action:"lose-life"})}).catch(()=>{});void submitGameScore();}window.removeEventListener("keydown",kd);window.removeEventListener("keyup",ku);m.remove();openRozviGame.loading=false;if(launchButton){launchButton.disabled=false;launchButton.removeAttribute("aria-busy");launchButton.innerHTML=launchButton.dataset.originalLabel||"Jugar ahora";}}
  window.addEventListener("keydown",kd);window.addEventListener("keyup",ku);m.querySelector(".rozvi-close").addEventListener("click",close);m.addEventListener("click",e=>{if(e.target===m)close();});startBtn.addEventListener("click",()=>{if(paused){togglePause();return;}begin();});exitBtn.addEventListener("click",close);paintLives();reset();scenery(0);api("/api/rozvi/leaderboard",{noMemoryCache:true}).then(d=>renderRozviLeaderboard(d.ranking||[])).catch(()=>renderRozviLeaderboard([]));
+}
+
+
+/* v2.9.2 · DIVORZINHA · penal arcade exclusivo del administrador */
+function initDivorzhinhaGame(){
+ const button=document.getElementById("divorzhinha-open-game");
+ if(button&&!button.dataset.ready){button.dataset.ready="1";button.addEventListener("click",openDivorzhinhaGame);}
+}
+async function openDivorzhinhaGame(){
+ if(!currentUser?.isPrimaryAdmin||document.getElementById("divorzhinha-game-modal")||openDivorzhinhaGame.loading)return;
+ openDivorzhinhaGame.loading=true;
+ const launch=document.getElementById("divorzhinha-open-game");
+ if(launch){launch.disabled=true;launch.dataset.label=launch.innerHTML;launch.innerHTML="CARGANDO…";}
+ let state;
+ try{state=await api("/api/divorzhinha/state",{noMemoryCache:true,timeoutMs:8000});}
+ catch(error){openDivorzhinhaGame.loading=false;if(launch){launch.disabled=false;launch.innerHTML=launch.dataset.label||"JUGAR AHORA →";}alert(error.message||"No se pudo cargar DIVORZINHA.");return;}
+ const modal=document.createElement("section");modal.id="divorzhinha-game-modal";modal.className="divorzhinha-game-modal";
+ modal.innerHTML='<div class="divorzhinha-shell" role="dialog" aria-modal="true" aria-label="DIVORZINHA"><header class="divorzhinha-header"><div><span class="divorzhinha-overline">NAVIDAD PYME ARCADE · PENAL CHALLENGE</span><h2>DIVORZINHA</h2></div><button type="button" class="divorzhinha-close" aria-label="Cerrar">×</button></header><div class="divorzhinha-hud"><div><small>GOLES</small><strong id="divorzhinha-score">0</strong></div><div><small>VIDAS</small><strong id="divorzhinha-lives">❤️❤️❤️❤️❤️</strong></div><div><small>RÉCORD</small><strong id="divorzhinha-best">0</strong></div><button type="button" id="divorzhinha-pause" disabled>Ⅱ</button></div><div class="divorzhinha-stage-wrap"><canvas id="divorzhinha-canvas" width="960" height="540" aria-label="Patea al arco e intenta marcarle al arquero"></canvas><div class="divorzhinha-overlay" id="divorzhinha-overlay"><div class="divorzhinha-overlay-card"><span id="divorzhinha-overlay-kicker">✦ RETO DE PENALES ✦</span><h3 id="divorzhinha-overlay-title">¡SUPERA AL ARQUERO!</h3><p id="divorzhinha-overlay-copy">Toca la pantalla cuando el balón pase por el lugar donde quieras patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.</p><button type="button" id="divorzhinha-start">▶ COMENZAR</button><button type="button" id="divorzhinha-exit">SALIR</button></div></div></div><div class="divorzhinha-controls"><span>👆 TOCA PARA PATEAR</span><span>⚽ CADA GOL = +1 ESPÍRITU</span><span>🧤 ATAJADA = −1 VIDA</span></div><section class="divorzhinha-history"><div><h3>🏆 TU RÉCORD</h3><p id="divorzhinha-stats">Cargando estadísticas…</p></div><ol id="divorzhinha-history-list"><li>Historial de partidas</li></ol></section><footer class="divorzhinha-footer">CINCO VIDAS POR DÍA · RENOVACIÓN 18:00 HORA DE LIMA</footer></div>';
+ document.body.append(modal);openDivorzhinhaGame.loading=false;
+ modal.addEventListener("selectstart",e=>e.preventDefault());modal.addEventListener("contextmenu",e=>e.preventDefault());modal.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();});
+ const canvas=modal.querySelector("#divorzhinha-canvas"),ctx=canvas.getContext("2d"),scoreEl=modal.querySelector("#divorzhinha-score"),livesEl=modal.querySelector("#divorzhinha-lives"),bestEl=modal.querySelector("#divorzhinha-best"),pauseBtn=modal.querySelector("#divorzhinha-pause"),overlay=modal.querySelector("#divorzhinha-overlay"),startBtn=modal.querySelector("#divorzhinha-start"),exitBtn=modal.querySelector("#divorzhinha-exit");
+ const W=960,H=540;let lives=Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),markerX=480,direction=1,speed=175,active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,message="",messageUntil=0,keeperLane=1,keeperDive=0,gameId=crypto.randomUUID().replace(/-/g,"");
+ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ function paintHud(){scoreEl.textContent=String(score);livesEl.textContent="❤️".repeat(lives)+"🖤".repeat(5-lives);bestEl.textContent=String(Math.max(best,score));pauseBtn.disabled=!active&&!paused;}
+ function pixel(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
+ function drawGoal(){
+  ctx.fillStyle="#eaf4df";ctx.fillRect(160,60,640,360);ctx.fillStyle="#f7f4e8";ctx.fillRect(180,80,600,320);
+  ctx.strokeStyle="#b9d1c2";ctx.lineWidth=3;
+  for(let x=190;x<780;x+=28){ctx.beginPath();ctx.moveTo(x,82);ctx.lineTo(x,398);ctx.stroke();}
+  for(let y=100;y<400;y+=24){ctx.beginPath();ctx.moveTo(182,y);ctx.lineTo(778,y);ctx.stroke();}
+  ctx.strokeStyle="#fff";ctx.lineWidth=16;ctx.strokeRect(160,60,640,360);ctx.strokeStyle="#b4a77c";ctx.lineWidth=5;ctx.strokeRect(172,72,616,336);
+ }
+ function drawKeeper(now){
+  const center=480,baseY=375,laneX=[300,480,660],target=laneX[keeperLane];
+  const dive=keeperDive?Math.sin(Math.min(1,(now-keeperDive)/360)*Math.PI):0;
+  const dx=keeperDive?((target-center)*dive):0,dy=keeperDive?(-18*dive):0;
+  ctx.save();ctx.translate(dx,dy);const x=center;
+  pixel(x-66,baseY+1,132,9,"#45634a");
+  pixel(x-48,baseY-27,38,24,"#e96b28");pixel(x+10,baseY-27,38,24,"#e96b28");pixel(x-53,baseY-12,47,7,"#ff9a45");pixel(x+7,baseY-12,47,7,"#ff9a45");
+  pixel(x-48,baseY-75,96,52,"#e8b91e");pixel(x-5,baseY-74,10,49,"#c99116");
+  pixel(x-58,baseY-166,116,96,"#f4ca2f");pixel(x-78,baseY-154,24,70,"#e9b91f");pixel(x+54,baseY-154,24,70,"#e9b91f");pixel(x-44,baseY-161,88,12,"#ffe16a");pixel(x-12,baseY-149,24,70,"#dcae18");
+  pixel(x-85,baseY-112,22,57,"#a96d4b");pixel(x+63,baseY-112,22,57,"#a96d4b");pixel(x-91,baseY-139,34,29,"#fff9e9");pixel(x+57,baseY-139,34,29,"#fff9e9");pixel(x-88,baseY-145,27,9,"#fff");pixel(x+61,baseY-145,27,9,"#fff");
+  pixel(x-24,baseY-190,48,28,"#a96d4b");pixel(x-38,baseY-236,76,54,"#b97952");pixel(x-45,baseY-228,12,28,"#965b40");pixel(x+33,baseY-228,12,28,"#965b40");
+  pixel(x-43,baseY-246,86,19,"#211d1b");pixel(x-32,baseY-258,65,16,"#211d1b");pixel(x-22,baseY-264,43,10,"#211d1b");pixel(x-22,baseY-216,8,8,"#241b18");pixel(x+14,baseY-216,8,8,"#241b18");pixel(x-8,baseY-195,16,5,"#74402e");
+  ctx.restore();
+ }
+ function drawBall(x,y,r=20){ctx.save();ctx.translate(x,y);ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#26343c";ctx.lineWidth=3;ctx.stroke();ctx.fillStyle="#26343c";ctx.beginPath();ctx.moveTo(-4,-7);ctx.lineTo(5,-10);ctx.lineTo(10,-2);ctx.lineTo(4,7);ctx.lineTo(-6,5);ctx.closePath();ctx.fill();ctx.beginPath();ctx.arc(-12,-4,3,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(12,8,3,0,Math.PI*2);ctx.fill();ctx.restore();}
+ function render(now){
+  ctx.clearRect(0,0,W,H);const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,"#173f43");sky.addColorStop(.55,"#2e7254");sky.addColorStop(1,"#16452f");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  for(let i=0;i<20;i++){pixel(i*50,25,30,18,i%2?"#f4d78a":"#e9f0d6");pixel(i*50+8,51,20,10,i%3?"#d75a4e":"#f2c94c");}
+  ctx.fillStyle="#285c43";ctx.fillRect(0,110,W,170);ctx.fillStyle="#d5b66c";ctx.fillRect(0,280,W,8);drawGoal();
+  ctx.fillStyle="#f2d58b";ctx.font="bold 20px monospace";ctx.textAlign="center";ctx.fillText("PENAL NAVIDEÑO",480,35);
+  ctx.fillStyle="#fff";ctx.fillRect(0,418,W,122);ctx.fillStyle="#d9e5d2";ctx.fillRect(0,418,W,8);ctx.strokeStyle="#d6ded3";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,500);ctx.lineTo(W,500);ctx.stroke();
+  drawKeeper(now);
+  if(shot){const t=clamp((now-shot.started)/420,0,1),ease=t*t*(3-2*t);drawBall(shot.x+(shot.targetX-shot.x)*ease,shot.y+(180-shot.y)*ease,Math.max(9,20-9*ease));}
+  else drawBall(markerX,455,21);
+  if(active&&!shooting){ctx.strokeStyle="#f5d36f";ctx.lineWidth=4;ctx.setLineDash([10,9]);ctx.beginPath();ctx.moveTo(markerX,425);ctx.lineTo(markerX,485);ctx.stroke();ctx.setLineDash([]);}
+  if(message&&performance.now()<messageUntil){ctx.fillStyle="#fff2c7";ctx.font="1000 36px monospace";ctx.textAlign="center";ctx.shadowColor="#123b31";ctx.shadowBlur=8;ctx.fillText(message,480,465);ctx.shadowBlur=0;}
+ }
+ function updateHistory(data){
+  const stats=data.stats||{};best=Number(stats.best_score||best);gamesPlayed=Number(stats.games_played||gamesPlayed);
+  modal.querySelector("#divorzhinha-stats").textContent="Partidas: "+gamesPlayed+" · Goles totales: "+Number(stats.total_goals||0)+" · Récord: "+best;
+  const list=modal.querySelector("#divorzhinha-history-list");list.replaceChildren();
+  (data.history||[]).forEach((row,index)=>{const li=document.createElement("li");li.textContent=(index+1)+". "+Number(row.goals)+" goles · "+Number(row.saves)+" atajadas";list.append(li);});
+  if(!list.children.length){const li=document.createElement("li");li.textContent="Todavía no hay partidas registradas.";list.append(li);}
+  paintHud();
+ }
+ function showOverlay(kicker,title,copy,buttonText,showExit=true){
+  overlay.hidden=false;modal.querySelector("#divorzhinha-overlay-kicker").textContent=kicker;modal.querySelector("#divorzhinha-overlay-title").textContent=title;modal.querySelector("#divorzhinha-overlay-copy").textContent=copy;startBtn.textContent=buttonText;startBtn.hidden=!buttonText;exitBtn.hidden=!showExit;
+ }
+ async function submit(){
+  if(submitted)return true;submitted=true;
+  try{const result=await api("/api/divorzhinha/score",{method:"POST",body:JSON.stringify({gameId,goals:score,saves}),noMemoryCache:true});updateHistory(result);message="+"+Number(result.awardedPoints||0)+" ESPÍRITU";messageUntil=performance.now()+1800;return true;}
+  catch(error){submitted=false;return false;}
+ }
+ async function consumeLife(){
+  if(!active||shooting)return;shooting=true;saves++;lives=Math.max(0,lives-1);paintHud();
+  try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Number(result.livesRemaining??lives);}
+  catch(error){showOverlay("SIN CONEXIÓN","NO SE PUDO GUARDAR LA VIDA",error.message,"REINTENTAR",true);active=false;paused=true;shooting=false;return;}
+  paintHud();if(lives<=0){active=false;finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):("No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez."),saved?"VER RESULTADO":"REINTENTAR",true);}
+  else{message="¡ATAJADA! -1 VIDA";messageUntil=performance.now()+900;shooting=false;keeperDive=performance.now();setTimeout(()=>{if(active)keeperDive=0;},400);}
+ }
+ function resolveShot(){
+  if(!shot)return;const current=shot;shot=null;shooting=false;
+  if(current.lane===current.keeperLane){void consumeLife();}
+  else{score++;speed=Math.min(920,175+score*30);message="¡GOOOOL! +1";messageUntil=performance.now()+900;keeperDive=performance.now();paintHud();setTimeout(()=>{if(active)keeperDive=0;},400);}
+ }
+ function shoot(){
+  if(!active||paused||shooting||finished)return;
+  const lane=markerX<390?0:markerX>570?2:1;keeperLane=Math.floor(Math.random()*3);
+  shot={x:markerX,y:455,targetX:[300,480,660][lane],lane,keeperLane,started:performance.now()};shooting=true;setTimeout(()=>resolveShot(),430);
+ }
+ function frame(now){
+  if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
+  if(!shooting){markerX+=direction*speed*dt;if(markerX>730){markerX=730;direction=-1;}if(markerX<230){markerX=230;direction=1;}}
+  render(now);raf=requestAnimationFrame(frame);
+ }
+ function start(){if(active||lives<=0||finished)return;overlay.hidden=true;active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
+ function togglePause(){
+  if(!active&&!paused)return;paused=!paused;
+  if(paused){active=false;cancelAnimationFrame(raf);pauseBtn.textContent="▶";showOverlay("PARTIDA EN PAUSA","TÓMATE UN RESPIRO","Tu progreso y tus vidas se mantienen.","▶ CONTINUAR",true);}
+  else{overlay.hidden=true;active=true;pauseBtn.textContent="Ⅱ";last=performance.now();raf=requestAnimationFrame(frame);}
+ }
+ function close(){active=false;paused=false;cancelAnimationFrame(raf);if(score>0&&!submitted)void submit();window.removeEventListener("keydown",keyDown);modal.remove();const button=document.getElementById("divorzhinha-open-game");if(button){button.disabled=false;button.innerHTML=button.dataset.label||"JUGAR AHORA →";}}
+ function keyDown(event){if(event.code==="Space"||event.key==="Enter"){if(active){event.preventDefault();shoot();}}}
+ canvas.addEventListener("pointerdown",event=>{event.preventDefault();shoot();},{passive:false});
+ pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",()=>{if(paused){togglePause();return;}if(finished){if(!submitted){void submit().then(saved=>showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y sumaste "+score+" puntos de Espíritu."):"No se pudo guardar. Vuelve a intentarlo.",saved?"VER RESULTADO":"REINTENTAR",true));return;}close();return;}start();});
+ exitBtn.addEventListener("click",close);modal.querySelector(".divorzhinha-close").addEventListener("click",close);modal.addEventListener("click",event=>{if(event.target===modal)close();});window.addEventListener("keydown",keyDown);
+ updateHistory(state);paintHud();render(performance.now());
+ if(lives<=0)showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Tus cinco vidas ya fueron utilizadas. Se renovarán a las 18:00, hora de Lima.","",false);
+ else showOverlay("✦ RETO DE PENALES ✦","¡SUPERA AL ARQUERO!","Toca la pantalla cuando el balón pase por el lugar donde quieras patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.","▶ COMENZAR",true);
 }
