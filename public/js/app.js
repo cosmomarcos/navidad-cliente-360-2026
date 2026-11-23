@@ -1286,54 +1286,34 @@ if("serviceWorker"in navigator){
 }
 
 
-/* v2.3.0 · ¡Vamos Rozvi! juego arcade navideño exclusivo para el administrador */
-function initRozviGame(){
- const trigger=document.getElementById("rozvi-open-game");
- if(!trigger||trigger.dataset.ready==="1")return;
- trigger.dataset.ready="1";
- trigger.addEventListener("click",openRozviGame);
-}
+/* v2.4.0 · Rozvi Pixel Arcade · modo de pruebas */
+function initRozviGame(){const b=document.getElementById("rozvi-open-game");if(b&&!b.dataset.ready){b.dataset.ready="1";b.addEventListener("click",openRozviGame);}}
 function openRozviGame(){
  if(document.getElementById("rozvi-game-modal"))return;
- const modal=document.createElement("section");modal.id="rozvi-game-modal";modal.className="rozvi-game-modal";
- modal.innerHTML='<div class="rozvi-game-shell" role="dialog" aria-modal="true" aria-labelledby="rozvi-game-title"><header class="rozvi-game-header"><div><span>🎄 ARCADE NAVIDEÑO</span><h2 id="rozvi-game-title">¡Vamos Rozvi!</h2></div><button type="button" class="rozvi-close" aria-label="Cerrar juego">✕</button></header><div class="rozvi-game-hud"><span>🍺 Pilsen: <b id="rozvi-score">0</b></span><span>⏱️ <b id="rozvi-time">60</b>s</span></div><canvas id="rozvi-canvas" width="900" height="420" aria-label="Juego de plataformas en una villa navideña"></canvas><div class="rozvi-game-message" id="rozvi-message">Recorre la villa, salta los montículos de nieve y recoge las botellas Pilsen. ¡Completa el recorrido!</div><div class="rozvi-game-controls"><button type="button" id="rozvi-left" aria-label="Mover a la izquierda">◀</button><button type="button" id="rozvi-jump">SALTAR ⬆</button><button type="button" id="rozvi-right" aria-label="Mover a la derecha">▶</button></div><button type="button" class="rozvi-start" id="rozvi-start">Comenzar partida</button><p class="rozvi-game-note">Juego ficticio. Las botellas son objetos coleccionables del arcade.</p></div>';
- document.body.append(modal);
- const canvas=modal.querySelector("#rozvi-canvas"),ctx=canvas.getContext("2d"),scoreEl=modal.querySelector("#rozvi-score"),timeEl=modal.querySelector("#rozvi-time"),message=modal.querySelector("#rozvi-message"),start=modal.querySelector("#rozvi-start");
- let running=false,frame=0,last=0,elapsed=0,score=0,player={x:95,y:0,vy:0,ground:true},items=[],obstacles=[],keys={left:false,right:false},raf=0,finished=false;
- const ground=345,gravity=.72;
- function reset(){elapsed=0;score=0;player={x:95,y:ground-54,vy:0,ground:true};items=Array.from({length:14},(_,i)=>({x:360+i*190,y:ground-35-Math.random()*70,taken:false}));obstacles=Array.from({length:10},(_,i)=>({x:520+i*260,w:35+Math.random()*18}));scoreEl.textContent="0";timeEl.textContent="60";finished=false;}
- function draw(){
-  const w=canvas.width,h=canvas.height;const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,"#173f43");sky.addColorStop(1,"#d6e7dc");ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
-  ctx.fillStyle="#fff";for(let i=0;i<45;i++){const x=(i*137+frame*.25)%w,y=(i*71)%270;ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fill();}
-  ctx.fillStyle="#214b3a";for(let i=0;i<7;i++){const x=i*155-(frame*.45%155);ctx.beginPath();ctx.moveTo(x,ground-25);ctx.lineTo(x+70,95+(i%3)*16);ctx.lineTo(x+140,ground-25);ctx.fill();}
-  ctx.fillStyle="#f7f2e6";ctx.fillRect(0,ground,w,h-ground);
-  ctx.fillStyle="#b7d7c9";for(let i=0;i<9;i++){const x=(i*130-frame*.8%130);ctx.fillRect(x,ground-5,65,5);}
-  for(let i=0;i<6;i++){const x=i*175-(frame*.65%175);ctx.fillStyle="#8a4438";ctx.fillRect(x+25,ground-100,58,75);ctx.fillStyle="#f4d68c";ctx.fillRect(x+44,ground-78,14,20);ctx.fillStyle="#315947";ctx.beginPath();ctx.moveTo(x+8,ground-98);ctx.lineTo(x+54,ground-150);ctx.lineTo(x+100,ground-98);ctx.fill();}
-  items.forEach(o=>{if(!o.taken){const x=o.x-(frame%3000),y=o.y-25;ctx.save();ctx.translate(x,y);ctx.fillStyle="#d6b45d";ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-8,-17);ctx.lineTo(-5,-23);ctx.lineTo(-5,-31);ctx.lineTo(5,-31);ctx.lineTo(5,-23);ctx.lineTo(8,-17);ctx.lineTo(8,0);ctx.quadraticCurveTo(0,7,-8,0);ctx.fill();ctx.fillStyle="#b51f2b";ctx.fillRect(-7,-17,14,10);ctx.fillStyle="#fff4d7";ctx.font="bold 6px sans-serif";ctx.textAlign="center";ctx.fillText("PILSEN",0,-10);ctx.restore();}});
-  obstacles.forEach(o=>{const x=o.x-(frame%2600);ctx.fillStyle="#d8e8f0";ctx.beginPath();ctx.ellipse(x,ground-4,o.w,17,0,0,Math.PI*2);ctx.fill();});
-  ctx.font="48px sans-serif";ctx.fillText("👨",player.x,player.y+48);
-  ctx.fillStyle="#b71c1c";ctx.fillRect(player.x+8,player.y+5,26,7);
-  ctx.fillStyle="#f0d58e";ctx.font="bold 16px sans-serif";ctx.fillText("VILLA NAVIDEÑA",20,30);
- }
- function finish(){running=false;finished=true;cancelAnimationFrame(raf);start.hidden=false;start.textContent="Jugar otra vez";message.textContent="¡Recorrido completado! Recogiste "+score+" botellas. Registrando tus puntos Espíritu…";api("/api/spirit/rozvi/claim",{method:"POST",body:JSON.stringify({score,durationSeconds:60})}).then(result=>{message.textContent=result.awarded?"¡Bien hecho, Rozvi! +"+result.points+" puntos Espíritu registrados.":"¡Buen recorrido! "+(result.message||"Ya reclamaste los puntos de hoy.");}).catch(error=>{message.textContent="Partida terminada. No se pudieron registrar los puntos: "+error.message;});}
- function tick(now){if(!running)return;const dt=Math.min(32,now-last||16);last=now;elapsed+=dt;frame+=dt*.28;const speed=dt*.23;
-  if(keys.left)player.x=Math.max(18,player.x-speed);if(keys.right)player.x=Math.min(830,player.x+speed);
-  if(!player.ground){player.vy+=gravity;player.y+=player.vy;if(player.y>=ground-54){player.y=ground-54;player.vy=0;player.ground=true;}}
-  const world=frame%3000;
-  items.forEach(o=>{const x=o.x-world;if(!o.taken&&Math.abs(x-player.x)<42&&Math.abs(o.y-(player.y+30))<60){o.taken=true;score++;scoreEl.textContent=String(score);}});
-  obstacles.forEach(o=>{const x=o.x-world;if(x<player.x+32&&x+o.w>player.x&&player.ground){player.x=Math.max(18,player.x-12);}});
-  const remaining=Math.max(0,60-Math.floor(elapsed/1000));timeEl.textContent=String(remaining);
-  draw();if(elapsed>=60000){finish();return;}raf=requestAnimationFrame(tick);
- }
- function begin(){if(running)return;reset();running=true;last=performance.now();message.textContent="¡A correr por la villa! Usa las flechas o los controles y salta para alcanzar las botellas.";start.hidden=true;raf=requestAnimationFrame(tick);}
- function bindHold(id,key){const el=modal.querySelector("#"+id);const down=e=>{e.preventDefault();keys[key]=true;},up=e=>{e.preventDefault();keys[key]=false;};el.addEventListener("pointerdown",down);["pointerup","pointercancel","pointerleave"].forEach(type=>el.addEventListener(type,up));}
- bindHold("rozvi-left","left");bindHold("rozvi-right","right");
- const jump=()=>{if(running&&player.ground){player.vy=-14;player.ground=false;}};
- modal.querySelector("#rozvi-jump").addEventListener("pointerdown",e=>{e.preventDefault();jump();});
- const keydown=e=>{if(e.key==="ArrowLeft")keys.left=true;if(e.key==="ArrowRight")keys.right=true;if(e.code==="Space"){e.preventDefault();jump();}};
- const keyup=e=>{if(e.key==="ArrowLeft")keys.left=false;if(e.key==="ArrowRight")keys.right=false;};
- window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);
- function close(){running=false;cancelAnimationFrame(raf);window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);modal.remove();}
- modal.querySelector(".rozvi-close").addEventListener("click",close);modal.addEventListener("click",e=>{if(e.target===modal)close();});start.addEventListener("click",begin);
- draw();
+ const m=document.createElement("section");m.id="rozvi-game-modal";m.className="rozvi-game-modal";
+ m.innerHTML='<div class="rozvi-game-shell" role="dialog" aria-modal="true"><header class="rozvi-game-top"><div class="rozvi-game-brand"><span class="rozvi-pixel-mark">★</span><div><span class="rozvi-overline">NAVIDAD PYME ARCADE · BETA</span><h2>¡VAMOS ROZVI!</h2></div></div><button class="rozvi-close" aria-label="Cerrar">×</button></header><div class="rozvi-game-stage"><div class="rozvi-stage-topline"><span>❄ OPERACIÓN: LLUVIA DE PILSEN</span><span class="rozvi-live-tag">● MODO PRUEBAS</span></div><div class="rozvi-hud"><div><small>BOTELLAS</small><strong id="rozvi-score">000</strong></div><div class="rozvi-hud-time"><span>TIEMPO</span><strong><b id="rozvi-time">60</b><small> SEG</small></strong></div></div><div class="rozvi-canvas-frame"><canvas id="rozvi-canvas" width="960" height="540" aria-label="Juego pixel art de atrapar botellas"></canvas><div class="rozvi-stage-overlay" id="rozvi-overlay"><div class="rozvi-overlay-card"><span class="rozvi-overlay-eyebrow">✦ MISIÓN NAVIDEÑA ✦</span><h3>¡ATRAPA LA LLUVIA!</h3><p>Mueve a Rozvi, salta y recoge todas las botellas que puedas.</p><button id="rozvi-start" class="rozvi-start">▶ COMENZAR PARTIDA</button></div></div></div><div class="rozvi-game-instructions"><span><b>← →</b> MOVER</span><span><b>↑ / ESPACIO</b> SALTAR</span><span><b>+1</b> POR BOTELLA</span></div></div><div class="rozvi-game-controls"><button id="rozvi-left">◀</button><button id="rozvi-jump">▲ SALTAR</button><button id="rozvi-right">▶</button></div><footer class="rozvi-game-footer"><span>✦ CADA BOTELLA VALE 1 PUNTO</span><span>NO SE GUARDA EN ESPÍRITU</span></footer></div>';
+ document.body.append(m);
+ const c=m.querySelector("canvas"),x=c.getContext("2d"),scoreEl=m.querySelector("#rozvi-score"),timeEl=m.querySelector("#rozvi-time"),overlay=m.querySelector("#rozvi-overlay"),start=m.querySelector("#rozvi-start"),W=960,H=540,floor=466,keys={left:false,right:false};
+ let active=false,score=0,time=60,last=0,elapsed=0,spawn=0,raf=0,items=[],snow=[],p={x:480,y:392,vy:0,ground:true,walk:0};
+ const rnd=(a,b)=>a+Math.random()*(b-a),rect=(a,b,w,h,col)=>{x.fillStyle=col;x.fillRect(a,b,w,h);};
+ function scene(dt){const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,"#102e50");g.addColorStop(.55,"#28677a");g.addColorStop(1,"#b2d4c1");x.fillStyle=g;x.fillRect(0,0,W,H);x.fillStyle="#fff0bc";x.beginPath();x.arc(790,90,35,0,7);x.fill();x.fillStyle="#234d64";x.beginPath();x.arc(805,80,32,0,7);x.fill();
+ x.globalAlpha=.22;x.fillStyle="#9ee5be";for(let i=0;i<5;i++){x.beginPath();x.ellipse(130+i*170,100+(i%2)*32,130,18,-.1,0,7);x.fill();}x.globalAlpha=1;
+ for(let i=0;i<9;i++){let a=i*125+20;x.fillStyle="#0b493a";x.beginPath();x.moveTo(a,442);x.lineTo(a+40,285+(i%3)*16);x.lineTo(a+80,442);x.fill();x.fillStyle="#17634a";x.beginPath();x.moveTo(a+10,390);x.lineTo(a+40,310);x.lineTo(a+70,390);x.fill();}
+ for(let i=0;i<5;i++){let a=65+i*205;rect(a-38,390,76,69,"#75403a");x.fillStyle="#244d40";x.beginPath();x.moveTo(a-49,393);x.lineTo(a,340);x.lineTo(a+49,393);x.fill();rect(a-28,408,13,15,"#ffdb85");rect(a+14,408,13,15,"#ffdb85");rect(a-8,430,16,29,"#382927");rect(a-43,387,86,7,"#fff3d8");}
+ rect(0,floor,W,H-floor,"#eff5e9");rect(0,floor,W,8,"#fff");snow.forEach(s=>{s.y+=s.v*dt;if(s.y>H){s.y=-3;s.x=rnd(0,W);}x.globalAlpha=s.a;rect(s.x,s.y,s.z,s.z,"#fff");});x.globalAlpha=1;
+ items.forEach(b=>{x.save();x.translate(b.x,b.y);x.rotate(Math.sin(elapsed*4+b.phase)*.13);rect(-5,-30,10,6,"#b17b39");rect(-3,-38,6,10,"#d9b35f");rect(-7,-31,14,28,"#edc765");rect(-6,-19,12,10,"#b21f32");rect(-4,-17,8,5,"#fff0d4");x.font="bold 7px monospace";x.fillStyle="#a11c2b";x.textAlign="center";x.fillText("P",0,-13);x.restore();});
+ const bob=p.ground?Math.sin(p.walk)*2:0;x.save();x.translate(Math.round(p.x),Math.round(p.y+bob));x.fillStyle="#15363a66";x.beginPath();x.ellipse(0,70,27,7,0,0,7);x.fill();rect(-17,49,14,17,"#243e6b");rect(4,49,14,17,"#243e6b");rect(-19,63,18,8,"#503328");rect(2,63,18,8,"#503328");rect(-20,18,40,34,"#17654d");rect(-24,21,8,24,"#e8c95f");rect(16,21,8,24,"#e8c95f");rect(-18,43,36,7,"#f2d47d");rect(-18,-11,36,31,"#d99b70");rect(-22,-7,6,22,"#c47c5c");rect(16,-7,6,22,"#c47c5c");rect(-21,-18,42,10,"#263b36");rect(-17,-28,34,12,"#263b36");rect(-12,-34,24,8,"#e4c36f");rect(-8,-38,16,7,"#c83b3b");rect(-11,-1,4,5,"#172b34");rect(8,-1,4,5,"#172b34");rect(-5,9,12,4,"#8c413a");let arm=Math.sin(p.walk)*3;rect(-29,22+arm,10,23,"#d99b70");rect(19,22-arm,10,23,"#d99b70");x.restore();
+ x.fillStyle="#071d2d99";x.fillRect(16,16,250,34);x.fillStyle="#fff0bd";x.font="bold 15px monospace";x.fillText("ROZVI'S WINTER ARCADE",28,39);}
+ function addBottle(){items.push({x:rnd(35,W-35),y:-40,v:rnd(150,235)+Math.min(100,elapsed*1.2),phase:rnd(0,6)});}
+ function reset(){score=0;time=60;elapsed=0;spawn=0;items=[];p={x:480,y:392,vy:0,ground:true,walk:0};scoreEl.textContent="000";timeEl.textContent="60";overlay.hidden=true;snow=Array.from({length:95},()=>({x:rnd(0,W),y:rnd(0,H),z:rnd(1,3),v:rnd(20,85),a:rnd(.3,.9)}));for(let i=0;i<5;i++)addBottle();}
+ function finish(){active=false;cancelAnimationFrame(raf);overlay.hidden=false;overlay.querySelector("h3").textContent="¡BIEN JUGADO, ROZVI!";overlay.querySelector("p").textContent="Atrapaste "+score+" botellas. Resultado de prueba: no se guarda ni suma puntos en Espíritu.";start.textContent="↻ VOLVER A JUGAR";}
+ function update(dt){elapsed+=dt;time=Math.max(0,60-Math.floor(elapsed));timeEl.textContent=time;let d=(keys.right?1:0)-(keys.left?1:0);p.x=Math.max(28,Math.min(W-28,p.x+d*350*dt));if(d)p.walk+=dt*13;if(!p.ground){p.vy+=1050*dt;p.y+=p.vy*dt;if(p.y>=392){p.y=392;p.vy=0;p.ground=true;}}spawn+=dt;if(spawn>.7){spawn=0;addBottle();if(elapsed>25&&Math.random()<.35)addBottle();}items.forEach(b=>{b.y+=b.v*dt;b.x+=Math.sin(elapsed*2+b.phase)*18*dt;});items=items.filter(b=>{if(Math.abs(b.x-p.x)<35&&b.y>p.y-10&&b.y<p.y+68){score++;scoreEl.textContent=String(score).padStart(3,"0");return false;}return b.y<H+40;});}
+ function tick(now){if(!active)return;let dt=Math.min(.033,(now-last)/1000||.016);last=now;update(dt);scene(dt);if(time<=0){finish();return;}raf=requestAnimationFrame(tick);}
+ function begin(){if(active)return;reset();active=true;last=performance.now();raf=requestAnimationFrame(tick);}
+ function jump(){if(active&&p.ground){p.vy=-510;p.ground=false;}}
+ function hold(id,key){let el=m.querySelector("#"+id),down=e=>{e.preventDefault();keys[key]=true;},up=e=>{e.preventDefault();keys[key]=false;};el.addEventListener("pointerdown",down);["pointerup","pointercancel","pointerleave"].forEach(t=>el.addEventListener(t,up));}
+ hold("rozvi-left","left");hold("rozvi-right","right");m.querySelector("#rozvi-jump").addEventListener("pointerdown",e=>{e.preventDefault();jump();});
+ const kd=e=>{if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")keys.left=true;if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")keys.right=true;if(e.code==="Space"||e.key==="ArrowUp"){e.preventDefault();jump();}},ku=e=>{if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")keys.left=false;if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")keys.right=false;};
+ function close(){active=false;cancelAnimationFrame(raf);window.removeEventListener("keydown",kd);window.removeEventListener("keyup",ku);m.remove();}
+ window.addEventListener("keydown",kd);window.addEventListener("keyup",ku);m.querySelector(".rozvi-close").addEventListener("click",close);m.addEventListener("click",e=>{if(e.target===m)close();});start.addEventListener("click",begin);reset();scene(0);overlay.hidden=false;
 }
