@@ -576,6 +576,20 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member=await getParticipantEdition(env,user,url);
     if (!member) return json({ error: "Necesitas una participación activa para entrar a Espíritu Navideño." }, 403);
+    if(request.method==="POST"&&url.pathname==="/api/spirit/rozvi/claim"){
+      if(!(await isPrimaryAdmin(user,env)))return json({error:"¡Vamos Rozvi! está disponible solo para el administrador durante las pruebas."},403);
+      const body=await request.json().catch(()=>({}));
+      const duration=Math.max(0,Math.min(600,Number(body.durationSeconds)||0));
+      if(duration<55)return json({error:"Completa el recorrido antes de reclamar puntos."},400);
+      await ensureSpiritSchema(env);
+      const day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Lima",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+      const sourceId="rozvi:"+day;
+      const existing=await env.DB.prepare("SELECT id FROM spirit_points WHERE edition_id=? AND user_id=? AND source_type='game' AND source_id=?").bind(member.edition_id,user.id,sourceId).first();
+      if(existing)return json({ok:true,awarded:false,message:"Ya reclamaste los puntos de ¡Vamos Rozvi! por hoy."});
+      const points=15;
+      await env.DB.prepare("INSERT OR IGNORE INTO spirit_points (id,edition_id,user_id,source_type,source_id,points,description) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"game",sourceId,points,"¡Vamos Rozvi! · Partida completada").run();
+      return json({ok:true,awarded:true,points,score:Math.max(0,Math.min(1000,Number(body.score)||0))});
+    }
     if(request.method==="GET"&&url.pathname==="/api/spirit/achievements"){
       const achievementStart="2026-11-13 05:00:00"; // 00:00, hora Perú.
       await ensureWishesSchema(env);
