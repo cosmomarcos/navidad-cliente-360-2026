@@ -1199,3 +1199,5 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .rozvi-game-modal button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .rozvi-game-controls button,.rozvi-pause,.rozvi-start,.rozvi-exit{user-select:none;-webkit-user-select:none}
 @media(max-width:560px){.rozvi-overlay-card{width:min(360px,94%);padding:clamp(9px,2.2vw,14px);gap:5px}.rozvi-overlay-card h3{font-size:clamp(13px,3.5vw,19px);line-height:1.2;letter-spacing:0}.rozvi-overlay-card p{font-size:clamp(10px,2.6vw,13px);line-height:1.35;margin:2px auto 5px}.rozvi-overlay-card.is-intro .rozvi-start{min-height:40px}.rozvi-leaderboard{margin-top:5px;padding:7px 9px}.rozvi-leaderboard li{font-size:10px}}
+
+.rozvi-leaderboard-bottom{margin:12px auto 8px;width:calc(100% - 24px);max-width:560px;max-height:190px;overflow:auto}.rozvi-leaderboard-bottom ol{display:grid;gap:7px}.rozvi-game-shell{overflow-y:auto;max-height:calc(100dvh - 32px)}
