@@ -1291,37 +1291,74 @@ function initRozviGame(){const b=document.getElementById("rozvi-open-game");if(b
 function openRozviGame(){
  if(document.getElementById("rozvi-game-modal"))return;
  const m=document.createElement("section");m.id="rozvi-game-modal";m.className="rozvi-game-modal";
- m.innerHTML='<div class="rozvi-game-shell" role="dialog" aria-modal="true" aria-label="¡Vamos Rozvi!"><header class="rozvi-game-top"><div class="rozvi-game-brand"><span class="rozvi-pixel-mark">★</span><div><span class="rozvi-overline">NAVIDAD PYME ARCADE · BETA</span><h2>¡VAMOS ROZVI!</h2></div></div><button class="rozvi-close" aria-label="Cerrar">×</button></header><div class="rozvi-game-stage"><div class="rozvi-stage-topline"><span>❄ OPERACIÓN: LLUVIA DE PILSEN</span><span class="rozvi-live-tag">● MODO PRUEBAS</span></div><div class="rozvi-hud"><div class="rozvi-hud-score"><small>PUNTOS</small><strong id="rozvi-score">000</strong></div><div class="rozvi-hud-time"><span>TIEMPO</span><strong><b id="rozvi-time">40</b><small> SEG</small></strong></div><button id="rozvi-pause" class="rozvi-pause" type="button" disabled>Ⅱ PAUSAR</button></div><div class="rozvi-canvas-frame"><canvas id="rozvi-canvas" width="960" height="540" aria-label="Juego pixel art: atrapa botellas verdes y evita el agua mineral"></canvas><div class="rozvi-stage-overlay" id="rozvi-overlay"><div class="rozvi-overlay-card"><span class="rozvi-overlay-eyebrow">✦ MISIÓN NAVIDEÑA ✦</span><h3>¡ATRAPA LA LLUVIA!</h3><p>Recoge las botellas verdes. ¡Cuidado con el agua mineral!</p><div class="rozvi-overlay-actions"><button id="rozvi-start" class="rozvi-start">▶ COMENZAR PARTIDA</button><button id="rozvi-exit" class="rozvi-exit" hidden>✕ SALIR</button></div></div></div></div><div class="rozvi-game-instructions"><span><b>← →</b> MOVER</span><span><b>↑ / ESPACIO</b> SALTAR</span><span><b>VERDE +1</b></span><span><b>AGUA −2</b></span></div></div><div class="rozvi-game-controls"><button id="rozvi-left" aria-label="Mover a la izquierda">◀</button><button id="rozvi-jump">▲ SALTAR</button><button id="rozvi-right" aria-label="Mover a la derecha">▶</button></div><footer class="rozvi-game-footer"><span>✦ 40 SEGUNDOS · ATRAPA TODO LO QUE PUEDAS</span><span>NO SE GUARDA EN ESPÍRITU</span></footer></div>';
+ m.innerHTML='<div class="rozvi-game-shell" role="dialog" aria-modal="true" aria-label="¡Vamos Rozvi!"><header class="rozvi-game-top"><div class="rozvi-game-brand"><span class="rozvi-pixel-mark">★</span><div><span class="rozvi-overline">NAVIDAD PYME ARCADE · BETA</span><h2>¡VAMOS ROZVI!</h2></div></div><button class="rozvi-close" aria-label="Cerrar">×</button></header><div class="rozvi-game-stage"><div class="rozvi-stage-topline"><span>❄ OPERACIÓN: LLUVIA DE PILSEN</span><span class="rozvi-live-tag">● MODO PRUEBAS</span></div><div class="rozvi-hud"><div class="rozvi-hud-score"><small>PUNTOS</small><strong id="rozvi-score">000</strong></div><div class="rozvi-hud-time"><span>TIEMPO</span><strong><b id="rozvi-time">40</b><small> SEG</small></strong></div><button id="rozvi-pause" class="rozvi-pause" type="button" disabled>Ⅱ PAUSAR</button></div><div class="rozvi-canvas-frame"><canvas id="rozvi-canvas" width="960" height="540" aria-label="Juego pixel art: atrapa botellas de Pilsen y evita el agua mineral"></canvas><div class="rozvi-stage-overlay" id="rozvi-overlay"><div class="rozvi-overlay-card"><span class="rozvi-overlay-eyebrow">✦ MISIÓN NAVIDEÑA ✦</span><h3>¡ATRAPA LA LLUVIA!</h3><p>Atrapa botellas de Pilsen y evita el agua mineral.</p><div class="rozvi-overlay-actions"><button id="rozvi-start" class="rozvi-start">▶ COMENZAR PARTIDA</button><button id="rozvi-exit" class="rozvi-exit" hidden>✕ SALIR</button></div></div></div></div><div class="rozvi-game-instructions"><span><b>← →</b> MOVER</span><span><b>↑ / ESPACIO</b> SALTAR</span><span><b>PILSEN +1</b></span><span><b>AGUA −2</b></span></div></div><div class="rozvi-game-controls"><button id="rozvi-left" aria-label="Mover a la izquierda">◀</button><button id="rozvi-jump">▲ SALTAR</button><button id="rozvi-right" aria-label="Mover a la derecha">▶</button></div><footer class="rozvi-game-footer"><span>✦ 40 SEGUNDOS · ATRAPA TODO LO QUE PUEDAS</span><span>NO SE GUARDA EN ESPÍRITU</span></footer></div>';
  document.body.append(m);
  const c=m.querySelector("canvas"),x=c.getContext("2d"),scoreEl=m.querySelector("#rozvi-score"),timeEl=m.querySelector("#rozvi-time"),overlay=m.querySelector("#rozvi-overlay"),startBtn=m.querySelector("#rozvi-start"),exitBtn=m.querySelector("#rozvi-exit"),pauseBtn=m.querySelector("#rozvi-pause"),W=960,H=540,floor=466,keys={left:false,right:false};
  let active=false,paused=false,score=0,time=40,last=0,elapsed=0,spawn=0,raf=0,items=[],snow=[],p={x:480,y:392,vy:0,ground:true,walk:0};
  const rnd=(a,b)=>a+Math.random()*(b-a),rect=(a,b,w,h,col)=>{x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),Math.round(w),Math.round(h));};
- function scenery(dt){const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,"#102e50");g.addColorStop(.55,"#28677a");g.addColorStop(1,"#b2d4c1");x.fillStyle=g;x.fillRect(0,0,W,H);x.fillStyle="#fff0bc";x.beginPath();x.arc(790,90,35,0,7);x.fill();x.fillStyle="#234d64";x.beginPath();x.arc(805,80,32,0,7);x.fill();
- x.globalAlpha=.2;x.fillStyle="#9ee5be";for(let i=0;i<5;i++){x.beginPath();x.ellipse(130+i*170,100+(i%2)*32,130,18,-.1,0,7);x.fill();}x.globalAlpha=1;
- for(let i=0;i<9;i++){let a=i*125+20;x.fillStyle="#0b493a";x.beginPath();x.moveTo(a,442);x.lineTo(a+40,285+(i%3)*16);x.lineTo(a+80,442);x.fill();x.fillStyle="#17634a";x.beginPath();x.moveTo(a+10,390);x.lineTo(a+40,310);x.lineTo(a+70,390);x.fill();}
- for(let i=0;i<5;i++){let a=65+i*205;rect(a-38,390,76,69,"#75403a");x.fillStyle="#244d40";x.beginPath();x.moveTo(a-49,393);x.lineTo(a,340);x.lineTo(a+49,393);x.fill();rect(a-28,408,13,15,"#ffdb85");rect(a+14,408,13,15,"#ffdb85");rect(a-8,430,16,29,"#382927");rect(a-43,387,86,7,"#fff3d8");}
- rect(0,floor,W,H-floor,"#eff5e9");rect(0,floor,W,8,"#fff");snow.forEach(s=>{s.y+=s.v*dt;if(s.y>H){s.y=-3;s.x=rnd(0,W);}x.globalAlpha=s.a;rect(s.x,s.y,s.z,s.z,"#fff");});x.globalAlpha=1;
- items.forEach(b=>{x.save();x.translate(b.x,b.y);x.rotate(Math.sin(elapsed*4+b.phase)*.13);if(b.type==="beer"){rect(-5,-30,10,6,"#a77b30");rect(-3,-38,6,10,"#d7b45e");rect(-7,-31,14,28,"#167c42");rect(-6,-19,12,10,"#d7b44f");rect(-4,-17,8,5,"#fff0c6");x.font="bold 7px monospace";x.fillStyle="#72521e";x.textAlign="center";x.fillText("P",0,-13);}else{rect(-4,-37,8,7,"#dcecf0");rect(-3,-43,6,7,"#9dcbd6");rect(-7,-31,14,29,"#b7e0e8");rect(-5,-28,10,23,"#80c5d4");rect(-6,-19,12,10,"#f5fbf8");x.font="bold 6px monospace";x.fillStyle="#267b9a";x.textAlign="center";x.fillText("AGUA",0,-12);}x.restore();});
- const bob=p.ground?Math.sin(p.walk)*2:0;x.save();x.translate(Math.round(p.x),Math.round(p.y+bob));x.fillStyle="#15363a66";x.beginPath();x.ellipse(0,70,29,7,0,0,7);x.fill();
- // zapatillas blancas y pantalón azul noche
- rect(-19,49,15,17,"#101d3d");rect(4,49,15,17,"#101d3d");rect(-22,63,21,8,"#fff");rect(1,63,22,8,"#fff");rect(-23,68,23,3,"#c9d5df");rect(1,68,23,3,"#c9d5df");
- // camiseta azul y brazos trigueños sosteniendo caja roja
- rect(-21,15,42,38,"#2368b9");rect(-25,19,8,26,"#2368b9");rect(17,19,8,26,"#2368b9");rect(-19,44,38,7,"#173b78");
- rect(-29,20,10,25,"#b97850");rect(19,20,10,25,"#b97850");
- // caja de cerveza roja al frente
- rect(-23,25,46,25,"#a91f2b");rect(-21,27,42,4,"#d84a43");rect(-18,33,36,12,"#f0d18b");x.fillStyle="#9c2028";x.font="bold 9px monospace";x.textAlign="center";x.fillText("PILSEN",0,42);rect(-24,47,48,4,"#761b27");
- // rostro trigueño, cabello negro y gorro navideño
- rect(-17,-13,34,32,"#bd8159");rect(-21,-9,5,21,"#a96948");rect(16,-9,5,21,"#a96948");rect(-12,-2,4,5,"#172b34");rect(8,-2,4,5,"#172b34");rect(-5,8,11,3,"#773e36");
- rect(-21,-20,42,10,"#10151b");rect(-17,-29,34,13,"#10151b");rect(-12,-34,24,7,"#10151b");rect(-10,-37,20,4,"#d8bd78");
+ function scenery(dt){
+ // Escenario retro de posada navideña, dibujado a baja resolución y ampliado sin suavizado.
+ if(!scenery.bg){const bg=document.createElement("canvas");bg.width=240;bg.height=135;const q=bg.getContext("2d");q.imageSmoothingEnabled=false;const R=(a,b,w,h,col)=>{q.fillStyle=col;q.fillRect(a,b,w,h);};
+ R(0,0,240,135,"#302b4b");R(0,0,240,8,"#9d5545");R(0,8,240,3,"#d88a60");R(0,11,240,57,"#70453f");
+ // ventanales nevados y cielo nocturno
+ R(5,14,83,44,"#3c6680");R(9,18,75,36,"#9ccbd0");R(9,18,75,8,"#567e9b");R(9,37,75,17,"#dce8dc");R(12,39,18,9,"#f4e7c9");R(35,36,22,18,"#718c91");R(61,40,18,12,"#dce4d2");R(45,14,3,44,"#6e3e35");R(5,35,83,3,"#6e3e35");R(7,56,80,4,"#e9c18c");
+ // tejados, abetos y nieve exterior
+ R(12,29,18,3,"#3e5364");R(15,25,12,4,"#536d7c");R(65,27,16,4,"#536d7c");R(68,23,10,4,"#6b7f87");R(16,50,5,2,"#fff3d7");R(55,49,8,2,"#fff3d7");
+ // pared de madera, vigas y lámparas
+ R(91,11,149,57,"#995a43");R(91,11,149,4,"#d18a5a");R(92,12,3,56,"#5a3438");R(151,12,4,56,"#633b3b");R(194,12,3,56,"#633b3b");
+ R(103,0,3,16,"#432b36");R(102,14,8,2,"#54313a");R(103,16,6,11,"#f6c56e");R(101,18,10,7,"#ffe6a4");R(103,27,6,2,"#54313a");
+ R(169,0,3,16,"#432b36");R(168,14,8,2,"#54313a");R(169,16,6,11,"#f6c56e");R(167,18,10,7,"#ffe6a4");R(169,27,6,2,"#54313a");
+ // estantería de botellas y tarros
+ R(199,14,37,43,"#5b3534");R(199,14,37,3,"#c17a4b");R(199,30,37,3,"#c17a4b");R(199,46,37,3,"#c17a4b");
+ for(let i=0;i<5;i++){const xx=202+i*6;R(xx,18,3,9,i%2?"#2b7551":"#426b91");R(xx,16,3,3,"#d6bd8a");R(xx,21,3,2,"#e3c36e");R(xx,34,3,9,i%2?"#b34d3d":"#3b7759");R(xx,32,3,3,"#d6bd8a");R(xx,37,3,2,"#e3c36e");}
+ // guirnalda con luces
+ R(91,10,149,2,"#315c49");for(let i=0;i<12;i++){R(96+i*12,12+(i%2)*2,2,2,i%3===0?"#f6d06e":i%3===1?"#e98b67":"#9ed5a5");}
+ // barra de madera, mostrador y taburetes
+ R(0,69,240,7,"#d28a56");R(0,76,240,3,"#6b3d3b");R(0,79,240,30,"#9b5841");for(let i=0;i<12;i++){R(i*22,80,2,28,"#713d38");R(i*22+3,83,14,2,"#bd7550");}
+ R(0,108,240,5,"#5c3b3a");R(0,113,240,22,"#b77a55");for(let i=0;i<15;i++){R(i*17,115,2,20,"#8d5544");R(i*17+4,119,9,2,"#d39a69");}
+ // árbol decorado y regalos a la izquierda
+ R(16,65,3,5,"#704638");R(12,59,11,8,"#17614a");R(14,54,7,7,"#247452");R(16,50,3,6,"#36835a");R(17,48,2,3,"#f3d477");R(10,66,4,3,"#b44a46");R(22,67,4,3,"#d7b65e");
+ // mesas, jarras y platos
+ R(117,67,55,3,"#d99b63");R(122,70,4,9,"#65403a");R(163,70,4,9,"#65403a");R(128,62,8,5,"#e7d5ad");R(130,60,4,2,"#d7a65d");R(145,63,7,4,"#f0dfbf");R(147,61,3,2,"#c1d9d5");
+ // nieve y luces de ambiente
+ for(let i=0;i<32;i++){const xx=(i*37+13)%240,yy=(i*19+7)%54;if(xx<88)R(xx,yy,1,1,"#fff6dc");}
+ scenery.bg=bg;
+ }
+ x.imageSmoothingEnabled=false;x.clearRect(0,0,W,H);x.drawImage(scenery.bg,0,0,W,H);
+ // pixel snowflakes drifting in front of the tavern windows
+ snow.forEach(s=>{s.y+=s.v*dt;if(s.y>H){s.y=-4;s.x=rnd(0,W);}const z=Math.max(3,Math.round(s.z*2/4)*4);rect(Math.round(s.x/4)*4,Math.round(s.y/4)*4,z,z,"#fff3d4");});
+ // wooden floorboards
+ rect(0,432,W,4,"#593b3a");for(let i=0;i<12;i++){rect(i*84,436,3,104,"#8c5747");rect(i*84+7,464,54,3,"#d49a6c");}
+ rect(0,524,W,16,"#553b3a");rect(0,524,W,4,"#d9a36f");
+ // falling collectible bottles, rendered with hard pixel edges
+ items.forEach(b=>{x.save();x.translate(Math.round(b.x/4)*4,Math.round(b.y/4)*4);if(b.type==="beer"){
+ rect(-8,-36,16,8,"#a77937");rect(-4,-48,8,12,"#d5b65d");rect(-12,-32,24,36,"#075b36");rect(-12,-24,24,4,"#2c9654");rect(-12,-12,24,12,"#d9b45c");rect(-8,-8,16,4,"#fff0c5");rect(-4,-20,8,4,"#f1d48a");
+ }else{rect(-4,-48,8,8,"#e8f6ef");rect(-8,-40,16,8,"#9acbd4");rect(-12,-32,24,36,"#c5e9e9");rect(-8,-28,16,28,"#78b9ca");rect(-12,-12,24,12,"#f3f5e8");rect(-8,-8,16,4,"#4a9db0");}x.restore();});
+ // Rozvi, as a larger 16-bit pixel character with crate held in front
+ const bob=p.ground?Math.sin(p.walk)*2:0;x.save();x.translate(Math.round(p.x/4)*4,Math.round((p.y+bob)/4)*4);
+ // ground shadow
+ rect(-36,68,72,8,"#4a333c");rect(-28,68,56,4,"#765147");
+ // white sneakers with sole highlights
+ rect(-28,48,20,20,"#17294a");rect(8,48,20,20,"#17294a");rect(-36,64,32,12,"#f4f1df");rect(4,64,32,12,"#f4f1df");rect(-36,72,32,4,"#b8c8d0");rect(4,72,32,4,"#b8c8d0");rect(-32,64,24,4,"#fff");
+ // navy trousers and blue jacket
+ rect(-28,28,24,24,"#17294a");rect(4,28,24,24,"#17294a");rect(-24,32,16,16,"#233e69");rect(8,32,16,16,"#233e69");
+ rect(-32,-12,64,48,"#2468a9");rect(-36,-8,8,32,"#2468a9");rect(28,-8,8,32,"#2468a9");rect(-28,-8,56,8,"#3988c6");rect(-8,-8,16,44,"#174e86");rect(-28,28,56,8,"#1a4b7b");
+ // warm tan hands holding the red beer crate
+ rect(-40,0,12,24,"#b97952");rect(28,0,12,24,"#b97952");rect(-44,16,12,8,"#d29366");rect(32,16,12,8,"#d29366");
+ rect(-36,8,72,28,"#9d2631");rect(-32,12,64,8,"#d84c48");rect(-32,20,64,12,"#e8c982");rect(-28,24,56,4,"#fff0c5");rect(-36,36,72,8,"#6d1e2b");rect(-28,16,8,4,"#f5d98e");rect(20,16,8,4,"#f5d98e");
+ // face, ears, black hair and festive beanie
+ rect(-24,-52,48,40,"#c4875d");rect(-28,-44,8,24,"#a96849");rect(20,-44,8,24,"#a96849");rect(-16,-36,8,8,"#18242c");rect(8,-36,8,8,"#18242c");rect(-8,-20,16,4,"#81453d");
+ rect(-28,-60,56,12,"#101820");rect(-24,-72,48,16,"#101820");rect(-16,-80,32,12,"#101820");rect(-20,-84,40,8,"#b92e37");rect(-12,-92,24,12,"#d94b4c");rect(-8,-96,16,8,"#f5e9cb");rect(-4,-104,8,8,"#fff7e4");
  x.restore();
- x.fillStyle="#071d2d99";x.fillRect(16,16,250,34);x.fillStyle="#fff0bd";x.font="bold 15px monospace";x.fillText("ROZVI'S WINTER ARCADE",28,39);}
- function addItem(){const beer=Math.random()<.72;items.push({type:beer?"beer":"water",x:rnd(35,W-35),y:-42,baseV:(beer?145:155),phase:rnd(0,6)});}
+ // pixel-style arcade sign
+ rect(16,16,264,40,"#302d43");rect(20,20,256,32,"#70453f");rect(24,24,248,24,"#263d50");x.fillStyle="#f9e4a7";x.font="bold 16px monospace";x.textBaseline="middle";x.fillText("ROZVI'S WINTER INN",36,36);
+ } function addItem(){const beer=Math.random()<.72;items.push({type:beer?"beer":"water",x:rnd(35,W-35),y:-42,baseV:(beer?145:155),phase:rnd(0,6)});}
  function reset(){score=0;time=40;elapsed=0;spawn=0;items=[];paused=false;active=false;p={x:480,y:392,vy:0,ground:true,walk:0};scoreEl.textContent="000";timeEl.textContent="40";pauseBtn.disabled=true;pauseBtn.textContent="Ⅱ PAUSAR";overlay.hidden=false;overlay.querySelector(".rozvi-overlay-eyebrow").textContent="✦ MISIÓN NAVIDEÑA ✦";overlay.querySelector("h3").textContent="¡ATRAPA LA LLUVIA!";overlay.querySelector("p").textContent="Recoge las botellas verdes. ¡Cuidado con el agua mineral!";startBtn.textContent="▶ COMENZAR PARTIDA";exitBtn.hidden=true;snow=Array.from({length:95},()=>({x:rnd(0,W),y:rnd(0,H),z:rnd(1,3),v:rnd(20,85),a:rnd(.3,.9)}));for(let i=0;i<4;i++)addItem();}
- function finish(){active=false;paused=false;cancelAnimationFrame(raf);pauseBtn.disabled=true;pauseBtn.textContent="Ⅱ PAUSAR";overlay.hidden=false;overlay.querySelector(".rozvi-overlay-eyebrow").textContent="✦ PARTIDA COMPLETADA ✦";overlay.querySelector("h3").textContent="¡BUEN TRABAJO, ROZVI!";overlay.querySelector("p").textContent="Puntuación final: "+score+". Las botellas verdes suman 1 y el agua mineral resta 2. Resultado de prueba: no se guarda en Espíritu.";startBtn.textContent="↻ JUGAR OTRA VEZ";exitBtn.hidden=false;}
+ function finish(){active=false;paused=false;keys.left=false;keys.right=false;cancelAnimationFrame(raf);pauseBtn.disabled=true;pauseBtn.textContent="Ⅱ PAUSAR";overlay.hidden=false;overlay.querySelector(".rozvi-overlay-eyebrow").textContent="✦ RESULTADO DE LA PARTIDA ✦";overlay.querySelector("h3").textContent="PUNTOS OBTENIDOS";overlay.querySelector("p").textContent=String(score).padStart(3,"0");startBtn.textContent="↻ JUGAR OTRA VEZ";exitBtn.hidden=false;}
  function update(dt){elapsed+=dt;time=Math.max(0,40-Math.floor(elapsed));timeEl.textContent=time;let d=(keys.right?1:0)-(keys.left?1:0);p.x=Math.max(28,Math.min(W-28,p.x+d*350*dt));if(d)p.walk+=dt*13;if(!p.ground){p.vy+=1050*dt;p.y+=p.vy*dt;if(p.y>=392){p.y=392;p.vy=0;p.ground=true;}}spawn+=dt;const interval=Math.max(.27,.82-score*.012);if(spawn>interval){spawn=0;addItem();if(score>=12&&Math.random()<.35)addItem();}items.forEach(b=>{b.y+=(b.baseV+Math.min(260,score*5))*dt;b.x+=Math.sin(elapsed*2+b.phase)*18*dt;});items=items.filter(b=>{if(Math.abs(b.x-p.x)<38&&b.y>p.y-12&&b.y<p.y+70){score=b.type==="beer"?score+1:Math.max(0,score-2);scoreEl.textContent=String(score).padStart(3,"0");return false;}return b.y<H+45;});}
  function tick(now){if(!active||paused)return;const dt=Math.min(.033,(now-last)/1000||.016);last=now;update(dt);scenery(dt);if(time<=0){finish();return;}raf=requestAnimationFrame(tick);}
  function begin(){if(active)return;reset();overlay.hidden=true;active=true;pauseBtn.disabled=false;last=performance.now();raf=requestAnimationFrame(tick);}
- function togglePause(){if(!active)return;paused=!paused;keys.left=false;keys.right=false;if(paused){cancelAnimationFrame(raf);pauseBtn.textContent="▶ CONTINUAR";overlay.hidden=false;overlay.querySelector(".rozvi-overlay-eyebrow").textContent="✦ PARTIDA EN PAUSA ✦";overlay.querySelector("h3").textContent="¡TÓMATE UN RESPIRO!";overlay.querySelector("p").textContent="Tu tiempo y tu puntuación están pausados.";startBtn.textContent="▶ CONTINUAR PARTIDA";exitBtn.hidden=true;}else{overlay.hidden=true;pauseBtn.textContent="Ⅱ PAUSAR";last=performance.now();raf=requestAnimationFrame(tick);}}
+ function togglePause(){if(!active)return;paused=!paused;keys.left=false;keys.right=false;if(paused){cancelAnimationFrame(raf);pauseBtn.textContent="▶ CONTINUAR";overlay.hidden=false;overlay.querySelector(".rozvi-overlay-eyebrow").textContent="✦ PARTIDA EN PAUSA ✦";overlay.querySelector("h3").textContent="JUEGO EN PAUSA";overlay.querySelector("p").textContent="Tu tiempo y tus puntos están a salvo.";startBtn.textContent="▶ REANUDAR";exitBtn.hidden=false;}else{overlay.hidden=true;pauseBtn.textContent="Ⅱ PAUSAR";last=performance.now();raf=requestAnimationFrame(tick);}}
  function jump(){if(active&&!paused&&p.ground){p.vy=-510;p.ground=false;}}
  function hold(id,key){const el=m.querySelector("#"+id),down=e=>{e.preventDefault();if(active&&!paused)keys[key]=true;},up=e=>{e.preventDefault();keys[key]=false;};el.addEventListener("pointerdown",down);["pointerup","pointercancel","pointerleave","lostpointercapture"].forEach(t=>el.addEventListener(t,up));}
  hold("rozvi-left","left");hold("rozvi-right","right");m.querySelector("#rozvi-jump").addEventListener("pointerdown",e=>{e.preventDefault();jump();});pauseBtn.addEventListener("click",togglePause);
