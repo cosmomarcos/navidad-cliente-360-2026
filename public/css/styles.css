@@ -1241,3 +1241,11 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 #rozvi-game-modal .rozvi-hud-score strong{color:#173d30!important;text-shadow:0 1px 0 #fff3d3!important}
 #rozvi-game-modal .rozvi-overlay-card .rozvi-score-feedback{color:#173d30!important}
 @media(max-width:560px){#rozvi-game-modal .rozvi-game-shell{height:calc(100dvh - 8px);max-height:calc(100dvh - 8px);padding:6px;gap:5px}#rozvi-game-modal .rozvi-canvas-frame{min-height:0}#rozvi-game-modal .rozvi-score-feedback{font-size:12px!important;padding:5px 6px}}
+
+
+/* v2.8.8 · Rozvi: restaurar CTA al cerrar y ocupar toda el área de juego */
+#rozvi-game-modal .rozvi-canvas-frame{width:100%;height:100%;flex:1 1 0;min-height:0;display:flex;align-items:stretch;justify-content:stretch;overflow:hidden;background:#1b2e47}
+#rozvi-game-modal .rozvi-canvas-frame canvas{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:fill!important;aspect-ratio:auto!important;flex:1 1 auto;image-rendering:pixelated}
+#rozvi-game-modal .rozvi-game-stage{flex:1 1 auto;min-height:0}
+#rozvi-game-modal .rozvi-game-shell{min-height:0}
+#rozvi-open-game[aria-busy="true"]{opacity:.82;cursor:wait}
