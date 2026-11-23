@@ -1435,7 +1435,7 @@ async function openDivorzhinhaGame(){
   roundedRect(-15,-177,30,27,8,"#a96d4b");ctx.beginPath();ctx.ellipse(0,-207,36,43,0,0,Math.PI*2);ctx.fillStyle="#b97952";ctx.fill();
   ctx.fillStyle="#211d1b";ctx.beginPath();ctx.ellipse(0,-236,38,17,0,Math.PI,Math.PI*2);ctx.fill();ctx.fillRect(-35,-235,70,9);
   ctx.fillStyle="#241b18";ctx.beginPath();ctx.arc(-13,-207,4,0,Math.PI*2);ctx.arc(13,-207,4,0,Math.PI*2);ctx.fill();ctx.restore();
-  if(keeperDive&&t>=1)keeperDive=null;
+  if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
  }
  function drawBall(x,y,r=34,rotation=0){
   ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.shadowColor="#071b1b99";ctx.shadowBlur=16;ctx.shadowOffsetY=8;
