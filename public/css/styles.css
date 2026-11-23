@@ -1204,7 +1204,6 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 
 
 /* v2.8.6 - Rozvi Arcade: gamer typography and compact mobile layout */
-@import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700;800&display=swap');
 .rozvi-game-shell,.rozvi-game-shell button,.rozvi-game-shell p,.rozvi-game-shell span,.rozvi-game-shell li{font-family:'Rajdhani','DM Sans',sans-serif}
 .rozvi-game-top h2,.rozvi-overline,.rozvi-stage-topline,.rozvi-hud small,.rozvi-hud span,.rozvi-game-instructions,.rozvi-game-footer,.rozvi-leaderboard h4,.rozvi-overlay-eyebrow,.rozvi-overlay-card h3,.rozvi-start,.rozvi-exit,.rozvi-pause{font-family:'Oxanium','Rajdhani',sans-serif}
 .rozvi-game-top h2{font-weight:800;letter-spacing:1.2px;text-shadow:0 2px 0 #d9c18b}
