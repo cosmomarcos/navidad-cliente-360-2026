@@ -1453,15 +1453,15 @@ async function openDivorzhinhaGame(){
   overlay.hidden=false;modal.querySelector("#divorzhinha-overlay-kicker").textContent=kicker;modal.querySelector("#divorzhinha-overlay-title").textContent=title;modal.querySelector("#divorzhinha-overlay-copy").textContent=copy;startBtn.textContent=buttonText;startBtn.hidden=!buttonText;exitBtn.hidden=!showExit;
  }
  async function submit(){
-  if(submitted)return;submitted=true;
-  try{const result=await api("/api/divorzhinha/score",{method:"POST",body:JSON.stringify({gameId,goals:score,saves}),noMemoryCache:true});updateHistory(result);message="+"+Number(result.awardedPoints||0)+" ESPÍRITU";messageUntil=performance.now()+1800;}
-  catch(error){submitted=false;showOverlay("ERROR AL GUARDAR","NO SE REGISTRÓ LA PARTIDA",error.message,"REINTENTAR",true);}
+  if(submitted)return true;submitted=true;
+  try{const result=await api("/api/divorzhinha/score",{method:"POST",body:JSON.stringify({gameId,goals:score,saves}),noMemoryCache:true});updateHistory(result);message="+"+Number(result.awardedPoints||0)+" ESPÍRITU";messageUntil=performance.now()+1800;return true;}
+  catch(error){submitted=false;return false;}
  }
  async function consumeLife(){
   if(!active||shooting)return;shooting=true;saves++;lives=Math.max(0,lives-1);paintHud();
   try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Number(result.livesRemaining??lives);}
   catch(error){showOverlay("SIN CONEXIÓN","NO SE PUDO GUARDAR LA VIDA",error.message,"REINTENTAR",true);active=false;paused=true;shooting=false;return;}
-  paintHud();if(lives<=0){active=false;finished=true;pauseBtn.disabled=true;await submit();showOverlay("✦ FIN DEL RETO ✦","¡PARTIDA TERMINADA!","Anotaste "+score+" goles y el arquero atajó "+saves+" disparos.","VER RESULTADO",true);}
+  paintHud();if(lives<=0){active=false;finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):("No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez."),saved?"VER RESULTADO":"REINTENTAR",true);}
   else{message="¡ATAJADA! -1 VIDA";messageUntil=performance.now()+900;shooting=false;keeperDive=performance.now();setTimeout(()=>{if(active)keeperDive=0;},400);}
  }
  function resolveShot(){
@@ -1488,7 +1488,7 @@ async function openDivorzhinhaGame(){
  function close(){active=false;paused=false;cancelAnimationFrame(raf);if(score>0&&!submitted)void submit();window.removeEventListener("keydown",keyDown);modal.remove();const button=document.getElementById("divorzhinha-open-game");if(button){button.disabled=false;button.innerHTML=button.dataset.label||"JUGAR AHORA →";}}
  function keyDown(event){if(event.code==="Space"||event.key==="Enter"){if(active){event.preventDefault();shoot();}}}
  canvas.addEventListener("pointerdown",event=>{event.preventDefault();shoot();},{passive:false});
- pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",()=>{if(paused){togglePause();return;}if(finished){close();return;}start();});
+ pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",()=>{if(paused){togglePause();return;}if(finished){if(!submitted){void submit().then(saved=>showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y sumaste "+score+" puntos de Espíritu."):"No se pudo guardar. Vuelve a intentarlo.",saved?"VER RESULTADO":"REINTENTAR",true));return;}close();return;}start();});
  exitBtn.addEventListener("click",close);modal.querySelector(".divorzhinha-close").addEventListener("click",close);modal.addEventListener("click",event=>{if(event.target===modal)close();});window.addEventListener("keydown",keyDown);
  updateHistory(state);paintHud();render(performance.now());
  if(lives<=0)showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Tus cinco vidas ya fueron utilizadas. Se renovarán a las 18:00, hora de Lima.","",false);
