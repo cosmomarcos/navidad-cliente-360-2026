@@ -1228,3 +1228,16 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .rozvi-score-feedback{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:800;line-height:1.2}
 @media(max-width:560px){.rozvi-game-modal{padding:4px}.rozvi-game-shell{height:calc(100dvh - 8px);max-height:calc(100dvh - 8px);padding:6px;gap:5px}.rozvi-game-top h2{font-size:clamp(18px,5vw,25px)}.rozvi-game-stage{padding:5px}.rozvi-game-instructions{font-size:9px;gap:4px 8px}.rozvi-game-controls{gap:7px}.rozvi-game-controls button{min-height:42px}.rozvi-leaderboard-bottom{max-height:70px;padding:4px 6px}.rozvi-leaderboard ol{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}.rozvi-leaderboard li{font-size:8px;gap:2px}.rozvi-game-footer{font-size:7px;letter-spacing:0}.rozvi-game-footer span{max-width:50%}}
 @media(max-height:680px){.rozvi-game-shell{gap:4px;padding:6px}.rozvi-game-top{margin:0}.rozvi-game-stage{padding:4px}.rozvi-game-instructions{padding-top:4px}.rozvi-game-controls{margin:1px auto}.rozvi-game-controls button{min-height:36px}.rozvi-leaderboard-bottom{max-height:55px}.rozvi-game-footer{padding-top:3px}}
+
+
+/* v2.8.7 · Rozvi: ampliar escenario, contraste y evitar selección accidental */
+#rozvi-game-modal,#rozvi-game-modal *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent}
+#rozvi-game-modal{-webkit-touch-callout:none;overscroll-behavior:contain}
+#rozvi-game-modal .rozvi-game-shell{height:calc(100dvh - 12px);max-height:calc(100dvh - 12px);overflow:hidden;display:flex;flex-direction:column}
+#rozvi-game-modal .rozvi-game-stage{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#rozvi-game-modal .rozvi-canvas-frame{flex:1 1 auto;min-height:220px;width:100%;background:#1b2e47;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#rozvi-game-modal .rozvi-canvas-frame canvas{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block}
+#rozvi-game-modal .rozvi-score-feedback{color:#173d30!important;text-shadow:0 1px 0 #fff4d4!important;font-family:'Oxanium','Rajdhani',sans-serif!important;font-size:clamp(12px,2.4vw,16px)!important;font-weight:800!important;line-height:1.25!important;letter-spacing:.2px!important;background:#fff2d2eF;border:1px solid #c5a86a;border-radius:5px;padding:6px 8px;margin-top:5px}
+#rozvi-game-modal .rozvi-hud-score strong{color:#173d30!important;text-shadow:0 1px 0 #fff3d3!important}
+#rozvi-game-modal .rozvi-overlay-card .rozvi-score-feedback{color:#173d30!important}
+@media(max-width:560px){#rozvi-game-modal .rozvi-game-shell{height:calc(100dvh - 8px);max-height:calc(100dvh - 8px);padding:6px;gap:5px}#rozvi-game-modal .rozvi-canvas-frame{min-height:0}#rozvi-game-modal .rozvi-score-feedback{font-size:12px!important;padding:5px 6px}}
