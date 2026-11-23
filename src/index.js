@@ -493,16 +493,18 @@ async function handleApi(request, env, url) {
 
 
   if(url.pathname==="/api/divorzhinha/state"&&request.method==="GET"){
-   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"DIVORZINHA está habilitado únicamente para el administrador."},403);
-   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"El juego está disponible únicamente en Cliente 360."},403);
-   await ensureDivorzhinhaSchema(env);await ensureParticipantProfilesSchema(env);
-   const gameDate=getRozviGameDate();
-   await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
-   const lives=await env.DB.prepare("SELECT lives_remaining FROM divorzhinha_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
-   const history=await env.DB.prepare("SELECT goals,saves,created_at FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 8").bind(member.edition_id,user.id).all();
-   const stats=await env.DB.prepare("SELECT COALESCE(MAX(goals),0) AS best_score,COUNT(*) AS games_played,COALESCE(SUM(goals),0) AS total_goals FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
-   return json({livesRemaining:Number(lives?.lives_remaining??5),maxLives:5,gameDate,history:history.results||[],stats:stats||{}});
+   try{
+    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+    if(!(await isPrimaryAdmin(user,env)))return json({error:"DIVORZINHA está habilitado únicamente para el administrador."},403);
+    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"El juego está disponible únicamente en Cliente 360."},403);
+    await ensureDivorzhinhaSchema(env);
+    const gameDate=getRozviGameDate();
+    await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
+    const lives=await env.DB.prepare("SELECT lives_remaining FROM divorzhinha_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
+    const history=await env.DB.prepare("SELECT goals,saves,created_at FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 8").bind(member.edition_id,user.id).all();
+    const stats=await env.DB.prepare("SELECT COALESCE(MAX(goals),0) AS best_score,COUNT(*) AS games_played,COALESCE(SUM(goals),0) AS total_goals FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+    return json({ok:true,livesRemaining:Number(lives?.lives_remaining??5),maxLives:5,gameDate,history:history.results||[],stats:stats||{}});
+   }catch(error){console.error("DIVORZINHA state error:",error);return json({error:"No se pudo inicializar DIVORZINHA. "+String(error?.message||"Error interno").slice(0,220)},500);}
   }
   if(url.pathname==="/api/divorzhinha/lives"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
@@ -536,6 +538,16 @@ async function handleApi(request, env, url) {
    return json({ok:true,awardedPoints,stats:stats||{},history:history.results||[]});
   }
 
+  if(url.pathname==="/api/divorzhinha/home-background"&&request.method==="GET"){
+   if(!env.MEDIA)return json({error:"Imagen no disponible."},404);
+   const object=await env.MEDIA.get("divorzhinha-game/home-background");if(!object)return json({error:"Imagen no configurada."},404);
+   return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"image/webp","cache-control":"public, max-age=300","etag":object.httpEtag||"divorzhinha-art","x-content-type-options":"nosniff"}});
+  }
+  if(url.pathname==="/api/divorzhinha/music/current"&&(request.method==="GET"||request.method==="HEAD")){
+   if(!env.MEDIA)return json({error:"Almacenamiento de audio no configurado."},503);
+   const object=await env.MEDIA.get("divorzhinha-game/music");if(!object)return json({error:"No hay canción configurada."},404);
+   return new Response(request.method==="HEAD"?null:object.body,{headers:{"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag||"divorzhinha-audio","content-length":String(object.size),"x-content-type-options":"nosniff"}});
+  }
   if (url.pathname === "/api/rozvi/music/current" && (request.method === "GET" || request.method === "HEAD")) { if (!env.MEDIA) return json({error:"Almacenamiento de audio no configurado."},503); const object=await env.MEDIA.get("rozvi-game/music"); if(!object)return json({error:"No hay canción configurada."},404); const headers={"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag,"x-content-type-options":"nosniff","content-length":String(object.size)}; return new Response(request.method==="HEAD"?null:object.body,{headers}); }
   if (url.pathname === "/api/music/current" && (request.method === "GET" || request.method === "HEAD")) {
     if (!env.MEDIA) return json({ error: "Almacenamiento de música no configurado." }, 503);
@@ -995,6 +1007,25 @@ async function handleApi(request, env, url) {
     if (!user) return json({ error: "Inicia sesión con Google primero." }, 401);
     if (!(await isPrimaryAdmin(user, env))) return json({ error: "Esta cuenta no es el administrador principal." }, 403);
 
+    if(url.pathname==="/api/admin/divorzhinha/art"&&request.method==="GET"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const object=await env.MEDIA.head("divorzhinha-game/home-background");return json({configured:!!object,fileName:object?.customMetadata?.fileName||null,size:object?.size||0});
+    }
+    if(url.pathname==="/api/admin/divorzhinha/art"&&request.method==="POST"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const length=Number(request.headers.get("content-length")||0);if(length>6*1024*1024)return json({error:"La imagen supera el límite de 5 MB."},413);
+      const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una imagen."},400);if(file.size>5*1024*1024)return json({error:"La imagen supera el límite de 5 MB."},413);
+      if(!new Set(["image/jpeg","image/png","image/webp"]).has(String(file.type).toLowerCase()))return json({error:"Usa JPG, PNG o WEBP."},400);
+      const fileName=String(file.name||"divorzhinha-portada").replace(/[\\r\\n"]/g,"").slice(0,120);await env.MEDIA.put("divorzhinha-game/home-background",await file.arrayBuffer(),{httpMetadata:{contentType:file.type,cacheControl:"public, max-age=300"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});return json({ok:true,fileName,size:file.size});
+    }
+    if(url.pathname==="/api/admin/divorzhinha/art"&&request.method==="DELETE"){if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);await env.MEDIA.delete("divorzhinha-game/home-background");return json({ok:true});}
+    if(url.pathname==="/api/admin/divorzhinha/music"&&request.method==="GET"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const object=await env.MEDIA.head("divorzhinha-game/music");return json({configured:!!object,fileName:object?.customMetadata?.fileName||null,size:object?.size||0});
+    }
+    if(url.pathname==="/api/admin/divorzhinha/music"&&request.method==="POST"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const length=Number(request.headers.get("content-length")||0);if(length>16*1024*1024)return json({error:"El audio supera el límite de 15 MB."},413);
+      const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una canción."},400);if(file.size>15*1024*1024)return json({error:"El audio supera el límite de 15 MB."},413);
+      if(!new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]).has(String(file.type).toLowerCase()))return json({error:"Usa MP3, M4A, AAC, OGG, WAV o WEBM."},400);
+      const fileName=String(file.name||"divorzhinha-audio").replace(/[\\r\\n"]/g,"").slice(0,120);await env.MEDIA.put("divorzhinha-game/music",await file.arrayBuffer(),{httpMetadata:{contentType:file.type||"audio/mpeg",cacheControl:"no-store"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});return json({ok:true,fileName,size:file.size});
+    }
     if (url.pathname === "/api/admin/rozvi/art" && request.method === "GET") {
       if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
       const object=await env.MEDIA.head("rozvi-game/home-background");
