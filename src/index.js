@@ -503,20 +503,14 @@ async function handleApi(request, env, url) {
     const lives=await env.DB.prepare("SELECT lives_remaining FROM divorzhinha_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
     const history=await env.DB.prepare("SELECT goals,saves,created_at FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 8").bind(member.edition_id,user.id).all();
     const stats=await env.DB.prepare("SELECT COALESCE(MAX(goals),0) AS best_score,COUNT(*) AS games_played,COALESCE(SUM(goals),0) AS total_goals FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
-    return json({ok:true,livesRemaining:Number(lives?.lives_remaining??5),maxLives:5,gameDate,history:history.results||[],stats:stats||{}});
+    return json({ok:true,livesRemaining:999,maxLives:999,unlimitedLives:true,gameDate,history:history.results||[],stats:stats||{}});
    }catch(error){console.error("DIVORZINHA state error:",error);return json({error:"No se pudo inicializar DIVORZINHA. "+String(error?.message||"Error interno").slice(0,220)},500);}
   }
   if(url.pathname==="/api/divorzhinha/lives"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    if(!(await isPrimaryAdmin(user,env)))return json({error:"Solo el administrador puede modificar las vidas."},403);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
-   await ensureDivorzhinhaSchema(env);const gameDate=getRozviGameDate();
-   await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
-   const body=await request.json().catch(()=>({}));
-   if(body.action!=="lose-life")return json({error:"Acción no válida."},400);
-   await env.DB.prepare("UPDATE divorzhinha_daily_lives SET lives_remaining=MAX(0,lives_remaining-1),updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).run();
-   const row=await env.DB.prepare("SELECT lives_remaining FROM divorzhinha_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
-   return json({livesRemaining:Number(row?.lives_remaining??0),maxLives:5,gameDate});
+   return json({livesRemaining:999,maxLives:999,unlimitedLives:true,gameDate:getRozviGameDate()});
   }
   if(url.pathname==="/api/divorzhinha/score"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
@@ -525,7 +519,7 @@ async function handleApi(request, env, url) {
    const body=await request.json().catch(()=>({}));const gameId=String(body.gameId||"").slice(0,80);
    if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
    const goals=Math.max(0,Math.min(10000,Math.floor(Number(body.goals)||0)));
-   const saves=Math.max(0,Math.min(5,Math.floor(Number(body.saves)||0)));
+   const saves=Math.max(0,Math.min(10000,Math.floor(Number(body.saves)||0)));
    await ensureDivorzhinhaSchema(env);await ensureSpiritSchema(env);
    const inserted=await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_game_scores(id,game_id,edition_id,user_id,goals,saves) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,goals,saves).run();
    let awardedPoints=0;
