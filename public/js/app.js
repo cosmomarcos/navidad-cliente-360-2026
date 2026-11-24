@@ -1413,7 +1413,7 @@ async function openDivorzhinhaGame(){
  document.body.append(modal);openDivorzhinhaGame.loading=false;
  modal.addEventListener("selectstart",e=>e.preventDefault());modal.addEventListener("contextmenu",e=>e.preventDefault());modal.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();});
  const canvas=modal.querySelector("#divorzhinha-canvas"),ctx=canvas.getContext("2d"),gameAudio=new Audio("/api/divorzhinha/music/current?v="+Date.now()),scoreEl=modal.querySelector("#divorzhinha-score"),livesEl=modal.querySelector("#divorzhinha-lives"),bestEl=modal.querySelector("#divorzhinha-best"),pauseBtn=modal.querySelector("#divorzhinha-pause"),overlay=modal.querySelector("#divorzhinha-overlay"),startBtn=modal.querySelector("#divorzhinha-start"),exitBtn=modal.querySelector("#divorzhinha-exit");
- gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540,unlimitedLives=state.unlimitedLives===true;let lives=Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,catchFeedback=false,shotSaveTargetX=null,crowdCheerUntil=0,audioCtx=null,gameId=crypto.randomUUID().replace(/-/g,"");
+ gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540,unlimitedLives=state.unlimitedLives===true;let lives=Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=220,keeperTargetX=480,keeperReactAt=0,keeperDive=null,catchFeedback=false,shotSaveTargetX=null,crowdCheerUntil=0,audioCtx=null,gameId=crypto.randomUUID().replace(/-/g,"");
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  function playCrowdSound(kind){
   try{
@@ -1540,7 +1540,7 @@ async function openDivorzhinhaGame(){
   if(!shot)return;const current=shot;shot=null;shooting=false;
   const inside=current.targetX>=170&&current.targetX<=790&&current.targetY>=78&&current.targetY<=390;
   if(!inside){finishOutsideShot();return;}
-  const caught=Math.abs(keeperX-current.targetX)<78&&current.targetY<255;
+  const caught=Math.abs(keeperX-current.targetX)<86&&current.targetY<285;
   if(caught){shotSaveTargetX=current.targetX;keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
   else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1500;playCrowdSound("goal");for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
  }
@@ -1548,17 +1548,19 @@ async function openDivorzhinhaGame(){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
   shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
-  shooting=true;aim=null;setTimeout(()=>resolveShot(),shot.duration);
+  shooting=true;aim=null;keeperTargetX=targetX;keeperReactAt=performance.now()+Math.max(85,260-Math.min(score,25)*7);setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
-  keeperX+=keeperDirection*keeperSpeed*dt;if(keeperX>700){keeperX=700;keeperDirection=-1;}if(keeperX<260){keeperX=260;keeperDirection=1;}keeperSpeed=Math.min(1050,150+Math.floor(score/10)*125);
+  const keeperMinX=205,keeperMaxX=755;keeperSpeed=220+Math.min(score,20)*12;
+  if(shooting&&shot&&now>=keeperReactAt){const delta=keeperTargetX-keeperX,step=keeperSpeed*dt;if(Math.abs(delta)<=step)keeperX=keeperTargetX;else keeperX+=Math.sign(delta)*step;}
+  else{keeperX+=keeperDirection*keeperSpeed*.58*dt;if(keeperX>=keeperMaxX){keeperX=keeperMaxX;keeperDirection=-1;}else if(keeperX<=keeperMinX){keeperX=keeperMinX;keeperDirection=1;}}
   render(now);raf=requestAnimationFrame(frame);
  }
  function start(){if(active||(!unlimitedLives&&lives<=0)||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
  function restartGame(){
   if(!unlimitedLives&&lives<=0){showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Has utilizado tus cinco vidas. Se renovarán a las 18:00, hora de Lima.","",false);startBtn.disabled=true;return;}
-  score=0;saves=0;finished=false;submitted=false;shooting=false;catchFeedback=false;shotSaveTargetX=null;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=150;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
+  score=0;saves=0;finished=false;submitted=false;shooting=false;catchFeedback=false;shotSaveTargetX=null;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=220;keeperTargetX=480;keeperReactAt=0;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
  }
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
