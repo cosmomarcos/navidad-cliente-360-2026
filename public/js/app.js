@@ -1408,36 +1408,51 @@ async function openDivorzhinhaGame(){
  try{state=await api("/api/divorzhinha/state",{noMemoryCache:true,timeoutMs:8000});}
  catch(error){openDivorzhinhaGame.loading=false;if(launch){launch.disabled=false;launch.innerHTML=launch.dataset.label||"JUGAR AHORA →";}alert(error.message||"No se pudo cargar DIVORZINHA.");return;}
  const modal=document.createElement("section");modal.id="divorzhinha-game-modal";modal.className="divorzhinha-game-modal";
- modal.innerHTML='<div class="rozvi-game-shell divorzhinha-shell" role="dialog" aria-modal="true" aria-label="DIVORZINHA"><header class="divorzhinha-header"><div><span class="divorzhinha-overline">NAVIDAD PYME ARCADE · PENAL CHALLENGE</span><h2>DIVORZINHA</h2></div><button type="button" class="divorzhinha-close" aria-label="Cerrar">×</button></header><div class="divorzhinha-hud"><div><small>GOLES</small><strong id="divorzhinha-score">0</strong></div><div><small>VIDAS</small><strong id="divorzhinha-lives">❤️❤️❤️❤️❤️</strong></div><div><small>RÉCORD</small><strong id="divorzhinha-best">0</strong></div><button type="button" id="divorzhinha-pause" disabled>Ⅱ</button></div><div class="divorzhinha-stage-wrap"><canvas id="divorzhinha-canvas" width="960" height="540" aria-label="Patea al arco e intenta marcarle al arquero"></canvas><div class="divorzhinha-overlay" id="divorzhinha-overlay"><div class="divorzhinha-overlay-card"><span id="divorzhinha-overlay-kicker">✦ RETO DE PENALES ✦</span><h3 id="divorzhinha-overlay-title">¡SUPERA AL ARQUERO!</h3><p id="divorzhinha-overlay-copy">Arrastra el dedo desde el balón hacia el espacio del arco donde quieras apuntar y suelta para patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.</p><button type="button" id="divorzhinha-start">▶ COMENZAR</button><button type="button" id="divorzhinha-exit">SALIR</button></div></div></div><div class="divorzhinha-controls"><span>👆 ARRASTRA EL BALÓN Y SUELTA PARA PATEAR</span><span>⚽ CADA GOL = +1 ESPÍRITU</span><span>🧤 ATAJADA = −1 VIDA</span></div><section class="divorzhinha-history"><div><h3>🏆 TU RÉCORD</h3><p id="divorzhinha-stats">Cargando estadísticas…</p></div><ol id="divorzhinha-history-list"><li>Historial de partidas</li></ol></section><section class="rozvi-leaderboard rozvi-leaderboard-bottom divorzhinha-leaderboard"><h4>🏆 TOP 5 · MEJORES JUGADORES</h4><ol id="divorzhinha-leaderboard-list"><li>Cargando ranking…</li></ol></section><footer class="divorzhinha-footer">MODO ADMIN · VIDAS INFINITAS · ENTORNO DE PRUEBAS</footer></div>';
+ modal.innerHTML='<div class="rozvi-game-shell divorzhinha-shell" role="dialog" aria-modal="true" aria-label="DIVORZINHA"><header class="divorzhinha-header"><div><span class="divorzhinha-overline">NAVIDAD PYME ARCADE · PENAL CHALLENGE</span><h2>DIVORZINHA</h2></div><button type="button" class="divorzhinha-close" aria-label="Cerrar">×</button></header><div class="divorzhinha-hud"><div><small>GOLES</small><strong id="divorzhinha-score">0</strong></div><div><small>VIDAS</small><strong id="divorzhinha-lives">❤️❤️❤️❤️❤️</strong></div><div><small>RÉCORD</small><strong id="divorzhinha-best">0</strong></div><button type="button" id="divorzhinha-pause" disabled>Ⅱ</button></div><div class="divorzhinha-stage-wrap"><canvas id="divorzhinha-canvas" width="960" height="540" aria-label="Patea al arco e intenta marcarle al arquero"></canvas><div class="divorzhinha-overlay" id="divorzhinha-overlay"><div class="divorzhinha-overlay-card"><span id="divorzhinha-overlay-kicker">✦ RETO DE PENALES ✦</span><h3 id="divorzhinha-overlay-title">¡SUPERA AL ARQUERO!</h3><p id="divorzhinha-overlay-copy">Arrastra el dedo desde el balón hacia el espacio del arco donde quieras apuntar y suelta para patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.</p><button type="button" id="divorzhinha-start">▶ COMENZAR</button><button type="button" id="divorzhinha-exit">SALIR</button></div></div></div><div class="divorzhinha-controls"><span>👆 ARRASTRA EL BALÓN Y SUELTA PARA PATEAR</span><span>⚽ CADA GOL = +1 ESPÍRITU</span><span>🧤 ATAJADA = −1 VIDA</span></div><section class="divorzhinha-history"><div><h3>🏆 TU RÉCORD</h3><p id="divorzhinha-stats">Cargando estadísticas…</p></div></section><section class="rozvi-leaderboard rozvi-leaderboard-bottom divorzhinha-leaderboard"><h4>🏆 TOP 5 · MEJORES JUGADORES</h4><ol id="divorzhinha-leaderboard-list"><li>Cargando ranking…</li></ol></section><footer class="divorzhinha-footer">MODO ADMIN · VIDAS INFINITAS · ENTORNO DE PRUEBAS</footer></div>';
  document.body.append(modal);openDivorzhinhaGame.loading=false;
  modal.addEventListener("selectstart",e=>e.preventDefault());modal.addEventListener("contextmenu",e=>e.preventDefault());modal.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();});
  const canvas=modal.querySelector("#divorzhinha-canvas"),ctx=canvas.getContext("2d"),gameAudio=new Audio("/api/divorzhinha/music/current?v="+Date.now()),scoreEl=modal.querySelector("#divorzhinha-score"),livesEl=modal.querySelector("#divorzhinha-lives"),bestEl=modal.querySelector("#divorzhinha-best"),pauseBtn=modal.querySelector("#divorzhinha-pause"),overlay=modal.querySelector("#divorzhinha-overlay"),startBtn=modal.querySelector("#divorzhinha-start"),exitBtn=modal.querySelector("#divorzhinha-exit");
- gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540;let lives=state.unlimitedLives?Infinity:Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,gameId=crypto.randomUUID().replace(/-/g,"");
+ gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540;let lives=state.unlimitedLives?Infinity:Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,gameId=crypto.randomUUID().replace(/-/g,"");
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  function paintHud(){scoreEl.textContent=String(score);livesEl.textContent=state.unlimitedLives?"∞":"❤️".repeat(lives)+"🖤".repeat(5-lives);bestEl.textContent=String(Math.max(best,score));pauseBtn.disabled=!active&&!paused;}
  function pixel(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
  function drawGoal(){
-  const g=ctx.createLinearGradient(0,55,0,410);g.addColorStop(0,"#f7fbff");g.addColorStop(1,"#b8d5dc");ctx.fillStyle=g;ctx.fillRect(150,55,660,355);
-  ctx.strokeStyle="rgba(46,92,105,.25)";ctx.lineWidth=2;for(let x=170;x<810;x+=24){ctx.beginPath();ctx.moveTo(x,60);ctx.lineTo(x,405);ctx.stroke();}for(let y=72;y<410;y+=22){ctx.beginPath();ctx.moveTo(154,y);ctx.lineTo(806,y);ctx.stroke();}
-  ctx.shadowColor="#081d20";ctx.shadowBlur=14;ctx.strokeStyle="#fff";ctx.lineWidth=18;ctx.strokeRect(150,55,660,355);ctx.shadowBlur=0;ctx.strokeStyle="#d5e3e5";ctx.lineWidth=5;ctx.strokeRect(166,71,628,323);
- }
- function roundedRect(x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();}
+  const wall=ctx.createLinearGradient(0,35,0,430);wall.addColorStop(0,"#d8e9e8");wall.addColorStop(.45,"#8fbab2");wall.addColorStop(1,"#477c6a");ctx.fillStyle=wall;ctx.fillRect(120,45,720,390);
+  for(let row=0;row<5;row++){for(let i=0;i<48;i++){const x=130+i*15,y=58+row*25;ctx.fillStyle=["#f8d77b","#f7f5e9","#e98565","#73b9a7","#324f66"][(i*7+row*3)%5];ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(x,y,4.3,0,Math.PI*2);ctx.fill();}}ctx.globalAlpha=1;
+  ctx.save();ctx.beginPath();ctx.moveTo(155,75);ctx.lineTo(805,75);ctx.lineTo(790,395);ctx.lineTo(170,395);ctx.closePath();ctx.clip();
+  const net=ctx.createLinearGradient(0,70,0,405);net.addColorStop(0,"#f5fcf5");net.addColorStop(1,"#a8c8c4");ctx.fillStyle=net;ctx.fillRect(150,70,660,335);
+  ctx.strokeStyle="rgba(32,75,77,.22)";ctx.lineWidth=1.5;for(let x=155;x<=805;x+=22){ctx.beginPath();ctx.moveTo(x,75);ctx.lineTo(170+(x-155)*.95,395);ctx.stroke();}for(let y=88;y<=395;y+=21){const p=(y-75)/320;ctx.beginPath();ctx.moveTo(155+15*p,y);ctx.lineTo(805-15*p,y);ctx.stroke();}ctx.restore();
+  ctx.save();ctx.shadowColor="#0a292c99";ctx.shadowBlur=18;ctx.strokeStyle="#f9ffff";ctx.lineWidth=22;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(154,397);ctx.lineTo(154,78);ctx.quadraticCurveTo(154,62,172,62);ctx.lineTo(788,62);ctx.quadraticCurveTo(806,62,806,80);ctx.lineTo(806,397);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle="#a8c4c7";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(164,391);ctx.lineTo(164,82);ctx.lineTo(796,82);ctx.lineTo(796,391);ctx.stroke();ctx.restore();
+  const turf=ctx.createLinearGradient(0,395,0,540);turf.addColorStop(0,"#2c9c5d");turf.addColorStop(1,"#0b5839");ctx.fillStyle=turf;ctx.fillRect(0,395,960,145);
+  ctx.strokeStyle="rgba(255,255,255,.38)";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,397);ctx.lineTo(960,397);ctx.stroke();ctx.strokeStyle="rgba(255,255,255,.28)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(220,540);ctx.lineTo(315,398);ctx.moveTo(740,540);ctx.lineTo(645,398);ctx.stroke();ctx.fillStyle="#f8f4dc";ctx.beginPath();ctx.ellipse(480,493,5,3,0,0,Math.PI*2);ctx.fill();
+ } function roundedRect(x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();}
  function drawKeeper(now){
-  const t=keeperDive?clamp((now-keeperDive.start)/420,0,1):0,e=t*t*(3-2*t),x=keeperDive?keeperDive.fromX+(keeperDive.toX-keeperDive.fromX)*e:keeperX;
-  const lean=keeperDive?Math.sin(e*Math.PI)*.4:Math.sin(now/170)*.035,ground=370+Math.sin(now/145)*3;
-  ctx.save();ctx.translate(x,ground);ctx.rotate(lean);ctx.shadowColor="#10231d88";ctx.shadowBlur=12;ctx.shadowOffsetY=7;
-  ctx.strokeStyle="#a96d4b";ctx.lineWidth=24;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(-20,-54);ctx.lineTo(-26,-13);ctx.moveTo(20,-54);ctx.lineTo(26,-13);ctx.stroke();
-  roundedRect(-57,-17,48,20,8,"#f47727");roundedRect(9,-17,48,20,8,"#f47727");
-  roundedRect(-48,-157,96,105,22,"#f4ca2f");roundedRect(-38,-150,76,15,7,"#ffe987");ctx.fillStyle="#d7a91b";ctx.fillRect(-7,-139,14,76);
-  const swing=Math.sin(now/190)*.12;
-  ctx.save();ctx.rotate(-swing);ctx.strokeStyle="#a96d4b";ctx.lineWidth=19;ctx.beginPath();ctx.moveTo(-43,-139);ctx.lineTo(-78,-104);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-82,-100,17,0,Math.PI*2);ctx.fill();ctx.restore();
-  ctx.save();ctx.rotate(swing);ctx.strokeStyle="#a96d4b";ctx.lineWidth=19;ctx.beginPath();ctx.moveTo(43,-139);ctx.lineTo(78,-104);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(82,-100,17,0,Math.PI*2);ctx.fill();ctx.restore();
-  roundedRect(-15,-177,30,27,8,"#a96d4b");ctx.beginPath();ctx.ellipse(0,-207,36,43,0,0,Math.PI*2);ctx.fillStyle="#b97952";ctx.fill();
-  ctx.fillStyle="#211d1b";ctx.beginPath();ctx.ellipse(0,-236,38,17,0,Math.PI,Math.PI*2);ctx.fill();ctx.fillRect(-35,-235,70,9);
-  ctx.fillStyle="#241b18";ctx.beginPath();ctx.arc(-13,-207,4,0,Math.PI*2);ctx.arc(13,-207,4,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#241b18";ctx.lineWidth=4;ctx.lineCap="round";ctx.beginPath();if(now<angryUntil){ctx.moveTo(-25,-221);ctx.lineTo(-8,-214);ctx.moveTo(25,-221);ctx.lineTo(8,-214);ctx.moveTo(-10,-187);ctx.quadraticCurveTo(0,-201,10,-187);}else{ctx.moveTo(-23,-216);ctx.lineTo(-7,-218);ctx.moveTo(23,-216);ctx.lineTo(7,-218);ctx.moveTo(-10,-188);ctx.quadraticCurveTo(0,-176,10,-188);}ctx.stroke();ctx.restore();
+  const t=keeperDive?clamp((now-keeperDive.start)/560,0,1):0,e=t*t*(3-2*t),x=keeperDive?keeperDive.fromX+(keeperDive.toX-keeperDive.fromX)*e:keeperX;
+  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,lean=keeperDive?Math.sin(e*Math.PI)*.32:Math.sin(now/310)*.025,ground=382+Math.sin(now/175)*2;
+  const armLift=keeperDive?-Math.sin(e*Math.PI)*22:Math.sin(now/280)*5;
+  const skin=ctx.createLinearGradient(-55,-220,55,-90);skin.addColorStop(0,"#d99a70");skin.addColorStop(.55,"#b97952");skin.addColorStop(1,"#875139");
+  const shirt=ctx.createLinearGradient(-55,-285,55,-105);shirt.addColorStop(0,"#fff06b");shirt.addColorStop(.35,"#f8d52d");shirt.addColorStop(1,"#d79d13");
+  const glove=ctx.createLinearGradient(-18,-20,18,22);glove.addColorStop(0,"#fff");glove.addColorStop(.55,"#f4f7f3");glove.addColorStop(1,"#b7c7c1");
+  ctx.save();ctx.translate(x,ground);ctx.rotate(lean);ctx.shadowColor="#061b1780";ctx.shadowBlur=20;ctx.shadowOffsetY=12;
+  ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle=skin;ctx.lineWidth=25;ctx.beginPath();ctx.moveTo(-19,-91);ctx.quadraticCurveTo(-26,-55,-31,-30);ctx.moveTo(19,-91);ctx.quadraticCurveTo(27,-55,31,-30);ctx.stroke();
+  ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+  const shorts=ctx.createLinearGradient(-42,-115,42,-70);shorts.addColorStop(0,"#ffea48");shorts.addColorStop(1,"#c99012");roundedRect(-43,-119,86,39,13,shorts);
+  roundedRect(-57,-32,48,24,9,"#f47725");roundedRect(9,-32,48,24,9,"#f47725");roundedRect(-58,-16,49,8,4,"#ffb15b");roundedRect(9,-16,49,8,4,"#ffb15b");
+  roundedRect(-53,-279,106,168,25,shirt);roundedRect(-42,-265,84,12,6,"#fff4a1");
+  const side=ctx.createLinearGradient(-53,0,53,0);side.addColorStop(0,"#d49a12");side.addColorStop(.5,"#ffed69");side.addColorStop(1,"#d49a12");ctx.fillStyle=side;ctx.fillRect(-53,-171,106,9);
+  ctx.fillStyle="#fff7b4";ctx.beginPath();ctx.moveTo(-17,-278);ctx.lineTo(0,-260);ctx.lineTo(17,-278);ctx.lineTo(10,-286);ctx.lineTo(-10,-286);ctx.closePath();ctx.fill();
+  ctx.save();ctx.translate(-43,-251);ctx.rotate(-.24-idle*.045-(keeperDive?Math.sin(e*Math.PI)*.9:0));ctx.strokeStyle=skin;ctx.lineWidth=23;ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(-24,24,-40,49+armLift);ctx.stroke();roundedRect(-55,38+armLift,33,36,12,glove);ctx.strokeStyle="#aabbb5";ctx.lineWidth=3;for(let j=0;j<3;j++){ctx.beginPath();ctx.moveTo(-50+j*8,42+armLift);ctx.lineTo(-52+j*8,57+armLift);ctx.stroke();}ctx.restore();
+  ctx.save();ctx.translate(43,-251);ctx.rotate(.24+idle*.045+(keeperDive?Math.sin(e*Math.PI)*.9:0));ctx.strokeStyle=skin;ctx.lineWidth=23;ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(24,24,40,49+armLift);ctx.stroke();roundedRect(22,38+armLift,33,36,12,glove);ctx.strokeStyle="#aabbb5";ctx.lineWidth=3;for(let j=0;j<3;j++){ctx.beginPath();ctx.moveTo(27+j*8,42+armLift);ctx.lineTo(25+j*8,57+armLift);ctx.stroke();}ctx.restore();
+  roundedRect(-16,-310,32,39,9,skin);ctx.beginPath();ctx.ellipse(0,-337+breath*.25,39,47,0,0,Math.PI*2);ctx.fillStyle=skin;ctx.fill();
+  ctx.fillStyle="#a96343";ctx.beginPath();ctx.ellipse(-39,-337,8,13,0,0,Math.PI*2);ctx.ellipse(39,-337,8,13,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#201b1a";ctx.beginPath();ctx.moveTo(-39,-346);ctx.quadraticCurveTo(-43,-385,-8,-389);ctx.quadraticCurveTo(29,-395,42,-360);ctx.lineTo(34,-354);ctx.quadraticCurveTo(12,-370,-4,-362);ctx.quadraticCurveTo(-21,-350,-39,-346);ctx.fill();
+  ctx.fillStyle="#251c19";ctx.beginPath();ctx.arc(-13,-337,4.2,0,Math.PI*2);ctx.arc(13,-337,4.2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#3b241d";ctx.lineWidth=3.5;ctx.lineCap="round";ctx.beginPath();if(now<angryUntil){ctx.moveTo(-24,-351);ctx.lineTo(-8,-345);ctx.moveTo(24,-351);ctx.lineTo(8,-345);ctx.moveTo(-10,-317);ctx.quadraticCurveTo(0,-331,10,-317);}else{ctx.moveTo(-24,-351);ctx.lineTo(-8,-353);ctx.moveTo(24,-351);ctx.lineTo(8,-353);ctx.moveTo(-11,-318);ctx.quadraticCurveTo(0,-307,11,-318);}ctx.stroke();
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-14,-338,1.5,0,Math.PI*2);ctx.arc(12,-338,1.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#fff8d0";ctx.beginPath();ctx.arc(0,-210,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#1e6b50";ctx.font="bold 11px system-ui";ctx.textAlign="center";ctx.fillText("D",0,-206);
+  ctx.globalAlpha=.22;ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-33,-258);ctx.lineTo(-26,-125);ctx.moveTo(33,-258);ctx.lineTo(26,-125);ctx.stroke();ctx.globalAlpha=1;ctx.restore();
   if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
- }
- function drawBall(x,y,r=34,rotation=0){
+ } function drawBall(x,y,r=34,rotation=0){
   ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.shadowColor="#071b1b99";ctx.shadowBlur=16;ctx.shadowOffsetY=8;
   const grad=ctx.createRadialGradient(-r*.35,-r*.4,2,0,0,r);grad.addColorStop(0,"#fff");grad.addColorStop(.72,"#f1f5f1");grad.addColorStop(1,"#9da9a5");
   ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle="#25353a";ctx.lineWidth=Math.max(2,r*.09);ctx.stroke();
@@ -1461,8 +1476,9 @@ async function openDivorzhinhaGame(){
   for(const x of [300,480,660]){ctx.strokeStyle="rgba(255,255,255,.22)";ctx.lineWidth=2;ctx.setLineDash([8,9]);ctx.beginPath();ctx.moveTo(x,90);ctx.lineTo(x,402);ctx.stroke();}ctx.setLineDash([]);
   drawKeeper(now);
   if(shot){const t=clamp((now-shot.started)/shot.duration,0,1),e=t*t*(3-2*t),x=shot.x+(shot.targetX-shot.x)*e,y=shot.y+(shot.targetY-shot.y)*e,r=shot.radiusStart+(shot.radiusEnd-shot.radiusStart)*e;ctx.save();ctx.globalAlpha=.3;ctx.strokeStyle="#fff";ctx.lineWidth=r*.7;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(x,y+24);ctx.lineTo(x+(shot.x-shot.targetX)*.16,y+80);ctx.stroke();ctx.restore();drawBall(x,y,r,now/90);}
-  else{drawBall(480,475,36,now/160);if(aim){const dx=aim.x-480,dy=aim.y-475;ctx.save();ctx.strokeStyle="#ffe18a";ctx.lineWidth=5;ctx.setLineDash([12,8]);ctx.lineCap="round";ctx.beginPath();ctx.moveTo(480,475);ctx.lineTo(aim.x,aim.y);ctx.stroke();ctx.setLineDash([]);const angle=Math.atan2(dy,dx);ctx.fillStyle="#ffe18a";ctx.beginPath();ctx.moveTo(aim.x,aim.y);ctx.lineTo(aim.x-22*Math.cos(angle-.45),aim.y-22*Math.sin(angle-.45));ctx.lineTo(aim.x-22*Math.cos(angle+.45),aim.y-22*Math.sin(angle+.45));ctx.closePath();ctx.fill();ctx.restore();}}
-  if(message&&performance.now()<messageUntil){ctx.fillStyle="#fff2c7";ctx.font="1000 35px system-ui";ctx.textAlign="center";ctx.shadowColor="#123b31";ctx.shadowBlur=12;ctx.fillText(message,480,465);ctx.shadowBlur=0;}
+  else{drawBall(480,475,44,now/160);if(aim){const dx=aim.x-480,dy=aim.y-475;ctx.save();ctx.strokeStyle="#ffe18a";ctx.lineWidth=5;ctx.setLineDash([12,8]);ctx.lineCap="round";ctx.beginPath();ctx.moveTo(480,475);ctx.lineTo(aim.x,aim.y);ctx.stroke();ctx.setLineDash([]);const angle=Math.atan2(dy,dx);ctx.fillStyle="#ffe18a";ctx.beginPath();ctx.moveTo(aim.x,aim.y);ctx.lineTo(aim.x-22*Math.cos(angle-.45),aim.y-22*Math.sin(angle-.45));ctx.lineTo(aim.x-22*Math.cos(angle+.45),aim.y-22*Math.sin(angle+.45));ctx.closePath();ctx.fill();ctx.restore();}}
+  const dtFx=1/60;for(let i=goalParticles.length-1;i>=0;i--){const p=goalParticles[i];p.x+=p.vx*dtFx;p.y+=p.vy*dtFx;p.vy+=420*dtFx;p.life-=dtFx*.75;ctx.save();ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle="hsl("+p.hue+" 88% 62%)";ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=10;ctx.translate(p.x,p.y);ctx.rotate((1-p.life)*8);ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*1.8);ctx.restore();if(p.life<=0)goalParticles.splice(i,1);}
+  if(message&&performance.now()<messageUntil){const pulse=1+Math.sin(now/75)*.045;ctx.save();ctx.translate(480,465);ctx.scale(pulse,pulse);ctx.fillStyle="#fff7d7";ctx.font="1000 38px system-ui";ctx.textAlign="center";ctx.shadowColor="#123b31";ctx.shadowBlur=18;ctx.strokeStyle="#174b36";ctx.lineWidth=5;ctx.strokeText(message,0,0);ctx.fillText(message,0,0);ctx.restore();}
  }
  async function loadDivorzhinhaLeaderboard(){
   const list=modal.querySelector("#divorzhinha-leaderboard-list");if(!list)return;
@@ -1472,9 +1488,6 @@ async function openDivorzhinhaGame(){
  function updateHistory(data){
   const stats=data.stats||{};best=Number(stats.best_score||best);gamesPlayed=Number(stats.games_played||gamesPlayed);
   modal.querySelector("#divorzhinha-stats").textContent="Partidas: "+gamesPlayed+" · Goles totales: "+Number(stats.total_goals||0)+" · Récord: "+best;
-  const list=modal.querySelector("#divorzhinha-history-list");list.replaceChildren();
-  (data.history||[]).forEach((row,index)=>{const li=document.createElement("li");li.textContent=(index+1)+". "+Number(row.goals)+" goles · "+Number(row.saves)+" atajadas";list.append(li);});
-  if(!list.children.length){const li=document.createElement("li");li.textContent="Todavía no hay partidas registradas.";list.append(li);}
   paintHud();
  }
  function showOverlay(kicker,title,copy,buttonText,showExit=true){
@@ -1489,13 +1502,13 @@ async function openDivorzhinhaGame(){
   if(!active||shooting)return;shooting=true;saves++;
   if(!state.unlimitedLives){lives=Math.max(0,lives-1);paintHud();try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Number(result.livesRemaining??lives);}catch(error){showOverlay("SIN CONEXIÓN","NO SE PUDO GUARDAR LA VIDA",error.message,"REINTENTAR",true);active=false;paused=true;shooting=false;return;}}
   paintHud();keeperDive={start:performance.now(),fromX:keeperX,toX:[300,480,660][keeperLane]};
-  if(!state.unlimitedLives&&lives<=0){active=false;gameAudio.pause();finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):"No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez.",saved?"VER RESULTADO":"REINTENTAR",true);}
+  if(!state.unlimitedLives&&lives<=0){active=false;gameAudio.pause();finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):"No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez.",saved?"JUGAR OTRA VEZ":"JUGAR OTRA VEZ",true);}
   else{message="¡ATAJADA! "+(state.unlimitedLives?"":"-1 VIDA");messageUntil=performance.now()+900;shooting=false;}
  }
  function finishOutsideShot(){
   active=false;paused=false;finished=true;shooting=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
   message="¡FUERA!";messageUntil=performance.now()+1200;
-  void submit().then(saved=>showOverlay(saved?"✦ PARTIDA TERMINADA ✦":"ERROR AL GUARDAR",saved?"¡LA MANDASTE FUERA!":"PUNTAJE PENDIENTE",saved?"El balón salió del arco. Tu partida terminó con "+score+" goles.":"No se pudo guardar tu resultado. Comprueba tu conexión e inténtalo otra vez.",saved?"VER RESULTADO":"REINTENTAR",true));
+  void submit().then(saved=>{showOverlay(saved?"✦ PARTIDA TERMINADA ✦":"ERROR AL GUARDAR",saved?"¡LA MANDASTE FUERA!":"PUNTAJE PENDIENTE",saved?"El balón salió del arco. Terminaste con "+score+" goles.":"No se pudo guardar tu resultado. Comprueba tu conexión e inténtalo otra vez.","JUGAR OTRA VEZ",true);startBtn.disabled=!state.unlimitedLives&&lives<=0;});
  }
  function resolveShot(){
   if(!shot)return;const current=shot;shot=null;shooting=false;
@@ -1503,12 +1516,12 @@ async function openDivorzhinhaGame(){
   if(!inside){finishOutsideShot();return;}
   const caught=Math.abs(keeperX-current.targetX)<78&&current.targetY<255;
   if(caught){keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
-  else{score++;angryUntil=performance.now()+1400;message="¡GOOOOL! +1";messageUntil=performance.now()+900;paintHud();}
+  else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1100;for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
  }
  function shoot(targetX=480,targetY=160){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
-  shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:36,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
+  shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
   shooting=true;aim=null;setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
@@ -1517,6 +1530,10 @@ async function openDivorzhinhaGame(){
   render(now);raf=requestAnimationFrame(frame);
  }
  function start(){if(active||lives<=0||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
+ function restartGame(){
+  if(!state.unlimitedLives&&lives<=0){showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Has utilizado tus cinco vidas. Se renovarán según el horario configurado.","JUGAR OTRA VEZ",true);startBtn.disabled=true;return;}
+  score=0;saves=0;finished=false;submitted=false;shooting=false;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=150;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
+ }
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
   if(paused){active=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.textContent="▶";showOverlay("PARTIDA EN PAUSA","TÓMATE UN RESPIRO","Tu progreso y tus vidas se mantienen.","▶ CONTINUAR",true);}
@@ -1531,9 +1548,9 @@ async function openDivorzhinhaGame(){
  const releaseAim=event=>{if(pointerId!==event.pointerId)return;event.preventDefault();const p=canvasPoint(event);pointerId=null;if(!active||!aim)return;const target={x:clamp(p.x,35,925),y:clamp(p.y,18,505)};aim=null;shoot(target.x,target.y);};
  canvas.addEventListener("pointerup",releaseAim,{passive:false});canvas.addEventListener("pointercancel",event=>{if(pointerId===event.pointerId){pointerId=null;aim=null;}});
 
- pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",()=>{if(paused){togglePause();return;}if(finished){if(!submitted){void submit().then(saved=>showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y sumaste "+score+" puntos de Espíritu."):"No se pudo guardar. Vuelve a intentarlo.",saved?"VER RESULTADO":"REINTENTAR",true));return;}close();return;}start();});
+ pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",async()=>{if(paused){togglePause();return;}if(finished){if(!submitted){const saved=await submit();if(!saved){showOverlay("ERROR AL GUARDAR","PUNTAJE PENDIENTE","No se pudo guardar la partida. Inténtalo nuevamente.","JUGAR OTRA VEZ",true);return;}}restartGame();return;}start();});
  exitBtn.addEventListener("click",close);modal.querySelector(".divorzhinha-close").addEventListener("click",close);modal.addEventListener("click",event=>{if(event.target===modal)close();});window.addEventListener("keydown",keyDown);
  updateHistory(state);paintHud();render(performance.now());loadDivorzhinhaLeaderboard();
  if(!state.unlimitedLives&&lives<=0)showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Tus cinco vidas ya fueron utilizadas. Se renovarán a las 18:00, hora de Lima.","",false);
- else showOverlay("✦ RETO DE PENALES ✦","¡SUPERA AL ARQUERO!","Toca la pantalla cuando el balón pase por el lugar donde quieras patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.","▶ COMENZAR",true);
+ else showOverlay("✦ RETO DE PENALES ✦","¡SUPERA AL ARQUERO!","Arrastra desde el balón hacia donde quieras disparar y suelta. ¡Marca goles y esquiva al arquero!","▶ COMENZAR",true);
 }
