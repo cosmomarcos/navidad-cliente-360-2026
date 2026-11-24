@@ -512,6 +512,14 @@ async function handleApi(request, env, url) {
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
    return json({livesRemaining:999,maxLives:999,unlimitedLives:true,gameDate:getRozviGameDate()});
   }
+  if(url.pathname==="/api/divorzhinha/leaderboard"&&request.method==="GET"){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"DIVORZINHA está habilitado únicamente para el administrador."},403);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   await ensureDivorzhinhaSchema(env);await ensureParticipantProfilesSchema(env);
+   const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ds.goals) AS best_score,COUNT(ds.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN divorzhinha_game_scores ds ON ds.edition_id=em.edition_id AND ds.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
+   return json({ranking:rows.results||[]});
+  }
   if(url.pathname==="/api/divorzhinha/score"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    if(!(await isPrimaryAdmin(user,env)))return json({error:"Solo el administrador puede registrar partidas."},403);
