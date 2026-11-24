@@ -1450,7 +1450,7 @@ async function openDivorzhinhaGame(){
   keeperCtx.lineCap="round";keeperCtx.lineJoin="round";keeperCtx.strokeStyle=skin;keeperCtx.lineWidth=25;keeperCtx.beginPath();keeperCtx.moveTo(-19,-91);keeperCtx.quadraticCurveTo(-26+step*.3,-55,-31+step,-30);keeperCtx.moveTo(19,-91);keeperCtx.quadraticCurveTo(27-step*.3,-55,31-step,-30);keeperCtx.stroke();
   keeperCtx.shadowBlur=0;keeperCtx.shadowOffsetY=0;
   const shorts=keeperCtx.createLinearGradient(-42,-115,42,-70);shorts.addColorStop(0,"#ffea48");shorts.addColorStop(1,"#c99012");keeperRoundedRect(-43,-119,86,39,13,shorts);
-  keeperRoundedRect(-57,-32,48,24,9,"#f47725");keeperRoundedRect(9,-32,48,24,9,"#f47725");keeperRoundedRect(-58,-16,49,8,4,"#ffb15b");keeperRoundedRect(9,-16,49,8,4,"#ffb15b");
+  keeperRoundedRect(-57+step,-32,48,24,9,"#f47725");keeperRoundedRect(9-step,-32,48,24,9,"#f47725");keeperRoundedRect(-58+step,-16,49,8,4,"#ffb15b");keeperRoundedRect(9-step,-16,49,8,4,"#ffb15b");
   keeperRoundedRect(-53,-279,106,168,25,shirt);keeperRoundedRect(-42,-265,84,12,6,"#fff4a1");keeperCtx.save();keeperCtx.fillStyle="#101010";keeperCtx.font="1000 72px Arial,sans-serif";keeperCtx.textAlign="center";keeperCtx.textBaseline="middle";keeperCtx.fillText("1",0,-194);keeperCtx.restore();
   const side=keeperCtx.createLinearGradient(-53,0,53,0);side.addColorStop(0,"#d49a12");side.addColorStop(.5,"#ffed69");side.addColorStop(1,"#d49a12");keeperCtx.fillStyle=side;keeperCtx.fillRect(-53,-171,106,9);
   keeperCtx.fillStyle="#fff7b4";keeperCtx.beginPath();keeperCtx.moveTo(-17,-278);keeperCtx.lineTo(0,-260);keeperCtx.lineTo(17,-278);keeperCtx.lineTo(10,-286);keeperCtx.lineTo(-10,-286);keeperCtx.closePath();keeperCtx.fill();
