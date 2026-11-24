@@ -1273,3 +1273,19 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 /* DIVORZINHA alignment with ¡Vamos Rozvi! */
 .divorzhinha-shell{width:min(940px,100%);max-height:calc(100dvh - 20px);padding:clamp(12px,2.5vw,24px);border-radius:17px;box-shadow:0 25px 90px #0009,inset 0 0 0 5px #fff9e9}.divorzhinha-leaderboard{margin-top:12px;padding:11px 13px;border:1px solid #c4ad78;border-radius:10px;background:#f8efd9}.divorzhinha-leaderboard h4{margin:0 0 8px;color:#244d3a;font-size:11px}.divorzhinha-leaderboard ol{display:grid;gap:6px;margin:0;padding:0;list-style:none}.divorzhinha-leaderboard li{display:flex;justify-content:space-between;gap:12px;padding:7px 9px;border-radius:6px;background:#fff8e8;color:#31513d;font-size:10px;font-weight:800}.divorzhinha-leaderboard li b{color:#936d2e;font-variant-numeric:tabular-nums}.divorzhinha-announcement{margin-top:14px}.divorzhinha-announcement .rozvi-kicker{color:#9a7840}.divorzhinha-announcement .rozvi-play-button{min-width:150px}.divorzhinha-announcement .divorzhinha-art{border-color:#b9944c;box-shadow:3px 3px 0 #a98a4d}
 @media(max-width:560px){.divorzhinha-shell{max-height:calc(100dvh - 10px);padding:9px}.divorzhinha-leaderboard{padding:9px}.divorzhinha-leaderboard li{font-size:9px}}
+
+/* DIVORZINHA v2.9.7 · visual polish and responsive stage */
+.divorzhinha-game-modal{padding:10px;overflow-y:auto;overscroll-behavior:contain}
+.divorzhinha-shell{width:min(940px,100%);max-width:940px;max-height:calc(100dvh - 20px);padding:clamp(12px,2.5vw,24px);border-radius:17px;box-shadow:0 25px 90px #000a,inset 0 0 0 5px #fff9e9}
+.divorzhinha-stage-wrap{position:relative;width:100%;border:4px solid #173f3b;border-radius:10px;background:linear-gradient(145deg,#153b4b,#1c7549);box-shadow:0 6px 0 #b49b65,0 14px 30px #0a251c55,inset 0 0 0 2px #ffffff24}
+.divorzhinha-stage-wrap canvas{display:block;width:100%;height:auto;image-rendering:auto;filter:saturate(1.15) contrast(1.04);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.divorzhinha-overlay{z-index:4;display:grid;place-items:center;padding:clamp(10px,3vw,24px);background:linear-gradient(135deg,#071c3caa,#10223b99);backdrop-filter:blur(3px)}
+.divorzhinha-overlay[hidden]{display:none!important}
+.divorzhinha-overlay-card{width:min(430px,94%);max-height:calc(100% - 8px);overflow-y:auto;padding:clamp(15px,3vw,24px);border:3px solid #f1d48d;border-radius:13px;background:linear-gradient(145deg,#fff5dc,#e7cc91);box-shadow:0 0 0 3px #754d43,0 12px 26px #1c160f88;text-align:center}
+.divorzhinha-overlay-card h3{margin:9px 0;color:#1c493b;font:1000 clamp(19px,4vw,27px)/1.12 'DM Sans',sans-serif;letter-spacing:.3px}
+.divorzhinha-overlay-card p{max-width:360px;margin:8px auto 16px;color:#274d40;font-size:clamp(12px,2vw,14px);line-height:1.5;overflow-wrap:anywhere}
+.divorzhinha-overlay-card button{display:block!important;width:100%;min-height:48px;margin:8px auto 0;padding:12px 16px;border:2px solid #f6e1a7;border-radius:9px;background:linear-gradient(180deg,#287a54,#164431);color:#fff7df;font:1000 13px 'DM Sans',sans-serif;letter-spacing:.5px;box-shadow:0 4px 0 #79573b;cursor:pointer}
+.divorzhinha-overlay-card button[hidden]{display:none!important}
+.divorzhinha-overlay-card button+button{border-color:#e8cda0;background:linear-gradient(#a64b43,#783b3b)}
+.divorzhinha-controls{line-height:1.45;overflow-wrap:anywhere}
+@media(max-width:560px){.divorzhinha-game-modal{padding:4px}.divorzhinha-shell{width:100%;max-width:none;max-height:calc(100dvh - 8px);padding:8px;border-radius:11px}.divorzhinha-overlay-card{width:min(430px,96%);padding:13px}.divorzhinha-overlay-card p{font-size:12px;margin-bottom:11px}.divorzhinha-overlay-card button{min-height:46px;font-size:12px}}
