@@ -1487,7 +1487,7 @@ async function openDivorzhinhaGame(){
   if(!active||shooting)return;shooting=true;saves++;
   if(!state.unlimitedLives){lives=Math.max(0,lives-1);paintHud();try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Number(result.livesRemaining??lives);}catch(error){showOverlay("SIN CONEXIÓN","NO SE PUDO GUARDAR LA VIDA",error.message,"REINTENTAR",true);active=false;paused=true;shooting=false;return;}}
   paintHud();keeperDive={start:performance.now(),fromX:keeperX,toX:[300,480,660][keeperLane]};
-  if(!state.unlimitedLives&&lives<=0){active=false;gameAudio.pause();finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):"No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez.",saved?"VER RESULTADO":"REINTENTAR",true);}
+  if(!state.unlimitedLives&&lives<=0){active=false;gameAudio.pause();finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):"No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez.",saved?"JUGAR OTRA VEZ":"JUGAR OTRA VEZ",true);}
   else{message="¡ATAJADA! "+(state.unlimitedLives?"":"-1 VIDA");messageUntil=performance.now()+900;shooting=false;}
  }
  function finishOutsideShot(){
