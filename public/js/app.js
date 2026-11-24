@@ -1450,6 +1450,13 @@ async function openDivorzhinhaGame(){
   ctx.fillStyle="#1c4650";ctx.fillRect(0,65,W,150);for(let row=0;row<4;row++)for(let i=0;i<48;i++){ctx.fillStyle=["#f5d36d","#f2f4ee","#e96c53","#78c6b3"][(i+row*3)%4];ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(i*21+8,85+row*29+(i%2)*5,5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
   const field=ctx.createLinearGradient(0,215,0,H);field.addColorStop(0,"#2d965d");field.addColorStop(1,"#12633f");ctx.fillStyle=field;ctx.fillRect(0,215,W,H-215);
   for(let i=0;i<12;i++){ctx.fillStyle=i%2?"rgba(255,255,255,.035)":"rgba(0,0,0,.035)";ctx.fillRect(i*80,215,80,325);}
+  // Stadium atmosphere: soft floodlights, animated beams and a richer pitch.
+  ctx.save();
+  for(let i=0;i<6;i++){const lx=80+i*160,glow=ctx.createRadialGradient(lx,65,3,lx,65,125);glow.addColorStop(0,"rgba(255,244,190,.34)");glow.addColorStop(1,"rgba(255,244,190,0)");ctx.fillStyle=glow;ctx.fillRect(lx-125,0,250,220);}
+  for(let i=0;i<4;i++){const x=115+i*245+Math.sin(now/900+i)*24;ctx.globalAlpha=.045;ctx.fillStyle="#fff3b0";ctx.beginPath();ctx.moveTo(x-8,55);ctx.lineTo(x-92,215);ctx.lineTo(x+92,215);ctx.closePath();ctx.fill();}
+  ctx.globalAlpha=1;
+  const vignette=ctx.createRadialGradient(480,330,140,480,330,610);vignette.addColorStop(0,"rgba(0,0,0,0)");vignette.addColorStop(1,"rgba(0,20,15,.24)");ctx.fillStyle=vignette;ctx.fillRect(0,0,W,H);
+  ctx.restore();
   drawGoal();ctx.fillStyle="#fff5d6";ctx.font="1000 19px system-ui";ctx.textAlign="center";ctx.fillText("DIVORZINHA · ¡PENAL NAVIDEÑO!",480,32);
   for(const x of [300,480,660]){ctx.strokeStyle="rgba(255,255,255,.22)";ctx.lineWidth=2;ctx.setLineDash([8,9]);ctx.beginPath();ctx.moveTo(x,90);ctx.lineTo(x,402);ctx.stroke();}ctx.setLineDash([]);
   drawKeeper(now);
