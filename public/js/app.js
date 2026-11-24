@@ -1507,7 +1507,7 @@ async function openDivorzhinhaGame(){
  function canvasPoint(event){const rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*W/rect.width,y:(event.clientY-rect.top)*H/rect.height};}
  function keyDown(event){if(event.code==="Space"||event.key==="Enter"){if(active){event.preventDefault();shoot(480,160);}}}
  canvas.style.touchAction="none";
- canvas.addEventListener("pointerdown",event=>{if(!active||paused||shooting||finished)return;const p=canvasPoint(event);if(p.y<330)return;event.preventDefault();pointerId=event.pointerId;aim={x:clamp(p.x,205,755),y:clamp(p.y,105,295)};canvas.setPointerCapture?.(event.pointerId);},{passive:false});
+ canvas.addEventListener("pointerdown",event=>{if(!active||paused||shooting||finished)return;const p=canvasPoint(event);if(p.y<330)return;event.preventDefault();pointerId=event.pointerId;aim={x:480,y:475};canvas.setPointerCapture?.(event.pointerId);},{passive:false});
  canvas.addEventListener("pointermove",event=>{if(pointerId!==event.pointerId||!aim)return;event.preventDefault();const p=canvasPoint(event);aim={x:clamp(p.x,205,755),y:clamp(p.y,105,295)};},{passive:false});
  const releaseAim=event=>{if(pointerId!==event.pointerId)return;event.preventDefault();const p=canvasPoint(event);pointerId=null;if(!active||!aim)return;const target={x:clamp(p.x,205,755),y:clamp(p.y,105,295)};aim=null;shoot(target.x,target.y);};
  canvas.addEventListener("pointerup",releaseAim,{passive:false});canvas.addEventListener("pointercancel",event=>{if(pointerId===event.pointerId){pointerId=null;aim=null;}});
