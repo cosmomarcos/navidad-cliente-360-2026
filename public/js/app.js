@@ -1475,7 +1475,7 @@ async function openDivorzhinhaGame(){
  }
  async function submit(){
   if(submitted)return true;submitted=true;
-  try{const result=await api("/api/divorzhinha/score",{method:"POST",body:JSON.stringify({gameId,goals:score,saves}),noMemoryCache:true});updateHistory(result);message="+"+Number(result.awardedPoints||0)+" ESPÍRITU";messageUntil=performance.now()+1800;return true;}
+  try{const result=await api("/api/divorzhinha/score",{method:"POST",body:JSON.stringify({gameId,goals:score,saves}),noMemoryCache:true});updateHistory(result);void loadDivorzhinhaLeaderboard();message="+"+Number(result.awardedPoints||0)+" ESPÍRITU";messageUntil=performance.now()+1800;return true;}
   catch(error){submitted=false;return false;}
  }
  async function consumeLife(){
