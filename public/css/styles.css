@@ -1338,7 +1338,10 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 }
 
 
-/* DIVORZINHA v2.11.0 · tarjeta de inicio como ¡Vamos Rozvi! */
-.divorzhinha-announcement{display:block;min-height:142px;padding:20px 22px;background:linear-gradient(125deg,#173c34,#205b42 68%,#9b682e);background-size:cover;background-position:center}
-.divorzhinha-announcement .divorzhinha-copy{max-width:560px}
-@media(max-width:560px){.divorzhinha-announcement{min-height:126px;padding:15px}}
+/* DIVORZINHA v2.11.2 · mismas dimensiones y jerarquía visual que ¡Vamos Rozvi! */
+.divorzhinha-announcement{display:block;box-sizing:border-box;width:100%;min-height:205px;margin:20px 0;padding:18px 15px;border:1px solid #d6b66b;border-radius:18px;background-size:cover;background-position:center;align-content:center}
+.divorzhinha-announcement .divorzhinha-copy{max-width:82%}
+.divorzhinha-announcement .divorzhinha-copy h2{margin:12px 0;color:#fff2c7;font-size:clamp(27px,6vw,40px)}
+.divorzhinha-announcement .divorzhinha-copy p{margin:9px 0 13px;color:#fff8e9;font-size:13px}
+.divorzhinha-announcement .divorzhinha-play-button{min-height:44px;padding:12px 18px;border:2px solid #f6e1a7;border-radius:7px;background:linear-gradient(#f6df9d,#d9b969);color:#183b2e;font-size:11px;font-weight:1000;box-shadow:0 4px 0 #886c37}
+@media(max-width:560px){.divorzhinha-announcement{min-height:205px;margin:20px 0;padding:18px 15px}.divorzhinha-announcement .divorzhinha-copy{max-width:95%}.divorzhinha-announcement .divorzhinha-copy h2{font-size:27px}.divorzhinha-announcement .divorzhinha-copy p{font-size:11px;max-width:260px}}
