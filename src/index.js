@@ -18,16 +18,14 @@ function rejectUnsafePayload(value) {
     ? json({ error: "El contenido parece incluir instrucciones de terminal o código ejecutable. Comparte tu mensaje como texto normal." }, 400)
     : null;
 }
-const schemaInitPromises = new Map();
-function ensureSchemaOnce(key, initialize) {
-  if (!schemaInitPromises.has(key)) {
-    const promise = Promise.resolve().then(initialize).catch(error => {
-      schemaInitPromises.delete(key);
-      throw error;
-    });
-    schemaInitPromises.set(key, promise);
-  }
-  return schemaInitPromises.get(key);
+const initializedSchemas = new Set();
+async function ensureSchemaOnce(key, initialize) {
+  // Never retain a request-bound D1 promise in module-global state. Cloudflare
+  // may reuse this Worker isolate for another request after the creator ends.
+  // DDL uses IF NOT EXISTS, so concurrent first requests can safely race.
+  if (initializedSchemas.has(key)) return;
+  await initialize();
+  initializedSchemas.add(key);
 }
 
 async function ensureDivorzhinhaSchema(env){
