@@ -1437,7 +1437,7 @@ async function openDivorzhinhaGame(){
   const turf=ctx.createLinearGradient(0,395,0,540);turf.addColorStop(0,"#2c9c5d");turf.addColorStop(1,"#0b5839");ctx.fillStyle=turf;ctx.fillRect(0,395,960,145);
   ctx.strokeStyle="rgba(255,255,255,.38)";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,397);ctx.lineTo(960,397);ctx.stroke();ctx.strokeStyle="rgba(255,255,255,.28)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(220,540);ctx.lineTo(315,398);ctx.moveTo(740,540);ctx.lineTo(645,398);ctx.stroke();ctx.fillStyle="#f8f4dc";ctx.beginPath();ctx.ellipse(480,493,5,3,0,0,Math.PI*2);ctx.fill();
  } function roundedRect(x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();}
- const keeperPixelCanvas=document.createElement("canvas");keeperPixelCanvas.width=240;keeperPixelCanvas.height=160;const keeperCtx=keeperPixelCanvas.getContext("2d");
+ const keeperPixelCanvas=document.createElement("canvas");keeperPixelCanvas.width=1920;keeperPixelCanvas.height=1280;const keeperCtx=keeperPixelCanvas.getContext("2d");
  function keeperRoundedRect(x,y,w,h,r,fill){keeperCtx.beginPath();keeperCtx.roundRect(x,y,w,h,r);keeperCtx.fillStyle=fill;keeperCtx.fill();}
  function drawPixelKeeperFrame(now){
   const t=keeperDive?clamp((now-keeperDive.start)/560,0,1):0,e=t*t*(3-2*t),x=keeperDive?keeperDive.fromX+(keeperDive.toX-keeperDive.fromX)*e:keeperX;
@@ -1467,10 +1467,10 @@ async function openDivorzhinhaGame(){
   if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
  }
  function drawKeeper(now){
-  keeperCtx.clearRect(0,0,240,160);keeperCtx.save();keeperCtx.setTransform(.25,0,0,.25,0,0);
+  keeperCtx.clearRect(0,0,1920,1280);keeperCtx.save();keeperCtx.setTransform(2,0,0,2,0,0);
   drawPixelKeeperFrame(now);
   keeperCtx.restore();
-  ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(keeperPixelCanvas,0,0,960,640);ctx.restore();
+  ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(keeperPixelCanvas,0,0,960,640);ctx.restore();
  } function drawBall(x,y,r=34,rotation=0){
   ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.shadowColor="#071b1b99";ctx.shadowBlur=16;ctx.shadowOffsetY=8;
   const grad=ctx.createRadialGradient(-r*.35,-r*.4,2,0,0,r);grad.addColorStop(0,"#fff");grad.addColorStop(.72,"#f1f5f1");grad.addColorStop(1,"#9da9a5");
