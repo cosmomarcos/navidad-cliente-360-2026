@@ -1552,7 +1552,7 @@ async function openDivorzhinhaGame(){
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
-  const keeperMinX=205,keeperMaxX=755;keeperSpeed=220+Math.min(score,20)*12;
+  const keeperMinX=205,keeperMaxX=755;keeperSpeed=220*Math.pow(3,Math.floor(score/5));
   if(shooting&&shot&&now>=keeperReactAt){const delta=keeperTargetX-keeperX,step=keeperSpeed*dt;if(Math.abs(delta)<=step)keeperX=keeperTargetX;else keeperX+=Math.sign(delta)*step;}
   else{keeperX+=keeperDirection*keeperSpeed*.58*dt;if(keeperX>=keeperMaxX){keeperX=keeperMaxX;keeperDirection=-1;}else if(keeperX<=keeperMinX){keeperX=keeperMinX;keeperDirection=1;}}
   render(now);raf=requestAnimationFrame(frame);
