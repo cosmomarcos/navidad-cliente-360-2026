@@ -1519,10 +1519,13 @@ async function openDivorzhinhaGame(){
   showOverlay(saved?"✦ ATAJADA ✦":"ERROR AL GUARDAR",saved?"¡DIVORZINHA LA ATAJÓ!":"PUNTAJE PENDIENTE",saved?("La partida terminó. Marcaste "+score+" goles. "+(hasLives?"Te quedan "+lives+" vidas para hoy.":"Has agotado tus cinco vidas de hoy.")):"No se pudo guardar tu resultado. Comprueba tu conexión e inténtalo otra vez.",hasLives?"JUGAR OTRA VIDA":"",true);
   startBtn.disabled=!saved||!hasLives;
  }
- function finishOutsideShot(){
+ async function finishOutsideShot(){
   active=false;paused=false;finished=true;shooting=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
   message="¡FUERA!";messageUntil=performance.now()+1200;
-  void submit().then(saved=>{showOverlay(saved?"✦ PARTIDA TERMINADA ✦":"ERROR AL GUARDAR",saved?"¡LA MANDASTE FUERA!":"PUNTAJE PENDIENTE",saved?"El balón salió del arco. Terminaste con "+score+" goles.":"No se pudo guardar tu resultado. Comprueba tu conexión e inténtalo otra vez.","JUGAR OTRA VEZ",true);startBtn.disabled=lives<=0;});
+  let lifeSaved=false;try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Math.max(0,Math.min(5,Number(result.livesRemaining??Math.max(0,lives-1))));lifeSaved=true;paintHud();}catch(error){lives=Math.max(0,lives-1);paintHud();}
+  const saved=await submit(),hasLives=lives>0;
+  showOverlay(saved&&lifeSaved?"✦ PARTIDA TERMINADA ✦":"ERROR AL GUARDAR",saved&&lifeSaved?"¡LA MANDASTE FUERA!":"PUNTAJE PENDIENTE",saved&&lifeSaved?"El balón salió del arco. Terminaste con "+score+" goles. "+(hasLives?"Te quedan "+lives+" vidas para hoy.":"Has agotado tus cinco vidas de hoy."):"No se pudo confirmar el resultado o la vida. Comprueba tu conexión antes de continuar.","JUGAR OTRA VEZ",true);
+  startBtn.disabled=!saved||!lifeSaved||!hasLives;
  }
  function resolveShot(){
   if(!shot)return;const current=shot;shot=null;shooting=false;
