@@ -1408,11 +1408,11 @@ async function openDivorzhinhaGame(){
  try{state=await api("/api/divorzhinha/state",{noMemoryCache:true,timeoutMs:8000});}
  catch(error){openDivorzhinhaGame.loading=false;if(launch){launch.disabled=false;launch.innerHTML=launch.dataset.label||"JUGAR AHORA →";}alert(error.message||"No se pudo cargar DIVORZINHA.");return;}
  const modal=document.createElement("section");modal.id="divorzhinha-game-modal";modal.className="divorzhinha-game-modal";
- modal.innerHTML='<div class="rozvi-game-shell divorzhinha-shell" role="dialog" aria-modal="true" aria-label="DIVORZINHA"><header class="divorzhinha-header"><div><span class="divorzhinha-overline">NAVIDAD PYME ARCADE · PENAL CHALLENGE</span><h2>DIVORZINHA</h2></div><button type="button" class="divorzhinha-close" aria-label="Cerrar">×</button></header><div class="divorzhinha-hud"><div><small>GOLES</small><strong id="divorzhinha-score">0</strong></div><div><small>VIDAS</small><strong id="divorzhinha-lives">❤️❤️❤️❤️❤️</strong></div><div><small>RÉCORD</small><strong id="divorzhinha-best">0</strong></div><button type="button" id="divorzhinha-pause" disabled>Ⅱ</button></div><div class="divorzhinha-stage-wrap"><canvas id="divorzhinha-canvas" width="960" height="540" aria-label="Patea al arco e intenta marcarle al arquero"></canvas><div class="divorzhinha-overlay" id="divorzhinha-overlay"><div class="divorzhinha-overlay-card"><span id="divorzhinha-overlay-kicker">✦ RETO DE PENALES ✦</span><h3 id="divorzhinha-overlay-title">¡SUPERA AL ARQUERO!</h3><p id="divorzhinha-overlay-copy">Arrastra el dedo desde el balón hacia el espacio del arco donde quieras apuntar y suelta para patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.</p><button type="button" id="divorzhinha-start">▶ COMENZAR</button><button type="button" id="divorzhinha-exit">SALIR</button></div></div></div><div class="divorzhinha-controls"><span>👆 ARRASTRA EL BALÓN Y SUELTA PARA PATEAR</span><span>⚽ CADA GOL = +1 ESPÍRITU</span><span>🧤 ATAJADA = −1 VIDA</span></div><section class="divorzhinha-history"><div><h3>🏆 TU RÉCORD</h3><p id="divorzhinha-stats">Cargando estadísticas…</p></div><ol id="divorzhinha-history-list"><li>Historial de partidas</li></ol></section><section class="rozvi-leaderboard rozvi-leaderboard-bottom divorzhinha-leaderboard"><h4>🏆 TOP 5 · MEJORES JUGADORES</h4><ol id="divorzhinha-leaderboard-list"><li>Cargando ranking…</li></ol></section><footer class="divorzhinha-footer">MODO ADMIN · VIDAS INFINITAS · ENTORNO DE PRUEBAS</footer></div>';
+ modal.innerHTML='<div class="rozvi-game-shell divorzhinha-shell" role="dialog" aria-modal="true" aria-label="DIVORZINHA"><header class="divorzhinha-header"><div><span class="divorzhinha-overline">NAVIDAD PYME ARCADE · PENAL CHALLENGE</span><h2>DIVORZINHA</h2></div><button type="button" class="divorzhinha-close" aria-label="Cerrar">×</button></header><div class="divorzhinha-hud"><div><small>GOLES</small><strong id="divorzhinha-score">0</strong></div><div><small>VIDAS</small><strong id="divorzhinha-lives">❤️❤️❤️❤️❤️</strong></div><div><small>RÉCORD</small><strong id="divorzhinha-best">0</strong></div><button type="button" id="divorzhinha-pause" disabled>Ⅱ</button></div><div class="divorzhinha-stage-wrap"><canvas id="divorzhinha-canvas" width="960" height="540" aria-label="Patea al arco e intenta marcarle al arquero"></canvas><div class="divorzhinha-overlay" id="divorzhinha-overlay"><div class="divorzhinha-overlay-card"><span id="divorzhinha-overlay-kicker">✦ RETO DE PENALES ✦</span><h3 id="divorzhinha-overlay-title">¡SUPERA AL ARQUERO!</h3><p id="divorzhinha-overlay-copy">Arrastra el dedo desde el balón hacia el espacio del arco donde quieras apuntar y suelta para patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.</p><button type="button" id="divorzhinha-start">▶ COMENZAR</button><button type="button" id="divorzhinha-exit">SALIR</button></div></div></div><div class="divorzhinha-controls"><span>👆 ARRASTRA EL BALÓN Y SUELTA PARA PATEAR</span><span>⚽ CADA GOL = +1 ESPÍRITU</span><span>🧤 ATAJADA = −1 VIDA</span></div><section class="divorzhinha-history"><div><h3>🏆 TU RÉCORD</h3><p id="divorzhinha-stats">Cargando estadísticas…</p></div></section><section class="rozvi-leaderboard rozvi-leaderboard-bottom divorzhinha-leaderboard"><h4>🏆 TOP 5 · MEJORES JUGADORES</h4><ol id="divorzhinha-leaderboard-list"><li>Cargando ranking…</li></ol></section><footer class="divorzhinha-footer">MODO ADMIN · VIDAS INFINITAS · ENTORNO DE PRUEBAS</footer></div>';
  document.body.append(modal);openDivorzhinhaGame.loading=false;
  modal.addEventListener("selectstart",e=>e.preventDefault());modal.addEventListener("contextmenu",e=>e.preventDefault());modal.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();});
  const canvas=modal.querySelector("#divorzhinha-canvas"),ctx=canvas.getContext("2d"),gameAudio=new Audio("/api/divorzhinha/music/current?v="+Date.now()),scoreEl=modal.querySelector("#divorzhinha-score"),livesEl=modal.querySelector("#divorzhinha-lives"),bestEl=modal.querySelector("#divorzhinha-best"),pauseBtn=modal.querySelector("#divorzhinha-pause"),overlay=modal.querySelector("#divorzhinha-overlay"),startBtn=modal.querySelector("#divorzhinha-start"),exitBtn=modal.querySelector("#divorzhinha-exit");
- gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540;let lives=state.unlimitedLives?Infinity:Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,gameId=crypto.randomUUID().replace(/-/g,"");
+ gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540;let lives=state.unlimitedLives?Infinity:Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,gameId=crypto.randomUUID().replace(/-/g,"");
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  function paintHud(){scoreEl.textContent=String(score);livesEl.textContent=state.unlimitedLives?"∞":"❤️".repeat(lives)+"🖤".repeat(5-lives);bestEl.textContent=String(Math.max(best,score));pauseBtn.disabled=!active&&!paused;}
  function pixel(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
@@ -1461,8 +1461,9 @@ async function openDivorzhinhaGame(){
   for(const x of [300,480,660]){ctx.strokeStyle="rgba(255,255,255,.22)";ctx.lineWidth=2;ctx.setLineDash([8,9]);ctx.beginPath();ctx.moveTo(x,90);ctx.lineTo(x,402);ctx.stroke();}ctx.setLineDash([]);
   drawKeeper(now);
   if(shot){const t=clamp((now-shot.started)/shot.duration,0,1),e=t*t*(3-2*t),x=shot.x+(shot.targetX-shot.x)*e,y=shot.y+(shot.targetY-shot.y)*e,r=shot.radiusStart+(shot.radiusEnd-shot.radiusStart)*e;ctx.save();ctx.globalAlpha=.3;ctx.strokeStyle="#fff";ctx.lineWidth=r*.7;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(x,y+24);ctx.lineTo(x+(shot.x-shot.targetX)*.16,y+80);ctx.stroke();ctx.restore();drawBall(x,y,r,now/90);}
-  else{drawBall(480,475,36,now/160);if(aim){const dx=aim.x-480,dy=aim.y-475;ctx.save();ctx.strokeStyle="#ffe18a";ctx.lineWidth=5;ctx.setLineDash([12,8]);ctx.lineCap="round";ctx.beginPath();ctx.moveTo(480,475);ctx.lineTo(aim.x,aim.y);ctx.stroke();ctx.setLineDash([]);const angle=Math.atan2(dy,dx);ctx.fillStyle="#ffe18a";ctx.beginPath();ctx.moveTo(aim.x,aim.y);ctx.lineTo(aim.x-22*Math.cos(angle-.45),aim.y-22*Math.sin(angle-.45));ctx.lineTo(aim.x-22*Math.cos(angle+.45),aim.y-22*Math.sin(angle+.45));ctx.closePath();ctx.fill();ctx.restore();}}
-  if(message&&performance.now()<messageUntil){ctx.fillStyle="#fff2c7";ctx.font="1000 35px system-ui";ctx.textAlign="center";ctx.shadowColor="#123b31";ctx.shadowBlur=12;ctx.fillText(message,480,465);ctx.shadowBlur=0;}
+  else{drawBall(480,475,44,now/160);if(aim){const dx=aim.x-480,dy=aim.y-475;ctx.save();ctx.strokeStyle="#ffe18a";ctx.lineWidth=5;ctx.setLineDash([12,8]);ctx.lineCap="round";ctx.beginPath();ctx.moveTo(480,475);ctx.lineTo(aim.x,aim.y);ctx.stroke();ctx.setLineDash([]);const angle=Math.atan2(dy,dx);ctx.fillStyle="#ffe18a";ctx.beginPath();ctx.moveTo(aim.x,aim.y);ctx.lineTo(aim.x-22*Math.cos(angle-.45),aim.y-22*Math.sin(angle-.45));ctx.lineTo(aim.x-22*Math.cos(angle+.45),aim.y-22*Math.sin(angle+.45));ctx.closePath();ctx.fill();ctx.restore();}}
+  const dtFx=1/60;for(let i=goalParticles.length-1;i>=0;i--){const p=goalParticles[i];p.x+=p.vx*dtFx;p.y+=p.vy*dtFx;p.vy+=420*dtFx;p.life-=dtFx*.75;ctx.save();ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle="hsl("+p.hue+" 88% 62%)";ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=10;ctx.translate(p.x,p.y);ctx.rotate((1-p.life)*8);ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*1.8);ctx.restore();if(p.life<=0)goalParticles.splice(i,1);}
+  if(message&&performance.now()<messageUntil){const pulse=1+Math.sin(now/75)*.045;ctx.save();ctx.translate(480,465);ctx.scale(pulse,pulse);ctx.fillStyle="#fff7d7";ctx.font="1000 38px system-ui";ctx.textAlign="center";ctx.shadowColor="#123b31";ctx.shadowBlur=18;ctx.strokeStyle="#174b36";ctx.lineWidth=5;ctx.strokeText(message,0,0);ctx.fillText(message,0,0);ctx.restore();}
  }
  async function loadDivorzhinhaLeaderboard(){
   const list=modal.querySelector("#divorzhinha-leaderboard-list");if(!list)return;
@@ -1472,9 +1473,6 @@ async function openDivorzhinhaGame(){
  function updateHistory(data){
   const stats=data.stats||{};best=Number(stats.best_score||best);gamesPlayed=Number(stats.games_played||gamesPlayed);
   modal.querySelector("#divorzhinha-stats").textContent="Partidas: "+gamesPlayed+" · Goles totales: "+Number(stats.total_goals||0)+" · Récord: "+best;
-  const list=modal.querySelector("#divorzhinha-history-list");list.replaceChildren();
-  (data.history||[]).forEach((row,index)=>{const li=document.createElement("li");li.textContent=(index+1)+". "+Number(row.goals)+" goles · "+Number(row.saves)+" atajadas";list.append(li);});
-  if(!list.children.length){const li=document.createElement("li");li.textContent="Todavía no hay partidas registradas.";list.append(li);}
   paintHud();
  }
  function showOverlay(kicker,title,copy,buttonText,showExit=true){
@@ -1495,7 +1493,7 @@ async function openDivorzhinhaGame(){
  function finishOutsideShot(){
   active=false;paused=false;finished=true;shooting=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
   message="¡FUERA!";messageUntil=performance.now()+1200;
-  void submit().then(saved=>showOverlay(saved?"✦ PARTIDA TERMINADA ✦":"ERROR AL GUARDAR",saved?"¡LA MANDASTE FUERA!":"PUNTAJE PENDIENTE",saved?"El balón salió del arco. Tu partida terminó con "+score+" goles.":"No se pudo guardar tu resultado. Comprueba tu conexión e inténtalo otra vez.",saved?"VER RESULTADO":"REINTENTAR",true));
+  void submit().then(saved=>{showOverlay(saved?"✦ PARTIDA TERMINADA ✦":"ERROR AL GUARDAR",saved?"¡LA MANDASTE FUERA!":"PUNTAJE PENDIENTE",saved?"El balón salió del arco. Terminaste con "+score+" goles.":"No se pudo guardar tu resultado. Comprueba tu conexión e inténtalo otra vez.","JUGAR OTRA VEZ",true);startBtn.disabled=!state.unlimitedLives&&lives<=0;});
  }
  function resolveShot(){
   if(!shot)return;const current=shot;shot=null;shooting=false;
@@ -1503,12 +1501,12 @@ async function openDivorzhinhaGame(){
   if(!inside){finishOutsideShot();return;}
   const caught=Math.abs(keeperX-current.targetX)<78&&current.targetY<255;
   if(caught){keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
-  else{score++;angryUntil=performance.now()+1400;message="¡GOOOOL! +1";messageUntil=performance.now()+900;paintHud();}
+  else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1100;for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
  }
  function shoot(targetX=480,targetY=160){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
-  shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:36,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
+  shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
   shooting=true;aim=null;setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
@@ -1517,6 +1515,10 @@ async function openDivorzhinhaGame(){
   render(now);raf=requestAnimationFrame(frame);
  }
  function start(){if(active||lives<=0||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
+ function restartGame(){
+  if(!state.unlimitedLives&&lives<=0){showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Has utilizado tus cinco vidas. Se renovarán según el horario configurado.","JUGAR OTRA VEZ",true);startBtn.disabled=true;return;}
+  score=0;saves=0;finished=false;submitted=false;shooting=false;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=150;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
+ }
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
   if(paused){active=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.textContent="▶";showOverlay("PARTIDA EN PAUSA","TÓMATE UN RESPIRO","Tu progreso y tus vidas se mantienen.","▶ CONTINUAR",true);}
@@ -1531,9 +1533,9 @@ async function openDivorzhinhaGame(){
  const releaseAim=event=>{if(pointerId!==event.pointerId)return;event.preventDefault();const p=canvasPoint(event);pointerId=null;if(!active||!aim)return;const target={x:clamp(p.x,35,925),y:clamp(p.y,18,505)};aim=null;shoot(target.x,target.y);};
  canvas.addEventListener("pointerup",releaseAim,{passive:false});canvas.addEventListener("pointercancel",event=>{if(pointerId===event.pointerId){pointerId=null;aim=null;}});
 
- pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",()=>{if(paused){togglePause();return;}if(finished){if(!submitted){void submit().then(saved=>showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y sumaste "+score+" puntos de Espíritu."):"No se pudo guardar. Vuelve a intentarlo.",saved?"VER RESULTADO":"REINTENTAR",true));return;}close();return;}start();});
+ pauseBtn.addEventListener("click",togglePause);startBtn.addEventListener("click",async()=>{if(paused){togglePause();return;}if(finished){if(!submitted){const saved=await submit();if(!saved){showOverlay("ERROR AL GUARDAR","PUNTAJE PENDIENTE","No se pudo guardar la partida. Inténtalo nuevamente.","JUGAR OTRA VEZ",true);return;}}restartGame();return;}start();});
  exitBtn.addEventListener("click",close);modal.querySelector(".divorzhinha-close").addEventListener("click",close);modal.addEventListener("click",event=>{if(event.target===modal)close();});window.addEventListener("keydown",keyDown);
  updateHistory(state);paintHud();render(performance.now());loadDivorzhinhaLeaderboard();
  if(!state.unlimitedLives&&lives<=0)showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Tus cinco vidas ya fueron utilizadas. Se renovarán a las 18:00, hora de Lima.","",false);
- else showOverlay("✦ RETO DE PENALES ✦","¡SUPERA AL ARQUERO!","Toca la pantalla cuando el balón pase por el lugar donde quieras patear. Cada gol suma 1 punto de Espíritu. Si el arquero ataja, pierdes una vida.","▶ COMENZAR",true);
+ else showOverlay("✦ RETO DE PENALES ✦","¡SUPERA AL ARQUERO!","Arrastra desde el balón hacia donde quieras disparar y suelta. ¡Marca goles y esquiva al arquero!","▶ COMENZAR",true);
 }
