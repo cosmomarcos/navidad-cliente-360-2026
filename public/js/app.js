@@ -1434,7 +1434,7 @@ async function openDivorzhinhaGame(){
   ctx.save();ctx.rotate(swing);ctx.strokeStyle="#a96d4b";ctx.lineWidth=19;ctx.beginPath();ctx.moveTo(43,-139);ctx.lineTo(78,-104);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(82,-100,17,0,Math.PI*2);ctx.fill();ctx.restore();
   roundedRect(-15,-177,30,27,8,"#a96d4b");ctx.beginPath();ctx.ellipse(0,-207,36,43,0,0,Math.PI*2);ctx.fillStyle="#b97952";ctx.fill();
   ctx.fillStyle="#211d1b";ctx.beginPath();ctx.ellipse(0,-236,38,17,0,Math.PI,Math.PI*2);ctx.fill();ctx.fillRect(-35,-235,70,9);
-  ctx.fillStyle="#241b18";ctx.beginPath();ctx.arc(-13,-207,4,0,Math.PI*2);ctx.arc(13,-207,4,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#241b18";ctx.lineWidth=4;ctx.lineCap="round";ctx.beginPath();if(now<angryUntil){ctx.moveTo(-25,-221);ctx.lineTo(-8,-214);ctx.moveTo(25,-221);ctx.lineTo(8,-214);ctx.moveTo(-10,-187);ctx.quadraticCurveTo(0,-178,10,-187);}else{ctx.moveTo(-23,-216);ctx.lineTo(-7,-218);ctx.moveTo(23,-216);ctx.lineTo(7,-218);ctx.moveTo(-9,-188);ctx.quadraticCurveTo(0,-193,9,-188);}ctx.stroke();ctx.restore();
+  ctx.fillStyle="#241b18";ctx.beginPath();ctx.arc(-13,-207,4,0,Math.PI*2);ctx.arc(13,-207,4,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#241b18";ctx.lineWidth=4;ctx.lineCap="round";ctx.beginPath();if(now<angryUntil){ctx.moveTo(-25,-221);ctx.lineTo(-8,-214);ctx.moveTo(25,-221);ctx.lineTo(8,-214);ctx.moveTo(-10,-187);ctx.quadraticCurveTo(0,-201,10,-187);}else{ctx.moveTo(-23,-216);ctx.lineTo(-7,-218);ctx.moveTo(23,-216);ctx.lineTo(7,-218);ctx.moveTo(-10,-188);ctx.quadraticCurveTo(0,-176,10,-188);}ctx.stroke();ctx.restore();
   if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
  }
  function drawBall(x,y,r=34,rotation=0){
@@ -1450,6 +1450,13 @@ async function openDivorzhinhaGame(){
   ctx.fillStyle="#1c4650";ctx.fillRect(0,65,W,150);for(let row=0;row<4;row++)for(let i=0;i<48;i++){ctx.fillStyle=["#f5d36d","#f2f4ee","#e96c53","#78c6b3"][(i+row*3)%4];ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(i*21+8,85+row*29+(i%2)*5,5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
   const field=ctx.createLinearGradient(0,215,0,H);field.addColorStop(0,"#2d965d");field.addColorStop(1,"#12633f");ctx.fillStyle=field;ctx.fillRect(0,215,W,H-215);
   for(let i=0;i<12;i++){ctx.fillStyle=i%2?"rgba(255,255,255,.035)":"rgba(0,0,0,.035)";ctx.fillRect(i*80,215,80,325);}
+  // Stadium atmosphere: soft floodlights, animated beams and a richer pitch.
+  ctx.save();
+  for(let i=0;i<6;i++){const lx=80+i*160,glow=ctx.createRadialGradient(lx,65,3,lx,65,125);glow.addColorStop(0,"rgba(255,244,190,.34)");glow.addColorStop(1,"rgba(255,244,190,0)");ctx.fillStyle=glow;ctx.fillRect(lx-125,0,250,220);}
+  for(let i=0;i<4;i++){const x=115+i*245+Math.sin(now/900+i)*24;ctx.globalAlpha=.045;ctx.fillStyle="#fff3b0";ctx.beginPath();ctx.moveTo(x-8,55);ctx.lineTo(x-92,215);ctx.lineTo(x+92,215);ctx.closePath();ctx.fill();}
+  ctx.globalAlpha=1;
+  const vignette=ctx.createRadialGradient(480,330,140,480,330,610);vignette.addColorStop(0,"rgba(0,0,0,0)");vignette.addColorStop(1,"rgba(0,20,15,.24)");ctx.fillStyle=vignette;ctx.fillRect(0,0,W,H);
+  ctx.restore();
   drawGoal();ctx.fillStyle="#fff5d6";ctx.font="1000 19px system-ui";ctx.textAlign="center";ctx.fillText("DIVORZINHA · ¡PENAL NAVIDEÑO!",480,32);
   for(const x of [300,480,660]){ctx.strokeStyle="rgba(255,255,255,.22)";ctx.lineWidth=2;ctx.setLineDash([8,9]);ctx.beginPath();ctx.moveTo(x,90);ctx.lineTo(x,402);ctx.stroke();}ctx.setLineDash([]);
   drawKeeper(now);
@@ -1471,7 +1478,7 @@ async function openDivorzhinhaGame(){
   paintHud();
  }
  function showOverlay(kicker,title,copy,buttonText,showExit=true){
-  overlay.hidden=false;modal.querySelector("#divorzhinha-overlay-kicker").textContent=kicker;modal.querySelector("#divorzhinha-overlay-title").textContent=title;modal.querySelector("#divorzhinha-overlay-copy").textContent=copy;startBtn.textContent=buttonText;startBtn.hidden=!buttonText;exitBtn.hidden=!showExit;
+  overlay.hidden=false;overlay.style.display="grid";modal.querySelector("#divorzhinha-overlay-kicker").textContent=kicker;modal.querySelector("#divorzhinha-overlay-title").textContent=title;modal.querySelector("#divorzhinha-overlay-copy").textContent=copy;startBtn.textContent=buttonText;startBtn.hidden=!buttonText;startBtn.style.display=buttonText?"block":"none";startBtn.disabled=!buttonText;exitBtn.hidden=!showExit;
  }
  async function submit(){
   if(submitted)return true;submitted=true;
@@ -1509,11 +1516,11 @@ async function openDivorzhinhaGame(){
   keeperX+=keeperDirection*keeperSpeed*dt;if(keeperX>700){keeperX=700;keeperDirection=-1;}if(keeperX<260){keeperX=260;keeperDirection=1;}keeperSpeed=Math.min(1050,150+Math.floor(score/10)*125);
   render(now);raf=requestAnimationFrame(frame);
  }
- function start(){if(active||lives<=0||finished)return;overlay.hidden=true;gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
+ function start(){if(active||lives<=0||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
   if(paused){active=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.textContent="▶";showOverlay("PARTIDA EN PAUSA","TÓMATE UN RESPIRO","Tu progreso y tus vidas se mantienen.","▶ CONTINUAR",true);}
-  else{overlay.hidden=true;gameAudio.play().catch(()=>{});active=true;pauseBtn.textContent="Ⅱ";last=performance.now();raf=requestAnimationFrame(frame);}
+  else{overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;pauseBtn.textContent="Ⅱ";last=performance.now();raf=requestAnimationFrame(frame);}
  }
  function close(){active=false;paused=false;gameAudio.pause();gameAudio.currentTime=0;cancelAnimationFrame(raf);if(score>0&&!submitted)void submit();window.removeEventListener("keydown",keyDown);modal.remove();const button=document.getElementById("divorzhinha-open-game");if(button){button.disabled=false;button.innerHTML=button.dataset.label||"JUGAR AHORA →";}}
  function canvasPoint(event){const rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*W/rect.width,y:(event.clientY-rect.top)*H/rect.height};}
