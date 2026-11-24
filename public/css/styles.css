@@ -1336,3 +1336,9 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
  .divorzhinha-history{min-height:36px}
  .divorzhinha-controls{padding:1px 0}
 }
+
+
+/* DIVORZINHA v2.11.0 · tarjeta de inicio como ¡Vamos Rozvi! */
+.divorzhinha-announcement{display:block;min-height:142px;padding:20px 22px;background:linear-gradient(125deg,#173c34,#205b42 68%,#9b682e);background-size:cover;background-position:center}
+.divorzhinha-announcement .divorzhinha-copy{max-width:560px}
+@media(max-width:560px){.divorzhinha-announcement{min-height:126px;padding:15px}}
