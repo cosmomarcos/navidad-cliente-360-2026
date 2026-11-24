@@ -1412,8 +1412,19 @@ async function openDivorzhinhaGame(){
  document.body.append(modal);openDivorzhinhaGame.loading=false;
  modal.addEventListener("selectstart",e=>e.preventDefault());modal.addEventListener("contextmenu",e=>e.preventDefault());modal.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();});
  const canvas=modal.querySelector("#divorzhinha-canvas"),ctx=canvas.getContext("2d"),gameAudio=new Audio("/api/divorzhinha/music/current?v="+Date.now()),scoreEl=modal.querySelector("#divorzhinha-score"),livesEl=modal.querySelector("#divorzhinha-lives"),bestEl=modal.querySelector("#divorzhinha-best"),pauseBtn=modal.querySelector("#divorzhinha-pause"),overlay=modal.querySelector("#divorzhinha-overlay"),startBtn=modal.querySelector("#divorzhinha-start"),exitBtn=modal.querySelector("#divorzhinha-exit");
- gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540;let lives=state.unlimitedLives?Infinity:Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,gameId=crypto.randomUUID().replace(/-/g,"");
+ gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540;let lives=state.unlimitedLives?Infinity:Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=150,keeperDive=null,catchFeedback=false,shotSaveTargetX=null,crowdCheerUntil=0,audioCtx=null,gameId=crypto.randomUUID().replace(/-/g,"");
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ function playCrowdSound(kind){
+  try{
+   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+   audioCtx=audioCtx||new AC();if(audioCtx.state==="suspended")void audioCtx.resume();
+   const now=audioCtx.currentTime,duration=kind==="goal"?1.35:.75;
+   const master=audioCtx.createGain();master.gain.setValueAtTime(.0001,now);master.gain.exponentialRampToValueAtTime(kind==="goal"?.16:.11,now+.08);master.gain.exponentialRampToValueAtTime(.0001,now+duration);master.connect(audioCtx.destination);
+   const freqs=kind==="goal"?[392,494,587,784,988]:[330,392,440];
+   freqs.forEach((freq,i)=>{const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type=i%2?"triangle":"sawtooth";osc.frequency.setValueAtTime(freq*(.98+Math.random()*.04),now);osc.frequency.exponentialRampToValueAtTime(freq*(kind==="goal"?1.25:.8),now+duration*.8);gain.gain.value=1/freqs.length;osc.connect(gain);gain.connect(master);osc.start(now);osc.stop(now+duration);});
+   crowdCheerUntil=performance.now()+duration*1000;
+  }catch(_){}
+ }
  function paintHud(){scoreEl.textContent=String(score);livesEl.textContent=state.unlimitedLives?"∞":"❤️".repeat(lives)+"🖤".repeat(5-lives);bestEl.textContent=String(Math.max(best,score));pauseBtn.disabled=!active&&!paused;}
  function pixel(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
  function drawGoal(){
@@ -1449,7 +1460,7 @@ async function openDivorzhinhaGame(){
   ctx.fillStyle="#251c19";ctx.beginPath();ctx.arc(-13,-337,4.2,0,Math.PI*2);ctx.arc(13,-337,4.2,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle="#3b241d";ctx.lineWidth=3.5;ctx.lineCap="round";ctx.beginPath();if(now<angryUntil){ctx.moveTo(-24,-351);ctx.lineTo(-8,-345);ctx.moveTo(24,-351);ctx.lineTo(8,-345);ctx.moveTo(-10,-317);ctx.quadraticCurveTo(0,-331,10,-317);}else{ctx.moveTo(-24,-351);ctx.lineTo(-8,-353);ctx.moveTo(24,-351);ctx.lineTo(8,-353);ctx.moveTo(-11,-318);ctx.quadraticCurveTo(0,-307,11,-318);}ctx.stroke();
   ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-14,-338,1.5,0,Math.PI*2);ctx.arc(12,-338,1.5,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle="#fff8d0";ctx.beginPath();ctx.arc(0,-210,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#1e6b50";ctx.font="bold 11px system-ui";ctx.textAlign="center";ctx.fillText("D",0,-206);
+  ctx.fillStyle="#fff8d0";ctx.beginPath();ctx.arc(0,-210,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#1e6b50";ctx.font="bold 11px system-ui";ctx.textAlign="center";ctx.fillText("1",0,-206);
   ctx.globalAlpha=.22;ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-33,-258);ctx.lineTo(-26,-125);ctx.moveTo(33,-258);ctx.lineTo(26,-125);ctx.stroke();ctx.globalAlpha=1;ctx.restore();
   if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
  } function drawBall(x,y,r=34,rotation=0){
@@ -1462,7 +1473,7 @@ async function openDivorzhinhaGame(){
  function render(now){
   ctx.clearRect(0,0,W,H);const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,"#102d48");sky.addColorStop(.48,"#286c66");sky.addColorStop(1,"#15432f");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
   for(let i=0;i<24;i++){ctx.fillStyle=i%2?"#f6d77a":"#eaf4ec";ctx.globalAlpha=.55+.2*Math.sin(now/500+i);ctx.beginPath();ctx.arc(i*42+12,24+(i%3)*5,6,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
-  ctx.fillStyle="#1c4650";ctx.fillRect(0,65,W,150);for(let row=0;row<4;row++)for(let i=0;i<48;i++){ctx.fillStyle=["#f5d36d","#f2f4ee","#e96c53","#78c6b3"][(i+row*3)%4];ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(i*21+8,85+row*29+(i%2)*5,5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
+  ctx.fillStyle="#1c4650";ctx.fillRect(0,65,W,150);for(let row=0;row<4;row++)for(let i=0;i<48;i++){ctx.fillStyle=["#f5d36d","#f2f4ee","#e96c53","#78c6b3"][(i+row*3)%4];ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(i*21+8,85+row*29+(i%2)*5+Math.sin(now/115+i*1.7+row)*((crowdCheerUntil>now)?9:2),5+((crowdCheerUntil>now)?Math.sin(now/90+i)*1.5:0),0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
   const field=ctx.createLinearGradient(0,215,0,H);field.addColorStop(0,"#2d965d");field.addColorStop(1,"#12633f");ctx.fillStyle=field;ctx.fillRect(0,215,W,H-215);
   for(let i=0;i<12;i++){ctx.fillStyle=i%2?"rgba(255,255,255,.035)":"rgba(0,0,0,.035)";ctx.fillRect(i*80,215,80,325);}
   // Stadium atmosphere: soft floodlights, animated beams and a richer pitch.
@@ -1500,10 +1511,11 @@ async function openDivorzhinhaGame(){
  }
  async function consumeLife(){
   if(!active||shooting)return;shooting=true;saves++;
-  if(!state.unlimitedLives){lives=Math.max(0,lives-1);paintHud();try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Number(result.livesRemaining??lives);}catch(error){showOverlay("SIN CONEXIÓN","NO SE PUDO GUARDAR LA VIDA",error.message,"REINTENTAR",true);active=false;paused=true;shooting=false;return;}}
-  paintHud();keeperDive={start:performance.now(),fromX:keeperX,toX:[300,480,660][keeperLane]};
-  if(!state.unlimitedLives&&lives<=0){active=false;gameAudio.pause();finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):"No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez.",saved?"JUGAR OTRA VEZ":"JUGAR OTRA VEZ",true);}
-  else{message="¡ATAJADA! "+(state.unlimitedLives?"":"-1 VIDA");messageUntil=performance.now()+900;shooting=false;}
+  catchFeedback=true;message="¡DIVORZINHA LA ATAJÓ!";messageUntil=performance.now()+1500;playCrowdSound("save");
+  if(!state.unlimitedLives){lives=Math.max(0,lives-1);paintHud();try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Number(result.livesRemaining??lives);}catch(error){showOverlay("SIN CONEXIÓN","NO SE PUDO GUARDAR LA VIDA",error.message,"REINTENTAR",true);active=false;paused=true;shooting=false;catchFeedback=false;return;}}
+  paintHud();keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,260,700)};shotSaveTargetX=null;
+  if(!state.unlimitedLives&&lives<=0){active=false;gameAudio.pause();finished=true;pauseBtn.disabled=true;const saved=await submit();showOverlay(saved?"✦ FIN DEL RETO ✦":"ERROR AL GUARDAR",saved?"¡PARTIDA TERMINADA!":"PUNTAJE PENDIENTE",saved?("Anotaste "+score+" goles y el arquero atajó "+saves+" disparos."):"No se pudo guardar la partida. Comprueba tu conexión e inténtalo otra vez.","JUGAR OTRA VEZ",true);}
+  else{setTimeout(()=>{if(!finished&&!paused){shooting=false;catchFeedback=false;message="";messageUntil=0;}},1450);}
  }
  function finishOutsideShot(){
   active=false;paused=false;finished=true;shooting=false;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
@@ -1515,8 +1527,8 @@ async function openDivorzhinhaGame(){
   const inside=current.targetX>=170&&current.targetX<=790&&current.targetY>=78&&current.targetY<=390;
   if(!inside){finishOutsideShot();return;}
   const caught=Math.abs(keeperX-current.targetX)<78&&current.targetY<255;
-  if(caught){keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
-  else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1100;for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
+  if(caught){shotSaveTargetX=current.targetX;keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
+  else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1500;playCrowdSound("goal");for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
  }
  function shoot(targetX=480,targetY=160){
   if(!active||paused||shooting||finished)return;
@@ -1532,7 +1544,7 @@ async function openDivorzhinhaGame(){
  function start(){if(active||lives<=0||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
  function restartGame(){
   if(!state.unlimitedLives&&lives<=0){showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Has utilizado tus cinco vidas. Se renovarán según el horario configurado.","JUGAR OTRA VEZ",true);startBtn.disabled=true;return;}
-  score=0;saves=0;finished=false;submitted=false;shooting=false;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=150;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
+  score=0;saves=0;finished=false;submitted=false;shooting=false;catchFeedback=false;shotSaveTargetX=null;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=150;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
  }
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
