@@ -1292,16 +1292,32 @@ try {
 }
 if("serviceWorker"in navigator){
  let refreshing=false;
- navigator.serviceWorker.addEventListener("controllerchange",()=>{
+ let updateCheckRunning=false;
+ const reloadForUpdatedWorker=()=>{
   if(refreshing)return;
   refreshing=true;
   location.reload();
- });
+ };
+ navigator.serviceWorker.addEventListener("controllerchange",reloadForUpdatedWorker);
+ const checkForAppUpdate=async(registration)=>{
+  if(updateCheckRunning||!navigator.onLine)return;
+  updateCheckRunning=true;
+  try{await registration.update();}
+  catch(error){console.warn("No se pudo comprobar la actualización de Navidad Pyme:",error);}
+  finally{updateCheckRunning=false;}
+ };
  window.addEventListener("load",async()=>{
   try{
    const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});
-   await registration.update();
-  }catch(error){console.warn("No se pudo comprobar la actualización de la aplicación:",error);}
+   await checkForAppUpdate(registration);
+   // Revisa periódicamente mientras la aplicación permanece abierta.
+   window.setInterval(()=>checkForAppUpdate(registration),30000);
+   window.addEventListener("focus",()=>checkForAppUpdate(registration));
+   document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible")checkForAppUpdate(registration);
+   });
+   window.addEventListener("online",()=>checkForAppUpdate(registration));
+  }catch(error){console.warn("No se pudo iniciar la actualización automática de Navidad Pyme:",error);}
  });
 }
 
