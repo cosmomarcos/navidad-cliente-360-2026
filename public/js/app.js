@@ -1469,14 +1469,16 @@ async function openDuckHuntGame(){
  }
  function drawPlane(){
   const cycle=elapsed-planeNext;if(cycle<0||cycle>7)return;
-  const x=-80+cycle*115,y=22+Math.sin(cycle*1.7)*5;
-  // El avión y su estela pasan por el cielo, detrás del edificio y de los NIKES.
-  pixel(x+4,y+5,62,4,"#eef2f5");pixel(x+25,y,19,3,"#f5f7f8");pixel(x+30,y-4,9,4,"#d8e3eb");
-  pixel(x+14,y+3,20,3,"#cbd8df");pixel(x+43,y+4,11,2,"#b5c5d0");
-  // Bandera arcoíris ondeando en la cola.
-  const colors=["#e5243b","#f18b2b","#f6d43b","#38a65a","#2777cf","#8c48a8"];
-  colors.forEach((color,i)=>pixel(x-5-i*.5,y+7+i*.0,12,2,color));
-  pixel(x+7,y+8,3,2,"#e8edf0");pixel(x+58,y+3,7,2,"#aebbc4");
+  const x=-90+cycle*115,y=18+Math.sin(cycle*1.7)*5;
+  // Avión claramente visible y bandera arcoíris grande, con seis franjas horizontales.
+  pixel(x+8,y+10,76,7,"#f4f6f7");pixel(x+34,y+2,25,8,"#f4f6f7");pixel(x+43,y-4,13,7,"#dce6eb");
+  pixel(x+20,y+8,27,5,"#c9d6dd");pixel(x+61,y+9,14,4,"#aebdc7");
+  // Mástil de cola y bandera rectangular: rojo, naranja, amarillo, verde, azul y violeta.
+  pixel(x+9,y-22,3,35,"#374957");
+  const rainbow=["#e5243b","#f18b2b","#f6d43b","#38a65a","#2777cf","#8c48a8"];
+  rainbow.forEach((color,index)=>pixel(x-20,y-21+index*5,29,5,color));
+  pixel(x-20,y-21,29,2,"#ffffff");
+  pixel(x-20,y+7,29,2,"#ffffff");
  }
  function drawScene(){
   ctx.imageSmoothingEnabled=false;
