@@ -1535,11 +1535,11 @@ async function openDuckHuntGame(){
  }
  function loop(now){
   if(!active)return;const dt=Math.min(.035,(now-last)/1000||0);last=now;elapsed+=dt;spawn-=dt;
-  const speedMultiplier=Math.pow(2,speedTier);
+  const speedMultiplier=1+(speedTier*0.2);
   if(spawn<=0&&ducks.length<4){
    const side=Math.random()<.5?-1:1,edge=side<0?-25:505,baseSpeed=rnd(58,76)*speedMultiplier,angle=rnd(-.58,.58);
    const duck={x:edge,y:rnd(42,225),vx:-side*Math.cos(angle)*baseSpeed,vy:Math.sin(angle)*baseSpeed,wing:0};
-   ducks.push(duck);spawn=Math.max(.18,rnd(.85,1.3)/Math.pow(1.5,speedTier));
+   ducks.push(duck);spawn=Math.max(.18,rnd(.85,1.3)/(1+(speedTier*0.1)));
   }
   ducks.forEach(d=>{d.x+=d.vx*dt;d.y+=d.vy*dt;if(d.y<34){d.y=34;d.vy=Math.abs(d.vy);}if(d.y>235){d.y=235;d.vy=-Math.abs(d.vy);}d.wing=Math.sin(now/65);});
   ducks=ducks.filter(d=>{if(d.x<-35||d.x>515){escaped++;return false;}return true;});
@@ -1567,7 +1567,7 @@ async function openDuckHuntGame(){
    const d=ducks.splice(hit,1)[0];score++;ducksShot++;playArcadeSound("quack");
    for(let k=0;k<18;k++){const angle=Math.PI*2*k/18,speed=rnd(25,100);explosions.push({x:d.x,y:d.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rnd(.22,.48),color:["#ffdf70","#ff8a36","#f7f0d5","#f04d36"][k%4]});}
    const nextTier=Math.floor(ducksShot/10);
-   if(nextTier>speedTier){speedTier=nextTier;feedback.textContent="¡NIVEL "+speedTier+"! VELOCIDAD x"+Math.pow(2,speedTier)+" · SALEN MÁS NIKES";}
+   if(nextTier>speedTier){speedTier=nextTier;feedback.textContent="¡NIVEL "+speedTier+"! VELOCIDAD x"+(1+(speedTier*0.2)).toFixed(1)+" · SALEN MÁS NIKES";}
    else feedback.textContent="¡NIKE CAZADO! +1 ESPÍRITU";
   }else feedback.textContent="¡FALLASTE!";
   if(ammo===0){feedback.textContent+=" · RECARGANDO";clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>{if(active){ammo=3;hud();}},650);}hud();
