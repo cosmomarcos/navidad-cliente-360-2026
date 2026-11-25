@@ -1,5 +1,5 @@
-const CACHE = "navidad-pyme-shell-v2.11.35";
-const SHELL = ["/", "/css/styles.css?v=2.11.35", "/js/app.js?v=2.11.35", "/js/participants.js", "/js/michi.js?v=2.11.35", "/manifest.webmanifest", "/icons/icon.svg"];
+const CACHE = "navidad-pyme-shell-v2.11.36";
+const SHELL = ["/", "/css/styles.css?v=2.11.36", "/js/app.js?v=2.11.36", "/js/participants.js", "/js/michi.js?v=2.11.36", "/manifest.webmanifest", "/icons/icon.svg"];
 self.addEventListener("install", event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
   await cache.addAll(SHELL);
