@@ -1467,6 +1467,20 @@ async function openDuckHuntGame(){
   if(d.wing>0)pixel(-7,d.wing>0.5?-13:4,15,8,"#303943");else pixel(-7,-1,15,7,"#252e37");
   ctx.restore();
  }
+ let carNext=0;
+ function drawNikeCar(){
+  const cycle=elapsed-carNext;if(cycle<0||cycle>6)return;
+  const x=-145+cycle*105,y=237;
+  // Cartel de despedida elevado sobre el auto para que se lea durante el recorrido.
+  pixel(x+5,y-27,166,19,"#f8f0d5");pixel(x+5,y-27,166,2,"#263746");pixel(x+5,y-10,166,2,"#263746");
+  pixel(x+2,y-25,3,15,"#263746");pixel(x+171,y-25,3,15,"#263746");
+  ctx.save();ctx.fillStyle="#193b4c";ctx.font="bold 9px monospace";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("¡TE EXTRAÑAREMOS NIKE!",x+88,y-18);ctx.restore();
+  // Auto festivo estilo 8-bit circulando por la pista.
+  pixel(x+27,y-8,76,12,"#c83235");pixel(x+43,y-17,43,10,"#e8edf0");pixel(x+48,y-15,13,7,"#75b9d3");pixel(x+65,y-15,16,7,"#75b9d3");
+  pixel(x+19,y-5,9,6,"#f6d36e");pixel(x+101,y-5,8,6,"#f6d36e");
+  pixel(x+37,y+2,17,7,"#18232b");pixel(x+81,y+2,17,7,"#18232b");
+  pixel(x+40,y+4,8,3,"#aebbc1");pixel(x+84,y+4,8,3,"#aebbc1");
+ }
  function drawPlane(){
   const cycle=elapsed-planeNext;if(cycle<0||cycle>7)return;
   const x=-90+cycle*115,y=18+Math.sin(cycle*1.7)*5;
@@ -1498,6 +1512,7 @@ async function openDuckHuntGame(){
   pixel(0,233,480,9,"#d9d0ba");pixel(0,242,480,6,"#aaa797");pixel(0,248,480,22,"#8c8a7c");pixel(116,210,248,37,"#192b39");pixel(123,215,234,26,"#e9e8dc");
   ctx.fillStyle="#17436b";ctx.font="bold 25px monospace";ctx.textAlign="center";ctx.fillText("BCP",240,236);ctx.textAlign="left";
   for(let i=0;i<9;i++)pixel(i*55+4,255,26,2,"#d5cdb7");
+  drawNikeCar();
   for(let i=0;i<36;i++){const x=(i*61)%480,y=108+(i*19)%78;pixel(x,y,2,2,"#c2d2d1");}
   ducks.forEach(drawDuck);
   explosions.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/.42);pixel(p.x,p.y,2.5,2.5,p.color);ctx.globalAlpha=1;});
@@ -1532,6 +1547,7 @@ async function openDuckHuntGame(){
   shots=shots.filter(s=>now-s.t<150);drawScene();hud();
   if(escaped>=10){endGame();return;}
   if(elapsed>=planeNext+7)planeNext=elapsed+rnd(8,15);
+  if(elapsed>=carNext+6)carNext=elapsed+rnd(10,18);
   raf=requestAnimationFrame(loop);
  }
  async function start(){
@@ -1541,7 +1557,7 @@ async function openDuckHuntGame(){
    catch(e){feedback.textContent=e.message||"No tienes vidas disponibles.";startButton.disabled=false;return;}
   }
   if(!unlimited&&Number(state.livesRemaining)<=0&&!lifeConsumed){feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 vidas.";startButton.disabled=false;return;}
-  score=0;ducksShot=0;ammo=3;escaped=0;speedTier=0;elapsed=0;planeNext=rnd(7,12);ducks=[];shots=[];explosions=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");void gameAudio.play().catch(()=>{});hud();raf=requestAnimationFrame(loop);
+  score=0;ducksShot=0;ammo=3;escaped=0;speedTier=0;elapsed=0;planeNext=rnd(7,12);carNext=rnd(10,18);ducks=[];shots=[];explosions=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");void gameAudio.play().catch(()=>{});hud();raf=requestAnimationFrame(loop);
  }
  canvas.addEventListener("pointerdown",e=>{
   if(!active||ammo<=0)return;e.preventDefault();const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*480/r.width,y=(e.clientY-r.top)*270/r.height;
