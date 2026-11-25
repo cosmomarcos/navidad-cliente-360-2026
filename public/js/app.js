@@ -1760,11 +1760,11 @@ async function openDivorzhinhaGame(){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
   shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
-  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.62,-95,110);keeperReactAt=performance.now()+Math.max(70,145-Math.min(score,20)*3);setTimeout(()=>resolveShot(),shot.duration);
+  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.62,-95,110);keeperReactAt=performance.now()+Math.max(55,180/(1+Math.floor(score/10)*.25));setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
-  keeperSpeed=Math.min(1100,620*Math.pow(2,Math.min(2,Math.floor(score/5))));
+  const reactionTier=Math.floor(score/10);keeperSpeed=360*(1+reactionTier*.15);
   if(shooting&&shot&&now>=keeperReactAt){const dx=keeperTargetX-keeperX,dy=keeperTargetY-keeperY,stepX=keeperSpeed*dt,stepY=keeperSpeed*.9*dt;keeperX=Math.abs(dx)<=stepX?keeperTargetX:keeperX+Math.sign(dx)*stepX;keeperY=Math.abs(dy)<=stepY?keeperTargetY:keeperY+Math.sign(dy)*stepY;}
   else if(!shooting&&!keeperDive){keeperX+=(480-keeperX)*Math.min(1,dt*5);keeperY+=(0-keeperY)*Math.min(1,dt*5);}
   render(now);raf=requestAnimationFrame(frame);
