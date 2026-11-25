@@ -28,6 +28,14 @@ async function ensureSchemaOnce(key, initialize) {
   initializedSchemas.add(key);
 }
 
+
+async function ensureDuckHuntSchema(env){
+ return ensureSchemaOnce("duckhunt-game",async()=>{
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS duckhunt_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS duckhunt_game_scores (id TEXT PRIMARY KEY,game_id TEXT NOT NULL UNIQUE,edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,score INTEGER NOT NULL DEFAULT 0,ducks INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_duckhunt_scores ON duckhunt_game_scores(edition_id,score DESC,created_at)").run();
+ });
+}
 async function ensureDivorzhinhaSchema(env){
  return ensureSchemaOnce("divorzhinha-game",async()=>{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS divorzhinha_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
@@ -576,7 +584,45 @@ async function handleApi(request, env, url) {
    return json({ok:true,awardedPoints,stats:stats||{},history:history.results||[]});
   }
 
-  if(url.pathname==="/api/divorzhinha/home-background"&&request.method==="GET"){
+  
+  if(url.pathname==="/api/duckhunt/state"&&request.method==="GET"){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Duck Hunt está disponible únicamente para participantes confirmados de Cliente 360."},403);
+   await ensureDuckHuntSchema(env);const gameDate=getRozviGameDate();
+   await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
+   const lives=await env.DB.prepare("SELECT lives_remaining FROM duckhunt_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
+   const stats=await env.DB.prepare("SELECT COALESCE(MAX(score),0) AS best_score,COUNT(*) AS games_played FROM duckhunt_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+   return json({ok:true,livesRemaining:Number(lives?.lives_remaining??5),unlimitedLives:await isPrimaryAdmin(user,env),stats:stats||{}});
+  }
+  if(url.pathname==="/api/duckhunt/lives"&&request.method==="POST"){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   await ensureDuckHuntSchema(env);const gameDate=getRozviGameDate(),admin=await isPrimaryAdmin(user,env);
+   await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
+   if(!admin){const changed=await env.DB.prepare("UPDATE duckhunt_daily_lives SET lives_remaining=lives_remaining-1,updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=? AND lives_remaining>0").bind(member.edition_id,user.id,gameDate).run();if(Number(changed.meta?.changes||0)===0)return json({error:"Ya utilizaste tus 5 partidas de hoy. ¡Vuelve mañana!"},409);}
+   const row=await env.DB.prepare("SELECT lives_remaining FROM duckhunt_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
+   return json({ok:true,livesRemaining:admin?5:Number(row?.lives_remaining??0),unlimitedLives:admin});
+  }
+  if(url.pathname==="/api/duckhunt/score"&&request.method==="POST"){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   const body=await request.json().catch(()=>({})),gameId=String(body.gameId||"").slice(0,80);
+   if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
+   const score=Math.max(0,Math.min(10000,Math.floor(Number(body.score)||0))),ducks=Math.max(0,Math.min(1000,Math.floor(Number(body.ducks)||0)));
+   if(score>ducks*50||score<ducks*10)return json({error:"Puntuación no válida."},400);
+   await ensureDuckHuntSchema(env);await ensureSpiritSchema(env);const inserted=await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_game_scores(id,game_id,edition_id,user_id,score,ducks) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,score,ducks).run();
+   let awardedPoints=0;if(Number(inserted.meta?.changes||0)>0&&score>0){awardedPoints=Math.floor(score/10);await env.DB.prepare("INSERT OR IGNORE INTO spirit_points(id,edition_id,user_id,source_type,source_id,points,description) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"duckhunt_game",gameId,awardedPoints,"DUCK HUNT · "+ducks+" patos cazados").run();}
+   const stats=await env.DB.prepare("SELECT COALESCE(MAX(score),0) AS best_score,COUNT(*) AS games_played FROM duckhunt_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+   return json({ok:true,awardedPoints,stats:stats||{}});
+  }
+  if(url.pathname==="/api/duckhunt/leaderboard"&&request.method==="GET"){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   await ensureDuckHuntSchema(env);await ensureParticipantProfilesSchema(env);
+   const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ds.score) AS best_score,COUNT(ds.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN duckhunt_game_scores ds ON ds.edition_id=em.edition_id AND ds.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
+   return json({ranking:rows.results||[]});
+  }
+if(url.pathname==="/api/divorzhinha/home-background"&&request.method==="GET"){
    if(!env.MEDIA)return json({error:"Imagen no disponible."},404);
    const object=await env.MEDIA.get("divorzhinha-game/home-background");if(!object)return json({error:"Imagen no configurada."},404);
    return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"image/webp","cache-control":"public, max-age=300","etag":object.httpEtag||"divorzhinha-art","x-content-type-options":"nosniff"}});
