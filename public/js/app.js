@@ -1626,8 +1626,7 @@ async function openDivorzhinhaGame(){
  function keeperRoundedRect(x,y,w,h,r,fill){keeperCtx.beginPath();keeperCtx.roundRect(x,y,w,h,r);keeperCtx.fillStyle=fill;keeperCtx.fill();}
  function drawPixelKeeperFrame(now){
   const t=keeperDive?clamp((now-keeperDive.start)/560,0,1):0,e=t*t*(3-2*t),x=keeperDive?keeperDive.fromX+(keeperDive.toX-keeperDive.fromX)*e:keeperX;
-  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,pose=keeperDive?.pose||(shooting&&shot?(shot.targetY<165?(shot.targetX<390?"high-left":shot.targetX>570?"high-right":"high"):shot.targetY>300?(shot.targetX<390?"low-left":shot.targetX>570?"low-right":"low"):shot.targetX<390?"left":shot.targetX>570?"right":"center"):"idle"),divePower=keeperDive?Math.sin(e*Math.PI):0,lean=keeperDive?(pose==="left"?.72:pose==="right"?-.72:pose==="high-left"?.52:pose==="high-right"?-.52:0):Math.sin(now/310)*.025,vertical=keeperDive?keeperDive.fromY+(keeperDive.toY-keeperDive.fromY)*e:keeperY,ground=382+vertical+Math.sin(now/175)*2+Math.abs(Math.sin(now/260))*2; const step=Math.sin(now/145)*7,saved=catchFeedback&&finished,scored=now<angryUntil,crouch=pose==="low"||pose==="low-left"||pose==="low-right",stretch=pose==="left"||pose==="right"||pose==="high-left"||pose==="high-right";
-  const armLift=keeperDive?-(pose.startsWith("high")?112:pose==="low"?-24:pose==="low-left"||pose==="low-right"?-8:84)*divePower:Math.sin(now/280)*5;
+  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,pose=keeperDive?.pose||(shooting&&shot?(shot.targetY<165?(shot.targetX<390?"high-left":shot.targetX>570?"high-right":"high"):shot.targetY>300?(shot.targetX<390?"low-left":shot.targetX>570?"low-right":"low"):shot.targetX<390?"left":shot.targetX>570?"right":"center"):"idle"),divePower=keeperDive?Math.sin(e*Math.PI):0,actionActive=shooting&&shot&&now>=keeperReactAt,actionT=actionActive?clamp((now-keeperReactAt)/190,0,1):0,aimLean=actionActive?clamp((shot.targetX-480)/310,-1,1):0,aimLow=actionActive&&shot.targetY>285,lean=keeperDive?(pose==="left"?.72:pose==="right"?-.72:pose==="high-left"?.52:pose==="high-right"?-.52:0):aimLean*.48*actionT+Math.sin(now/310)*.012,vertical=keeperDive?keeperDive.fromY+(keeperDive.toY-keeperDive.fromY)*e:keeperY,ground=382+vertical+(aimLow?14*actionT:0)+Math.sin(now/175)*1.2; const step=Math.sin(now/145)*3+aimLean*16*actionT,saved=catchFeedback&&finished,scored=now<angryUntil,crouch=aimLow||pose==="low"||pose==="low-left"||pose==="low-right",stretch=Math.abs(aimLean)>.25||pose==="left"||pose==="right"||pose==="high-left"||pose==="high-right";
   const skin=keeperCtx.createLinearGradient(-55,-220,55,-90);skin.addColorStop(0,"#d99a70");skin.addColorStop(.55,"#b97952");skin.addColorStop(1,"#875139");
   const shirt=keeperCtx.createLinearGradient(-55,-285,55,-105);shirt.addColorStop(0,"#fff06b");shirt.addColorStop(.35,"#f8d52d");shirt.addColorStop(1,"#d79d13");
   const glove=keeperCtx.createLinearGradient(-18,-20,18,22);glove.addColorStop(0,"#fff");glove.addColorStop(.55,"#f4f7f3");glove.addColorStop(1,"#b7c7c1");
@@ -1639,8 +1638,15 @@ async function openDivorzhinhaGame(){
   keeperRoundedRect(-53,-279,106,168,25,shirt);keeperRoundedRect(-42,-265,84,12,6,"#fff4a1");keeperCtx.save();keeperCtx.fillStyle="#101010";keeperCtx.font="1000 72px Arial,sans-serif";keeperCtx.textAlign="center";keeperCtx.textBaseline="middle";keeperCtx.fillText("1",0,-194);keeperCtx.restore();
   const side=keeperCtx.createLinearGradient(-53,0,53,0);side.addColorStop(0,"#d49a12");side.addColorStop(.5,"#ffed69");side.addColorStop(1,"#d49a12");keeperCtx.fillStyle=side;keeperCtx.fillRect(-53,-171,106,9);
   keeperCtx.fillStyle="#fff7b4";keeperCtx.beginPath();keeperCtx.moveTo(-17,-278);keeperCtx.lineTo(0,-260);keeperCtx.lineTo(17,-278);keeperCtx.lineTo(10,-286);keeperCtx.lineTo(-10,-286);keeperCtx.closePath();keeperCtx.fill();
-  keeperCtx.save();keeperCtx.translate(-43,-251);keeperCtx.rotate(-.24-idle*.045-(keeperDive?Math.sin(e*Math.PI)*.9:0));keeperCtx.strokeStyle=skin;keeperCtx.lineWidth=23;keeperCtx.beginPath();keeperCtx.moveTo(0,0);keeperCtx.quadraticCurveTo(-24,24,-40,49+armLift);keeperCtx.stroke();keeperRoundedRect(-55,38+armLift,33,36,12,glove);keeperCtx.strokeStyle="#aabbb5";keeperCtx.lineWidth=3;for(let j=0;j<3;j++){keeperCtx.beginPath();keeperCtx.moveTo(-50+j*8,42+armLift);keeperCtx.lineTo(-52+j*8,57+armLift);keeperCtx.stroke();}keeperCtx.restore();
-  keeperCtx.save();keeperCtx.translate(43,-251);keeperCtx.rotate(.24+idle*.045+(keeperDive?Math.sin(e*Math.PI)*.9:0));keeperCtx.strokeStyle=skin;keeperCtx.lineWidth=23;keeperCtx.beginPath();keeperCtx.moveTo(0,0);keeperCtx.quadraticCurveTo(24,24,40,49+armLift);keeperCtx.stroke();keeperRoundedRect(22,38+armLift,33,36,12,glove);keeperCtx.strokeStyle="#aabbb5";keeperCtx.lineWidth=3;for(let j=0;j<3;j++){keeperCtx.beginPath();keeperCtx.moveTo(27+j*8,42+armLift);keeperCtx.lineTo(25+j*8,57+armLift);keeperCtx.stroke();}keeperCtx.restore();
+  const actionActive=shooting&&shot&&now>=keeperReactAt,reachT=actionActive?clamp((now-keeperReactAt)/190,0,1):keeperDive?divePower:0,reachEase=reachT*reachT*(3-2*reachT);
+  const aimDX=actionActive?clamp((shot.targetX-480)/310,-1,1):0,aimDY=actionActive?clamp((shot.targetY-220)/170,-1,1):0;
+  const reachX=aimDX*108*reachEase,reachY=(-62+aimDY*112)*reachEase;
+  function drawReachArm(side){
+   const sx=side*43,spread=side*17,ex=sx+reachX+spread,ey=-251+reachY+side*10;
+   keeperCtx.strokeStyle=skin;keeperCtx.lineWidth=23;keeperCtx.lineCap="round";keeperCtx.beginPath();keeperCtx.moveTo(sx,-251);keeperCtx.quadraticCurveTo(sx+(ex-sx)*.52+side*8,-226+(ey+251)*.42,ex,ey);keeperCtx.stroke();
+   keeperCtx.save();keeperCtx.translate(ex,ey);keeperCtx.rotate(Math.atan2(ey+251,ex-sx));keeperRoundedRect(-15,-17,34,34,11,glove);keeperCtx.strokeStyle="#aabbb5";keeperCtx.lineWidth=2.5;for(let j=0;j<3;j++){keeperCtx.beginPath();keeperCtx.moveTo(-7+j*7,-12);keeperCtx.lineTo(-7+j*7,8);keeperCtx.stroke();}keeperCtx.restore();
+  }
+  drawReachArm(-1);drawReachArm(1);
   keeperRoundedRect(-16,-310,32,39,9,skin);keeperCtx.beginPath();keeperCtx.ellipse(0,-337+breath*.25,39,47,0,0,Math.PI*2);keeperCtx.fillStyle=skin;keeperCtx.fill();
   keeperCtx.fillStyle="#a96343";keeperCtx.beginPath();keeperCtx.ellipse(-39,-337,8,13,0,0,Math.PI*2);keeperCtx.ellipse(39,-337,8,13,0,0,Math.PI*2);keeperCtx.fill();
   keeperCtx.fillStyle="#201b1a";keeperCtx.beginPath();keeperCtx.moveTo(-39,-346);keeperCtx.quadraticCurveTo(-43,-385,-8,-389);keeperCtx.quadraticCurveTo(29,-395,42,-360);keeperCtx.lineTo(34,-354);keeperCtx.quadraticCurveTo(12,-370,-4,-362);keeperCtx.quadraticCurveTo(-21,-350,-39,-346);keeperCtx.fill();
@@ -1735,8 +1741,12 @@ async function openDivorzhinhaGame(){
    if(inBand(0,122,49))return true;
    // Torso, hombros y camiseta.
    if(inBand(105,278,65))return true;
-   // Brazos extendidos y guantes.
-   if(inBand(128,242,105))return true;
+   // Brazos, antebrazos y guantes: zona amplia de atajada.
+   if(inBand(72,285,148))return true;
+   // Guantes dirigidos hacia la trayectoria del balón (extensión de ambos brazos).
+   const aimX=clamp((ballX-480)/310,-1,1),aimY=clamp((ballY-220)/170,-1,1);
+   const gloveCenterX=keeperCenterX+aimX*92,gloveCenterY=382+keeperOffsetY-251-62+aimY*105;
+   if(Math.hypot(ballX-gloveCenterX,ballY-gloveCenterY)<52)return true;
    // Pantalones cortos, muslos, pantorrillas y botas.
    if(inBand(258,382,68))return true;
    return false;
@@ -1749,13 +1759,13 @@ async function openDivorzhinhaGame(){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
   shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
-  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.43,-78,72);keeperReactAt=performance.now()+Math.max(105,250-Math.min(score,20)*5);setTimeout(()=>resolveShot(),shot.duration);
+  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.43,-78,72);keeperReactAt=performance.now()+Math.max(70,145-Math.min(score,20)*3);setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
-  const keeperMinX=170,keeperMaxX=790;keeperSpeed=Math.min(550,220*Math.pow(2,Math.min(2,Math.floor(score/5))));
-  if(shooting&&shot&&now>=keeperReactAt){const dx=keeperTargetX-keeperX,dy=keeperTargetY-keeperY,stepX=keeperSpeed*dt,stepY=keeperSpeed*.82*dt;keeperX=Math.abs(dx)<=stepX?keeperTargetX:keeperX+Math.sign(dx)*stepX;keeperY=Math.abs(dy)<=stepY?keeperTargetY:keeperY+Math.sign(dy)*stepY;}
-  else{keeperX+=keeperDirection*keeperSpeed*.58*dt;if(keeperX>=keeperMaxX){keeperX=keeperMaxX;keeperDirection=-1;}else if(keeperX<=keeperMinX){keeperX=keeperMinX;keeperDirection=1;}keeperY+=(0-keeperY)*Math.min(1,dt*2.4);}
+  keeperSpeed=Math.min(1100,620*Math.pow(2,Math.min(2,Math.floor(score/5))));
+  if(shooting&&shot&&now>=keeperReactAt){const dx=keeperTargetX-keeperX,dy=keeperTargetY-keeperY,stepX=keeperSpeed*dt,stepY=keeperSpeed*.9*dt;keeperX=Math.abs(dx)<=stepX?keeperTargetX:keeperX+Math.sign(dx)*stepX;keeperY=Math.abs(dy)<=stepY?keeperTargetY:keeperY+Math.sign(dy)*stepY;}
+  else if(!shooting&&!keeperDive){keeperX+=(480-keeperX)*Math.min(1,dt*5);keeperY+=(0-keeperY)*Math.min(1,dt*5);}
   render(now);raf=requestAnimationFrame(frame);
  }
  function start(){if(active||(!unlimitedLives&&lives<=0)||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
