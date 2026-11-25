@@ -1556,7 +1556,24 @@ async function openDivorzhinhaGame(){
   if(!shot)return;const current=shot;shot=null;shooting=false;
   const inside=current.targetX>=170&&current.targetX<=790&&current.targetY>=78&&current.targetY<=390;
   if(!inside){finishOutsideShot();return;}
-  const caught=Math.abs(keeperX-current.targetX)<86&&current.targetY<285;
+  // Colisión con la silueta completa del arquero. Las coordenadas están
+  // expresadas en el canvas final (960x540), con el suelo del arquero en Y≈382.
+  // Se amplían los límites por el radio de la pelota para detectar también
+  // impactos rasantes en guantes, botas y piernas.
+  function hitsKeeperBody(ballX,ballY,keeperCenterX){
+   const dx=Math.abs(ballX-keeperCenterX),r=21,y=ballY;
+   const inBand=(top,bottom,halfWidth)=>y>=top-r&&y<=bottom+r&&dx<=halfWidth+r;
+   // Cabeza y cuello.
+   if(inBand(0,122,49))return true;
+   // Torso, hombros y camiseta.
+   if(inBand(105,278,65))return true;
+   // Brazos extendidos y guantes.
+   if(inBand(128,242,105))return true;
+   // Pantalones cortos, muslos, pantorrillas y botas.
+   if(inBand(258,382,68))return true;
+   return false;
+  }
+  const caught=hitsKeeperBody(current.targetX,current.targetY,keeperX);
   if(caught){shotSaveTargetX=current.targetX;keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
   else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1500;playCrowdSound("goal");for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
  }
