@@ -587,7 +587,7 @@ async function handleApi(request, env, url) {
   
   if(url.pathname==="/api/duckhunt/state"&&request.method==="GET"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"Duck Hunt está disponible únicamente para el administrador principal."},403);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"NIKE HUNT está disponible únicamente para el administrador principal."},403);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Duck Hunt está disponible únicamente para participantes confirmados de Cliente 360."},403);
    await ensureDuckHuntSchema(env);const gameDate=getRozviGameDate();
    await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
@@ -614,7 +614,7 @@ async function handleApi(request, env, url) {
    const score=Math.max(0,Math.min(10000,Math.floor(Number(body.score)||0))),ducks=Math.max(0,Math.min(1000,Math.floor(Number(body.ducks)||0)));
    if(score>ducks*50||score<ducks*10)return json({error:"Puntuación no válida."},400);
    await ensureDuckHuntSchema(env);await ensureSpiritSchema(env);const inserted=await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_game_scores(id,game_id,edition_id,user_id,score,ducks) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,score,ducks).run();
-   let awardedPoints=0;if(Number(inserted.meta?.changes||0)>0&&score>0){awardedPoints=Math.floor(score/10);await env.DB.prepare("INSERT OR IGNORE INTO spirit_points(id,edition_id,user_id,source_type,source_id,points,description) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"duckhunt_game",gameId,awardedPoints,"DUCK HUNT · "+ducks+" patos cazados").run();}
+   let awardedPoints=0;if(Number(inserted.meta?.changes||0)>0&&score>0){awardedPoints=Math.floor(score/10);await env.DB.prepare("INSERT OR IGNORE INTO spirit_points(id,edition_id,user_id,source_type,source_id,points,description) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"duckhunt_game",gameId,awardedPoints,"NIKE HUNT · "+ducks+" NIKES cazados").run();}
    const stats=await env.DB.prepare("SELECT COALESCE(MAX(score),0) AS best_score,COUNT(*) AS games_played FROM duckhunt_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
    return json({ok:true,awardedPoints,stats:stats||{}});
   }
