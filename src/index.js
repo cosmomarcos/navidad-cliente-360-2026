@@ -626,7 +626,15 @@ async function handleApi(request, env, url) {
    const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ds.score) AS best_score,COUNT(ds.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN duckhunt_game_scores ds ON ds.edition_id=em.edition_id AND ds.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
    return json({ranking:rows.results||[]});
   }
-if(url.pathname==="/api/divorzhinha/home-background"&&request.method==="GET"){
+if(url.pathname==="/api/duckhunt/home-background"&&request.method==="GET"){
+   if(!env.MEDIA)return json({error:"Imagen no disponible."},404);const object=await env.MEDIA.get("duckhunt-game/home-background");if(!object)return json({error:"Imagen no configurada."},404);
+   return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"image/webp","cache-control":"public, max-age=300","etag":object.httpEtag||"nike-hunt-art","x-content-type-options":"nosniff"}});
+  }
+  if(url.pathname==="/api/duckhunt/music/current"&&(request.method==="GET"||request.method==="HEAD")){
+   if(!env.MEDIA)return json({error:"Almacenamiento de audio no configurado."},503);const object=await env.MEDIA.get("duckhunt-game/music");if(!object)return json({error:"No hay canción configurada."},404);
+   const headers={"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag||"nike-hunt-audio","content-length":String(object.size),"x-content-type-options":"nosniff"};return new Response(request.method==="HEAD"?null:object.body,{headers});
+  }
+  if(url.pathname==="/api/divorzhinha/home-background"&&request.method==="GET"){
    if(!env.MEDIA)return json({error:"Imagen no disponible."},404);
    const object=await env.MEDIA.get("divorzhinha-game/home-background");if(!object)return json({error:"Imagen no configurada."},404);
    return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"image/webp","cache-control":"public, max-age=300","etag":object.httpEtag||"divorzhinha-art","x-content-type-options":"nosniff"}});
@@ -1113,6 +1121,25 @@ if(url.pathname==="/api/divorzhinha/home-background"&&request.method==="GET"){
       const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una canción."},400);if(file.size>15*1024*1024)return json({error:"El audio supera el límite de 15 MB."},413);
       if(!new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]).has(String(file.type).toLowerCase()))return json({error:"Usa MP3, M4A, AAC, OGG, WAV o WEBM."},400);
       const fileName=String(file.name||"divorzhinha-audio").replace(/[\\r\\n"]/g,"").slice(0,120);await env.MEDIA.put("divorzhinha-game/music",await file.arrayBuffer(),{httpMetadata:{contentType:file.type||"audio/mpeg",cacheControl:"no-store"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});return json({ok:true,fileName,size:file.size});
+    }
+    if(url.pathname==="/api/admin/duckhunt/art"&&request.method==="GET"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const object=await env.MEDIA.head("duckhunt-game/home-background");return json({configured:!!object,fileName:object?.customMetadata?.fileName||null,size:object?.size||0});
+    }
+    if(url.pathname==="/api/admin/duckhunt/art"&&request.method==="POST"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const length=Number(request.headers.get("content-length")||0);if(length>6*1024*1024)return json({error:"La imagen supera el límite de 5 MB."},413);
+      const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una imagen."},400);if(file.size>5*1024*1024)return json({error:"La imagen supera el límite de 5 MB."},413);
+      if(!new Set(["image/jpeg","image/png","image/webp"]).has(String(file.type).toLowerCase()))return json({error:"Usa JPG, PNG o WEBP."},400);
+      const fileName=String(file.name||"nike-hunt-portada").replace(/[\\r\\n"]/g,"").slice(0,120);await env.MEDIA.put("duckhunt-game/home-background",await file.arrayBuffer(),{httpMetadata:{contentType:file.type,cacheControl:"public, max-age=300"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});return json({ok:true,fileName,size:file.size});
+    }
+    if(url.pathname==="/api/admin/duckhunt/art"&&request.method==="DELETE"){if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);await env.MEDIA.delete("duckhunt-game/home-background");return json({ok:true});}
+    if(url.pathname==="/api/admin/duckhunt/music"&&request.method==="GET"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const object=await env.MEDIA.head("duckhunt-game/music");return json({configured:!!object,fileName:object?.customMetadata?.fileName||null,size:object?.size||0});
+    }
+    if(url.pathname==="/api/admin/duckhunt/music"&&request.method==="POST"){
+      if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);const length=Number(request.headers.get("content-length")||0);if(length>16*1024*1024)return json({error:"El audio supera el límite de 15 MB."},413);
+      const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona una canción."},400);if(file.size>15*1024*1024)return json({error:"El audio supera el límite de 15 MB."},413);
+      if(!new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]).has(String(file.type).toLowerCase()))return json({error:"Usa MP3, M4A, AAC, OGG, WAV o WEBM."},400);
+      const fileName=String(file.name||"nike-hunt-audio").replace(/[\\r\\n"]/g,"").slice(0,120);await env.MEDIA.put("duckhunt-game/music",await file.arrayBuffer(),{httpMetadata:{contentType:file.type||"audio/mpeg",cacheControl:"no-store"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});return json({ok:true,fileName,size:file.size});
     }
     if (url.pathname === "/api/admin/rozvi/art" && request.method === "GET") {
       if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
