@@ -1371,3 +1371,15 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 /* NIKE HUNT · escenario ampliado al formato de ¡Vamos Rozvi! */
 .duckhunt-shell{width:min(940px,100%);max-height:calc(100dvh - 20px);padding:clamp(12px,2.5vw,24px)}
 .duckhunt-screen{width:100%;}.duckhunt-screen canvas{width:100%;aspect-ratio:16/9;}
+
+/* NIKE HUNT: bandera arcoíris legible y escenario de juego realmente ampliado */
+.duckhunt-modal{padding:0;place-items:stretch center}
+.duckhunt-shell{width:min(1240px,100%);max-height:100dvh;padding:clamp(12px,2vw,24px);border-radius:0;display:flex;flex-direction:column;justify-content:flex-start}
+.duckhunt-screen{width:100%;flex:0 0 auto}
+.duckhunt-screen canvas{display:block;width:100%;height:clamp(380px,68vh,760px);aspect-ratio:auto;object-fit:fill}
+@media(max-width:700px){
+ .duckhunt-modal{padding:0}
+ .duckhunt-shell{width:100%;max-height:100dvh;padding:9px;border-radius:0}
+ .duckhunt-screen canvas{height:clamp(300px,56vh,520px);aspect-ratio:auto}
+ .duckhunt-ranking ol{grid-template-columns:1fr}
+}
