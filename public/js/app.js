@@ -1429,7 +1429,7 @@ async function openDuckHuntGame(){
  modal.querySelector("#duckhunt-copy").textContent=unlimited?"Toca directamente a los patos. Tienes 3 disparos por recarga y 60 segundos. Como administrador tienes partidas ilimitadas.":"Toca directamente a los patos para disparar. Tienes 3 disparos por recarga y 60 segundos. Cada pato normal vale 10 puntos; el dorado vale 50. Te quedan "+state.livesRemaining+" partidas hoy.";
  document.body.append(modal);openDuckHuntGame.loading=false;
  const canvas=modal.querySelector("#duckhunt-canvas"),ctx=canvas.getContext("2d"),overlay=modal.querySelector("#duckhunt-overlay"),scoreEl=modal.querySelector("#duckhunt-score"),timeEl=modal.querySelector("#duckhunt-time"),ammoEl=modal.querySelector("#duckhunt-ammo"),feedback=modal.querySelector("#duckhunt-feedback");
- let score=0,ammo=3,time=60,active=false,ended=false,raf=0,last=0,spawn=0,ducks=[],shots=[],escaped=0,gameId=crypto.randomUUID().replace(/-/g,""),lifeConsumed=false;
+ let score=0,ducksShot=0,ammo=3,time=60,active=false,ended=false,raf=0,last=0,spawn=0,ducks=[],shots=[],escaped=0,gameId=crypto.randomUUID().replace(/-/g,""),lifeConsumed=false;
  const rnd=(a,b)=>a+Math.random()*(b-a);
  function pixel(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
  function drawDuck(d){
@@ -1459,7 +1459,7 @@ async function openDuckHuntGame(){
   modal.querySelector("#duckhunt-copy").textContent="Cazaste "+Math.floor(score/10)+" patos equivalentes y conseguiste "+score+" puntos. Tu puntuación se guardará en Espíritu.";
   modal.querySelector("#duckhunt-start").textContent="JUGAR OTRA PARTIDA";
   modal.querySelector("#duckhunt-exit").textContent="CERRAR";
-  api("/api/duckhunt/score",{method:"POST",body:JSON.stringify({gameId,score,ducks:Math.floor(score/10)}) ,noMemoryCache:true,timeoutMs:8000}).then(result=>{feedback.textContent="¡"+result.awardedPoints+" PUNTOS ESPÍRITU CONSEGUIDOS!";modal.querySelector("#duckhunt-best").textContent=String(result.stats?.best_score||score);loadRanking();}).catch(e=>{feedback.textContent="No se pudo guardar el puntaje: "+(e.message||"intenta de nuevo");});
+  api("/api/duckhunt/score",{method:"POST",body:JSON.stringify({gameId,score,ducks:ducksShot}) ,noMemoryCache:true,timeoutMs:8000}).then(result=>{feedback.textContent="¡"+result.awardedPoints+" PUNTOS ESPÍRITU CONSEGUIDOS!";modal.querySelector("#duckhunt-best").textContent=String(result.stats?.best_score||score);loadRanking();}).catch(e=>{feedback.textContent="No se pudo guardar el puntaje: "+(e.message||"intenta de nuevo");});
  }
  function loop(now){
   if(!active)return;const dt=Math.min(.04,(now-last)/1000||0);last=now;time-=dt;spawn-=dt;
@@ -1475,13 +1475,13 @@ async function openDuckHuntGame(){
   if(active)return;
   if(!unlimited&&!lifeConsumed){try{const res=await api("/api/duckhunt/lives",{method:"POST",body:JSON.stringify({action:"consume-life"}),noMemoryCache:true});lifeConsumed=true;state.livesRemaining=res.livesRemaining;feedback.textContent="PARTIDAS RESTANTES HOY: "+res.livesRemaining;}catch(e){feedback.textContent=e.message||"No tienes partidas disponibles.";return;}}
   if(!unlimited&&Number(state.livesRemaining)<=0&&!lifeConsumed){feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 partidas.";return;}
-  score=0;ammo=3;time=60;escaped=0;ducks=[];shots=[];spawn=.2;ended=false;active=true;last=performance.now();overlay.classList.add("hidden");hud();raf=requestAnimationFrame(loop);
+  score=0;ducksShot=0;ammo=3;time=60;escaped=0;ducks=[];shots=[];spawn=.2;ended=false;active=true;last=performance.now();overlay.classList.add("hidden");hud();raf=requestAnimationFrame(loop);
  }
  canvas.addEventListener("pointerdown",e=>{
   if(!active||ammo<=0)return;e.preventDefault();const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*canvas.width/r.width,y=(e.clientY-r.top)*canvas.height/r.height;
   ammo--;shots.push({x,y,t:performance.now()});let hit=-1;
   for(let i=ducks.length-1;i>=0;i--){const d=ducks[i];if(Math.abs(x-d.x)<25&&Math.abs(y-d.y)<21){hit=i;break;}}
-  if(hit>=0){const d=ducks.splice(hit,1)[0],points=d.gold?50:10;score+=points;feedback.textContent=d.gold?"¡PATO DORADO! +50":"¡PATO CAZADO! +10";}
+  if(hit>=0){const d=ducks.splice(hit,1)[0],points=d.gold?50:10;score+=points;ducksShot++;feedback.textContent=d.gold?"¡PATO DORADO! +50":"¡PATO CAZADO! +10";}
   else feedback.textContent="¡FALLASTE!";
   if(ammo===0){feedback.textContent+=" · RECARGANDO";setTimeout(()=>{if(active){ammo=3;hud();}},650);}hud();
  });
