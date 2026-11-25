@@ -752,6 +752,8 @@ if(url.pathname==="/api/duckhunt/home-background"&&request.method==="GET"){
   }
 
   if (url.pathname.startsWith("/api/spirit/")) {
+    // Revoca una sola vez los puntos históricos de DIVORZINHA al entrar a Espíritu.
+    await ensureDivorzhinhaSchema(env);
     const user = await currentUser(request, env);
     if (!user) return json({ error: "Inicia sesión primero." }, 401);
     const member=await getParticipantEdition(env,user,url);
