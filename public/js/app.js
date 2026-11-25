@@ -1640,7 +1640,7 @@ async function openDivorzhinhaGame(){
   keeperCtx.fillStyle="#fff7b4";keeperCtx.beginPath();keeperCtx.moveTo(-17,-278);keeperCtx.lineTo(0,-260);keeperCtx.lineTo(17,-278);keeperCtx.lineTo(10,-286);keeperCtx.lineTo(-10,-286);keeperCtx.closePath();keeperCtx.fill();
   const armActionActive=shooting&&shot&&now>=keeperReactAt,reachT=armActionActive?clamp((now-keeperReactAt)/190,0,1):keeperDive?divePower:0,reachEase=reachT*reachT*(3-2*reachT);
   const aimDX=armActionActive?clamp((shot.targetX-480)/310,-1,1):0,aimDY=armActionActive?clamp((shot.targetY-220)/170,-1,1):0;
-  const reachX=aimDX*108*reachEase,reachY=(-62+aimDY*112)*reachEase;
+  const reachX=armActionActive?clamp(shot.targetX-keeperX,-155,155)*reachEase:0,reachY=armActionActive?clamp(shot.targetY-(382+keeperY-251),-120,150)*reachEase:0;
   function drawReachArm(side){
    const sx=side*43,spread=side*17,ex=sx+reachX+spread,ey=-251+reachY+side*10;
    keeperCtx.strokeStyle=skin;keeperCtx.lineWidth=23;keeperCtx.lineCap="round";keeperCtx.beginPath();keeperCtx.moveTo(sx,-251);keeperCtx.quadraticCurveTo(sx+(ex-sx)*.52+side*8,-226+(ey+251)*.42,ex,ey);keeperCtx.stroke();
@@ -1744,9 +1744,10 @@ async function openDivorzhinhaGame(){
    // Brazos, antebrazos y guantes: zona amplia de atajada.
    if(inBand(72,285,148))return true;
    // Guantes dirigidos hacia la trayectoria del balón (extensión de ambos brazos).
-   const aimX=clamp((ballX-480)/310,-1,1),aimY=clamp((ballY-220)/170,-1,1);
-   const gloveCenterX=keeperCenterX+aimX*92,gloveCenterY=382+keeperOffsetY-251-62+aimY*105;
-   if(Math.hypot(ballX-gloveCenterX,ballY-gloveCenterY)<52)return true;
+   const shoulderY=382+keeperOffsetY-251;
+   const gloveCenterX=keeperCenterX+clamp(ballX-keeperCenterX,-155,155);
+   const gloveCenterY=shoulderY+clamp(ballY-shoulderY,-120,150);
+   if(Math.hypot(ballX-gloveCenterX,ballY-gloveCenterY)<66)return true;
    // Pantalones cortos, muslos, pantorrillas y botas.
    if(inBand(258,382,68))return true;
    return false;
@@ -1759,7 +1760,7 @@ async function openDivorzhinhaGame(){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
   shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
-  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.43,-78,72);keeperReactAt=performance.now()+Math.max(70,145-Math.min(score,20)*3);setTimeout(()=>resolveShot(),shot.duration);
+  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.62,-95,110);keeperReactAt=performance.now()+Math.max(70,145-Math.min(score,20)*3);setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
