@@ -606,7 +606,6 @@ async function handleApi(request, env, url) {
   }
   if(url.pathname==="/api/duckhunt/lives"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"Duck Hunt está disponible únicamente para el administrador principal."},403);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
    await ensureDuckHuntSchema(env);const gameDate=getRozviGameDate(),admin=await isPrimaryAdmin(user,env);
    await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
@@ -616,7 +615,6 @@ async function handleApi(request, env, url) {
   }
   if(url.pathname==="/api/duckhunt/score"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"Duck Hunt está disponible únicamente para el administrador principal."},403);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
    const body=await request.json().catch(()=>({})),gameId=String(body.gameId||"").slice(0,80);
    if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
@@ -629,7 +627,6 @@ async function handleApi(request, env, url) {
   }
   if(url.pathname==="/api/duckhunt/leaderboard"&&request.method==="GET"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"Duck Hunt está disponible únicamente para el administrador principal."},403);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
    await ensureDuckHuntSchema(env);await ensureParticipantProfilesSchema(env);
    const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ds.score) AS best_score,COUNT(ds.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN duckhunt_game_scores ds ON ds.edition_id=em.edition_id AND ds.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
