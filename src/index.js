@@ -505,6 +505,52 @@ async function handleApi(request, env, url) {
   if(url.pathname==="/api/rozvi/lives"&&(request.method==="GET"||request.method==="POST")){const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"¡Vamos Rozvi! está disponible únicamente para el intercambio Cliente 360."},403);await ensureRozviSettingsSchema(env);await ensureRozviDailyLivesSchema(env);const settings=await env.DB.prepare("SELECT config_json FROM rozvi_game_settings WHERE id='default'").first();let config={lives:5};try{config={...config,...JSON.parse(settings?.config_json||"{}")};}catch{}const previousMax=Math.max(1,Math.min(10,Number(config.lives)||3));if(!config.cliente360LivesRaisedTo5V1){const todayForUpgrade=getRozviGameDate();await env.DB.prepare("UPDATE rozvi_daily_lives SET lives_remaining=MIN(5,lives_remaining+?),updated_at=datetime('now') WHERE edition_id=? AND game_date=?").bind(Math.max(0,5-previousMax),member.edition_id,todayForUpgrade).run();config.lives=5;config.cliente360LivesRaisedTo5V1=true;await env.DB.prepare("UPDATE rozvi_game_settings SET config_json=?,updated_at=datetime('now') WHERE id='default'").bind(JSON.stringify(config)).run();}const maxLives=5;if(isPrimaryAdmin(user)&&!config.cliente360LivesResetV284){const today=getRozviGameDate();await env.DB.prepare("INSERT INTO rozvi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,?) ON CONFLICT(edition_id,user_id,game_date) DO UPDATE SET lives_remaining=excluded.lives_remaining,updated_at=datetime('now')").bind(member.edition_id,user.id,today,maxLives).run();config.cliente360LivesResetV284=true;await env.DB.prepare("UPDATE rozvi_game_settings SET config_json=?,updated_at=datetime('now') WHERE id='default'").bind(JSON.stringify(config)).run();}if(!config.cliente360LaunchResetV282){await env.DB.prepare("UPDATE rozvi_daily_lives SET lives_remaining=?,updated_at=datetime('now') WHERE edition_id=? AND game_date=date('now','-5 hours')").bind(maxLives,member.edition_id).run();config.cliente360LaunchResetV282=true;await env.DB.prepare("UPDATE rozvi_game_settings SET config_json=?,updated_at=datetime('now') WHERE id='default'").bind(JSON.stringify(config)).run();}const gameDate=getRozviGameDate();await env.DB.prepare("INSERT OR IGNORE INTO rozvi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,?)").bind(member.edition_id,user.id,gameDate,maxLives).run();if(request.method==="POST"){const body=await request.json().catch(()=>({}));if(body.action==="admin-reset-lives"){if(!isPrimaryAdmin(user))return json({error:"Solo el administrador principal puede reiniciar las vidas."},403);await env.DB.prepare("UPDATE rozvi_daily_lives SET lives_remaining=?,updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=?").bind(maxLives,member.edition_id,user.id,gameDate).run();await env.DB.prepare("INSERT INTO rozvi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,?) ON CONFLICT(edition_id,user_id,game_date) DO UPDATE SET lives_remaining=excluded.lives_remaining,updated_at=datetime('now')").bind(member.edition_id,user.id,gameDate,maxLives).run();}else if(body.action==="lose-life"){await env.DB.prepare("UPDATE rozvi_daily_lives SET lives_remaining=MAX(0,lives_remaining-1),updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).run();}else return json({error:"Acción no válida."},400);}const row=await env.DB.prepare("SELECT lives_remaining FROM rozvi_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();return json({livesRemaining:Number(row?.lives_remaining??0),maxLives,gameDate});}
 
 
+  if(url.pathname==="/api/michi/state"&&(request.method==="GET"||request.method==="POST")){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"MICHI VS DOG está disponible únicamente para el administrador principal."},403);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"El juego requiere una sesión de administrador en Cliente 360."},403);
+   await env.DB.prepare("CREATE TABLE IF NOT EXISTS michi_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
+   const gameDate=getRozviGameDate();
+   await env.DB.prepare("INSERT OR IGNORE INTO michi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
+   if(request.method==="POST"){
+    const body=await request.json().catch(()=>({}));
+    if(body.action!=="consume-life")return json({error:"Acción no válida."},400);
+    const changed=await env.DB.prepare("UPDATE michi_daily_lives SET lives_remaining=lives_remaining-1,updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=? AND lives_remaining>0").bind(member.edition_id,user.id,gameDate).run();
+    if(Number(changed.meta?.changes||0)===0)return json({error:"Ya utilizaste tus 5 vidas de hoy. ¡Vuelve mañana!"},409);
+   }
+   const row=await env.DB.prepare("SELECT lives_remaining FROM michi_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
+   return json({livesRemaining:Number(row?.lives_remaining??5),maxLives:5,gameDate});
+  }
+  if(url.pathname==="/api/michi/home-background"&&request.method==="GET"){
+   if(!(await currentUser(request,env)))return json({error:"Inicia sesión primero."},401);
+   const object=await env.MEDIA?.get("michi-game/home-background");if(!object)return json({error:"Imagen no configurada."},404);
+   return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"image/webp","cache-control":"public, max-age=300","etag":object.httpEtag||"michi-art","x-content-type-options":"nosniff"}});
+  }
+  if(url.pathname==="/api/michi/music/current"&&(request.method==="GET"||request.method==="HEAD")){
+   if(!(await currentUser(request,env)))return json({error:"Inicia sesión primero."},401);
+   const object=await env.MEDIA?.get("michi-game/music");if(!object)return json({error:"No hay canción configurada."},404);
+   return new Response(request.method==="HEAD"?null:object.body,{headers:{"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag||"michi-audio","content-length":String(object.size),"x-content-type-options":"nosniff"}});
+  }
+  if(url.pathname.startsWith("/api/admin/michi/")){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"Solo el administrador principal puede configurar MICHI VS DOG."},403);
+   if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
+   const kind=url.pathname.endsWith("/art")?"art":url.pathname.endsWith("/music")?"music":null;
+   if(!kind)return json({error:"Recurso no válido."},404);
+   const key=kind==="art"?"michi-game/home-background":"michi-game/music";
+   if(request.method==="GET"){const o=await env.MEDIA.head(key);return json({configured:!!o,fileName:o?.customMetadata?.fileName||null,size:o?.size||0});}
+   if(request.method==="DELETE"&&kind==="art"){await env.MEDIA.delete(key);return json({ok:true});}
+   if(request.method==="POST"){
+    const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona un archivo."},400);
+    const max=kind==="art"?5*1024*1024:15*1024*1024;if(file.size>max)return json({error:kind==="art"?"La imagen supera 5 MB.":"El audio supera 15 MB."},413);
+    const allowed=kind==="art"?new Set(["image/jpeg","image/png","image/webp"]):new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]);
+    if(!allowed.has(String(file.type).toLowerCase()))return json({error:kind==="art"?"Usa JPG, PNG o WEBP.":"Usa MP3, M4A, AAC, OGG, WAV o WEBM."},400);
+    const fileName=String(file.name||"michi-"+kind).replace(/[\\r\\n"]/g,"").slice(0,120);
+    await env.MEDIA.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type,cacheControl:kind==="art"?"public, max-age=300":"no-store"},customMetadata:{fileName,uploadedAt:new Date().toISOString(),uploadedBy:user.email}});
+    return json({ok:true,fileName,size:file.size});
+   }
+   return json({error:"Método no permitido."},405);
+  }
   if(url.pathname==="/api/divorzhinha/state"&&request.method==="GET"){
    try{
     const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
