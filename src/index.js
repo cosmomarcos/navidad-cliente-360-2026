@@ -490,7 +490,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.36" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.37" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -513,17 +513,17 @@ async function handleApi(request, env, url) {
     ? await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed' AND w.name='Cliente 360'").bind(user.id,requestedEditionId).first()
     : await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' AND w.name='Cliente 360' ORDER BY e.year DESC,em.joined_at DESC LIMIT 1").bind(user.id).first();
    if(!member)return json({error:"No se encontró tu participación confirmada en Cliente 360. Verifica que el intercambio esté seleccionado."},403);
+   const adminInfiniteLives=true;
    await env.DB.prepare("CREATE TABLE IF NOT EXISTS michi_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
    const gameDate=getRozviGameDate();
    await env.DB.prepare("INSERT OR IGNORE INTO michi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
    if(request.method==="POST"){
     const body=await request.json().catch(()=>({}));
     if(body.action!=="consume-life")return json({error:"Acción no válida."},400);
-    const changed=await env.DB.prepare("UPDATE michi_daily_lives SET lives_remaining=lives_remaining-1,updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=? AND lives_remaining>0").bind(member.edition_id,user.id,gameDate).run();
-    if(Number(changed.meta?.changes||0)===0)return json({error:"Ya utilizaste tus 5 vidas de hoy. ¡Vuelve mañana!"},409);
+    if(!adminInfiniteLives){const changed=await env.DB.prepare("UPDATE michi_daily_lives SET lives_remaining=lives_remaining-1,updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=? AND lives_remaining>0").bind(member.edition_id,user.id,gameDate).run();if(Number(changed.meta?.changes||0)===0)return json({error:"Ya utilizaste tus 5 vidas de hoy. ¡Vuelve mañana!"},409);}
    }
    const row=await env.DB.prepare("SELECT lives_remaining FROM michi_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
-   return json({livesRemaining:Number(row?.lives_remaining??5),maxLives:5,gameDate});
+   return json({livesRemaining:adminInfiniteLives?-1:Number(row?.lives_remaining??5),maxLives:adminInfiniteLives?null:5,infiniteLives:adminInfiniteLives,gameDate});
   }
   if(url.pathname==="/api/michi/home-background"&&request.method==="GET"){
    if(!(await currentUser(request,env)))return json({error:"Inicia sesión primero."},401);
