@@ -41,6 +41,13 @@ async function ensureDivorzhinhaSchema(env){
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS divorzhinha_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS divorzhinha_game_scores (id TEXT PRIMARY KEY,game_id TEXT NOT NULL UNIQUE,edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,goals INTEGER NOT NULL DEFAULT 0,saves INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_divorzhinha_scores ON divorzhinha_game_scores(edition_id,goals DESC,created_at)").run();
+  await ensureSpiritSchema(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS spirit_schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+  const revocation=await env.DB.prepare("SELECT name FROM spirit_schema_migrations WHERE name='revoke_divorzhinha_points_v1'").first();
+  if(!revocation){
+   await env.DB.prepare("DELETE FROM spirit_points WHERE source_type='divorzhinha_game'").run();
+   await env.DB.prepare("INSERT OR IGNORE INTO spirit_schema_migrations(name) VALUES('revoke_divorzhinha_points_v1')").run();
+  }
  });
 }
 async function ensureRozviSettingsSchema(env) { return ensureSchemaOnce("rozvi-settings", async () => { await env.DB.prepare("CREATE TABLE IF NOT EXISTS rozvi_game_settings (id TEXT PRIMARY KEY, config_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run(); }); }
@@ -502,7 +509,7 @@ async function handleApi(request, env, url) {
    try{
     const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"DIVORZINHA está disponible únicamente para participantes confirmados de Cliente 360."},403);
-    const admin=await isPrimaryAdmin(user,env);
+    const admin=await isPrimaryAdmin(user,env);if(!admin)return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
     await ensureDivorzhinhaSchema(env);
     const gameDate=getRozviGameDate();
     await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
@@ -515,6 +522,7 @@ async function handleApi(request, env, url) {
   if(url.pathname==="/api/divorzhinha/lives"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
    await ensureDivorzhinhaSchema(env);const gameDate=getRozviGameDate();
    const body=await request.json().catch(()=>({}));if(body.action!=="lose-life")return json({error:"Acción no válida."},400);
    const admin=await isPrimaryAdmin(user,env);
@@ -526,6 +534,7 @@ async function handleApi(request, env, url) {
   if(url.pathname==="/api/divorzhinha/leaderboard"&&request.method==="GET"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
    await ensureDivorzhinhaSchema(env);await ensureParticipantProfilesSchema(env);
    const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ds.goals) AS best_score,COUNT(ds.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN divorzhinha_game_scores ds ON ds.edition_id=em.edition_id AND ds.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
    return json({ranking:rows.results||[]});
@@ -533,6 +542,7 @@ async function handleApi(request, env, url) {
   if(url.pathname==="/api/divorzhinha/score"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Juego no disponible para esta edición."},403);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
    const body=await request.json().catch(()=>({}));const gameId=String(body.gameId||"").slice(0,80);
    if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
    const goals=Math.max(0,Math.min(10000,Math.floor(Number(body.goals)||0)));
