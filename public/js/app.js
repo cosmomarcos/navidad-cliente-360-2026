@@ -1425,7 +1425,7 @@ async function loadNikeHuntHomeArt(){const el=document.querySelector(".nikehunt-
 /* NIKE HUNT · 8-bit Christmas Arcade */
 function initDuckHuntGame(){const b=document.getElementById("duckhunt-open-game");if(b&&!b.dataset.ready){b.dataset.ready="1";b.addEventListener("click",openDuckHuntGame);}}
 async function openDuckHuntGame(){
- if(!currentUser?.isPrimaryAdmin||currentUser?.membership?.team_name!=="Cliente 360"||document.getElementById("duckhunt-modal")||openDuckHuntGame.loading)return;
+ if(currentUser?.membership?.team_name!=="Cliente 360"||document.getElementById("duckhunt-modal")||openDuckHuntGame.loading)return;
  openDuckHuntGame.loading=true;
  const launch=document.getElementById("duckhunt-open-game"),launchLabel=launch?.innerHTML||"Jugar ahora →";
  if(launch){launch.disabled=true;launch.innerHTML="CARGANDO…";}
@@ -1434,16 +1434,17 @@ async function openDuckHuntGame(){
  try{state=await api("/api/duckhunt/state",{noMemoryCache:true,timeoutMs:8000});}
  catch(e){restoreLaunch();alert(e.message||"No se pudo cargar NIKE HUNT.");return;}
  const modal=document.createElement("section");modal.id="duckhunt-modal";modal.className="duckhunt-modal";
- modal.innerHTML='<div class="duckhunt-shell" role="dialog" aria-modal="true" aria-label="NIKE HUNT"><header class="duckhunt-head"><div><small>NAVIDAD PYME ARCADE · 8-BIT</small><h2>NIKE HUNT <span>🖤</span></h2></div><button type="button" class="duckhunt-close" aria-label="Cerrar">×</button></header><div class="duckhunt-hud"><div><small>PUNTOS</small><b id="duckhunt-score">0000</b></div><div><small>TIEMPO</small><b id="duckhunt-time">60</b></div><div><small>VIDAS</small><b id="duckhunt-lives">∞</b></div><div><small>MUNICIÓN</small><b id="duckhunt-ammo"><span class="nikehunt-bullet"></span><span class="nikehunt-bullet"></span><span class="nikehunt-bullet"></span></b></div><div><small>RÉCORD</small><b id="duckhunt-best">0</b></div></div><div class="duckhunt-screen"><canvas id="duckhunt-canvas" width="480" height="270" aria-label="Toca directamente a los NIKES para disparar"></canvas><div class="duckhunt-overlay" id="duckhunt-overlay"><div><small id="duckhunt-kicker">✦ TEMPORADA DE CAZA NAVIDEÑA ✦</small><h3 id="duckhunt-title">¡CAZA LOS NIKES!</h3><p id="duckhunt-copy">Toca directamente a los NIKES para disparar. Tienes 3 balas por recarga y 60 segundos.</p><button id="duckhunt-start" type="button">▶ COMENZAR</button><button id="duckhunt-exit" type="button">SALIR</button></div></div></div><div class="duckhunt-foot"><span>🖤 NIKE NORMAL +10</span><span>✨ NIKE DORADO +50</span><span>🔫 3 BALAS</span><span id="duckhunt-escaped">NIKES ESCAPADOS 0/10</span></div><p class="duckhunt-feedback" id="duckhunt-feedback">TOCA UN NIKE PARA DISPARAR</p><section class="duckhunt-ranking"><b>🏆 TOP 5 · CAZADORES</b><ol id="duckhunt-ranking-list"><li>Cargando…</li></ol></section></div>';
+ modal.innerHTML='<div class="duckhunt-shell" role="dialog" aria-modal="true" aria-label="NIKE HUNT"><header class="duckhunt-head"><div><small>NAVIDAD PYME ARCADE · 8-BIT</small><h2>NIKE HUNT <span>🖤</span></h2></div><button type="button" class="duckhunt-close" aria-label="Cerrar">×</button></header><div class="duckhunt-hud"><div><small>NIKES CAZADOS</small><b id="duckhunt-score">0000</b></div><div><small>VIDAS</small><b id="duckhunt-lives">5</b></div><div><small>MUNICIÓN</small><b id="duckhunt-ammo"><span class="nikehunt-bullet"></span><span class="nikehunt-bullet"></span><span class="nikehunt-bullet"></span></b></div><div><small>RÉCORD</small><b id="duckhunt-best">0</b></div></div><div class="duckhunt-screen"><canvas id="duckhunt-canvas" width="960" height="540" aria-label="Toca directamente a los NIKES para disparar"></canvas><div class="duckhunt-overlay" id="duckhunt-overlay"><div><small id="duckhunt-kicker">✦ TEMPORADA DE CAZA NAVIDEÑA ✦</small><h3 id="duckhunt-title">¡CAZA LOS NIKES!</h3><p id="duckhunt-copy">Toca directamente a los NIKES para disparar. Tienes 3 balas por recarga. Cada 10 NIKES cazados duplican su velocidad. ¡Evita que escapen 10!</p><button id="duckhunt-start" type="button">▶ COMENZAR</button><button id="duckhunt-exit" type="button">SALIR</button></div></div></div><div class="duckhunt-foot"><span>🖤 CADA NIKE = +1 ESPÍRITU</span><span>🔫 3 BALAS POR RECARGA</span><span id="duckhunt-escaped">NIKES ESCAPADOS 0/10</span></div><p class="duckhunt-feedback" id="duckhunt-feedback">TOCA UN NIKE PARA DISPARAR</p><section class="duckhunt-ranking"><b>🏆 TOP 5 · CAZADORES</b><ol id="duckhunt-ranking-list"><li>Cargando…</li></ol></section></div>';
  const best=Number(state.stats?.best_score||0),unlimited=state.unlimitedLives===true;
  modal.querySelector("#duckhunt-best").textContent=String(best);
  modal.querySelector("#duckhunt-lives").textContent=unlimited?"∞":String(state.livesRemaining??0);
- modal.querySelector("#duckhunt-copy").textContent=unlimited?"Toca directamente a los NIKES para disparar. Tienes 3 balas por recarga y 60 segundos. Como administrador tienes vidas ilimitadas. Cada 10 NIKES cazados aumenta ligeramente la velocidad.":"Toca directamente a los NIKES. Tienes 3 balas por recarga y 60 segundos. Cada 10 NIKES cazados aumenta ligeramente la velocidad. Te quedan "+state.livesRemaining+" vidas hoy.";
+ modal.querySelector("#duckhunt-copy").textContent=unlimited?"Toca directamente a los NIKES. Cada 10 NIKES cazados duplican su velocidad. Como administrador tienes vidas ilimitadas. La partida termina cuando escapan 10.":"Toca directamente a los NIKES. Tienes 3 balas por recarga y 5 vidas diarias. Cada 10 NIKES cazados duplican su velocidad. La partida termina cuando escapan 10.";
  document.body.append(modal);restoreLaunch();
- const canvas=modal.querySelector("#duckhunt-canvas"),ctx=canvas.getContext("2d"),overlay=modal.querySelector("#duckhunt-overlay"),scoreEl=modal.querySelector("#duckhunt-score"),timeEl=modal.querySelector("#duckhunt-time"),ammoEl=modal.querySelector("#duckhunt-ammo"),livesEl=modal.querySelector("#duckhunt-lives"),feedback=modal.querySelector("#duckhunt-feedback");
+ const canvas=modal.querySelector("#duckhunt-canvas"),ctx=canvas.getContext("2d"),overlay=modal.querySelector("#duckhunt-overlay"),scoreEl=modal.querySelector("#duckhunt-score"),ammoEl=modal.querySelector("#duckhunt-ammo"),livesEl=modal.querySelector("#duckhunt-lives"),feedback=modal.querySelector("#duckhunt-feedback");
+ ctx.setTransform(2,0,0,2,0,0);
  const gameAudio=new Audio("/api/duckhunt/music/current?v="+Date.now());gameAudio.loop=true;gameAudio.volume=.5;gameAudio.addEventListener("error",()=>gameAudio.removeAttribute("src"));modal.append(gameAudio);
- let score=0,ducksShot=0,ammo=3,time=60,active=false,ended=false,raf=0,last=0,spawn=0,ducks=[],shots=[],escaped=0,speedTier=0,gameId=crypto.randomUUID().replace(/-/g,""),lifeConsumed=false,reloadTimer=0,audioCtx=null;
- const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ let score=0,ducksShot=0,ammo=3,active=false,ended=false,raf=0,last=0,spawn=0,ducks=[],shots=[],explosions=[],escaped=0,speedTier=0,elapsed=0,planeNext=9,gameId=crypto.randomUUID().replace(/-/g,""),lifeConsumed=false,reloadTimer=0,audioCtx=null;
+ const rnd=(a,b)=>a+Math.random()*(b-a);
  function playArcadeSound(kind){
   try{
    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
@@ -1455,11 +1456,8 @@ async function openDuckHuntGame(){
    if(kind==="shot"){osc.type="sawtooth";osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(42,t+.14);}
    else{osc.type="triangle";osc.frequency.setValueAtTime(850,t);osc.frequency.exponentialRampToValueAtTime(390,t+.12);osc.frequency.exponentialRampToValueAtTime(260,t+.23);filter.frequency.exponentialRampToValueAtTime(650,t+.22);}
    osc.start(t);osc.stop(t+(kind==="shot"?.17:.25));
-   if(kind==="shot"){
-    const length=Math.floor(audioCtx.sampleRate*.07),buffer=audioCtx.createBuffer(1,length,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*(1-i/length);
-    const noise=audioCtx.createBufferSource(),ng=audioCtx.createGain();noise.buffer=buffer;ng.gain.setValueAtTime(.18,t);ng.gain.exponentialRampToValueAtTime(.001,t+.07);noise.connect(ng);ng.connect(audioCtx.destination);noise.start(t);noise.stop(t+.07);
-   }
-  }catch(error){/* Audio opcional: el juego sigue funcionando aunque el dispositivo lo bloquee. */}
+   if(kind==="shot"){const length=Math.floor(audioCtx.sampleRate*.07),buffer=audioCtx.createBuffer(1,length,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*(1-i/length);const noise=audioCtx.createBufferSource(),ng=audioCtx.createGain();noise.buffer=buffer;ng.gain.setValueAtTime(.18,t);ng.gain.exponentialRampToValueAtTime(.001,t+.07);noise.connect(ng);ng.connect(audioCtx.destination);noise.start(t);noise.stop(t+.07);}
+  }catch(error){}
  }
  function pixel(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
  function drawDuck(d){
@@ -1467,73 +1465,71 @@ async function openDuckHuntGame(){
   pixel(-16,-3,25,13,"#111820");pixel(-10,-8,14,8,"#202a32");pixel(5,-10,10,9,"#111820");pixel(11,-13,8,8,"#202a32");pixel(18,-11,4,3,"#ffd43b");pixel(21,-10,3,2,"#080b0e");
   pixel(3,-3,7,7,"#f4f1e8");pixel(-3,1,9,5,"#f4f1e8");pixel(-13,4,7,3,"#101820");
   if(d.wing>0)pixel(-7,d.wing>0.5?-13:4,15,8,"#303943");else pixel(-7,-1,15,7,"#252e37");
-  if(d.gold){pixel(-14,-16,5,5,"#ffe46a");pixel(-8,-20,4,4,"#fff0a0");pixel(1,-17,4,4,"#ffe46a");}
   ctx.restore();
+ }
+ function drawPlane(){
+  const cycle=elapsed-planeNext;if(cycle<0||cycle>7)return;
+  const x=-80+cycle*115,y=22+Math.sin(cycle*1.7)*5;
+  // El avión y su estela pasan por el cielo, detrás del edificio y de los NIKES.
+  pixel(x+4,y+5,62,4,"#eef2f5");pixel(x+25,y,19,3,"#f5f7f8");pixel(x+30,y-4,9,4,"#d8e3eb");
+  pixel(x+14,y+3,20,3,"#cbd8df");pixel(x+43,y+4,11,2,"#b5c5d0");
+  // Bandera arcoíris ondeando en la cola.
+  const colors=["#e5243b","#f18b2b","#f6d43b","#38a65a","#2777cf","#8c48a8"];
+  colors.forEach((color,i)=>pixel(x-5-i*.5,y+7+i*.0,12,2,color));
+  pixel(x+7,y+8,3,2,"#e8edf0");pixel(x+58,y+3,7,2,"#aebbc4");
  }
  function drawScene(){
   ctx.imageSmoothingEnabled=false;
-  // Ilustración pixel-art más trabajada de la sede BCP: cielo, edificio, cristales, banderas y jardines.
   const sky=ctx.createLinearGradient(0,0,0,270);sky.addColorStop(0,"#1671bb");sky.addColorStop(.62,"#8ec4df");sky.addColorStop(1,"#e5d9b6");ctx.fillStyle=sky;ctx.fillRect(0,0,480,270);
   for(let i=0;i<22;i++){const x=(i*97)%480,y=(i*31)%82;pixel(x,y,2+(i%3),2,"#c3e4f2");}
-  // Copas de árboles del entorno
+  drawPlane();
   for(let i=0;i<19;i++){const x=365+(i*17)%125,y=15+(i*29)%92;pixel(x,y,15,13,i%2?"#2d673e":"#3d7b48");pixel(x+3,y-4,9,7,"#4f9254");}
-  // Edificio principal y volumen cilíndrico superior
-  pixel(0,86,480,117,"#a9b0ad");pixel(0,86,480,8,"#687d87");pixel(0,98,480,7,"#d2d4cb");
-  pixel(18,106,444,86,"#c4c9c2");pixel(18,106,444,5,"#e2e2d8");
+  pixel(0,86,480,117,"#a9b0ad");pixel(0,86,480,8,"#687d87");pixel(0,98,480,7,"#d2d4cb");pixel(18,106,444,86,"#c4c9c2");pixel(18,106,444,5,"#e2e2d8");
   for(let row=0;row<3;row++)for(let col=0;col<26;col++){const x=24+col*17,y=117+row*22;pixel(x,y,12,14,(row+col)%4===0?"#244f70":"#315e7b");pixel(x+2,y+2,8,10,(row+col)%3===0?"#79a9bd":"#568aa6");pixel(x,y+14,12,2,"#b5c4c1");}
-  // Fajas azules y revestimiento de fachada
   pixel(0,103,480,5,"#2787bb");pixel(0,151,480,7,"#2385b9");pixel(0,190,480,8,"#1d6797");
   for(let x=0;x<480;x+=24){pixel(x,156,12,2,"#80c5df");pixel(x+8,192,8,2,"#6ab0d0");}
-  // Torre cilíndrica y letrero corporativo
-  pixel(165,50,151,41,"#8f9a9b");pixel(176,42,130,9,"#c5c9c2");pixel(182,35,118,8,"#aab4b3");pixel(176,58,130,28,"#6b7d83");
-  pixel(189,62,105,17,"#e7e7df");ctx.fillStyle="#173d63";ctx.font="bold 13px monospace";ctx.textAlign="center";ctx.fillText("BCP",241,75);ctx.textAlign="left";
-  // Mástiles y banderas
-  pixel(111,17,2,92,"#6d7372");pixel(286,12,2,95,"#6d7372");
-  pixel(114,20,25,28,"#e22f37");pixel(139,20,22,28,"#f6f0df");pixel(114,48,47,6,"#e22f37");
-  pixel(289,16,22,28,"#174b9a");pixel(311,16,18,28,"#f5f1e6");pixel(329,16,18,28,"#ed703b");pixel(289,44,58,5,"#174b9a");
-  // Jardines, palmeras estilizadas, vereda y letrero frontal BCP
+  pixel(165,50,151,41,"#8f9a9b");pixel(176,42,130,9,"#c5c9c2");pixel(182,35,118,8,"#aab4b3");pixel(176,58,130,28,"#6b7d83");pixel(189,62,105,17,"#e7e7df");
+  ctx.fillStyle="#173d63";ctx.font="bold 13px monospace";ctx.textAlign="center";ctx.fillText("BCP",241,75);ctx.textAlign="left";
+  pixel(111,17,2,92,"#6d7372");pixel(286,12,2,95,"#6d7372");pixel(114,20,25,28,"#e22f37");pixel(139,20,22,28,"#f6f0df");pixel(114,48,47,6,"#e22f37");pixel(289,16,22,28,"#174b9a");pixel(311,16,18,28,"#f5f1e6");pixel(329,16,18,28,"#ed703b");pixel(289,44,58,5,"#174b9a");
   pixel(0,202,480,68,"#427c3e");pixel(0,202,480,7,"#75a94d");
   for(let i=0;i<13;i++){const x=i*41+4;pixel(x,190,3,21,"#765538");pixel(x-7,187,17,5,"#2c6c3a");pixel(x-4,181,12,8,"#438c48");}
-  pixel(0,233,480,9,"#d9d0ba");pixel(0,242,480,6,"#aaa797");pixel(0,248,480,22,"#8c8a7c");
-  pixel(116,210,248,37,"#192b39");pixel(123,215,234,26,"#e9e8dc");ctx.fillStyle="#17436b";ctx.font="bold 25px monospace";ctx.textAlign="center";ctx.fillText("BCP",240,236);ctx.textAlign="left";
-  for(let i=0;i<9;i++){pixel(i*55+4,255,26,2,"#d5cdb7");}
-  // Brillos de fachada y textura de pixel art
+  pixel(0,233,480,9,"#d9d0ba");pixel(0,242,480,6,"#aaa797");pixel(0,248,480,22,"#8c8a7c");pixel(116,210,248,37,"#192b39");pixel(123,215,234,26,"#e9e8dc");
+  ctx.fillStyle="#17436b";ctx.font="bold 25px monospace";ctx.textAlign="center";ctx.fillText("BCP",240,236);ctx.textAlign="left";
+  for(let i=0;i<9;i++)pixel(i*55+4,255,26,2,"#d5cdb7");
   for(let i=0;i<36;i++){const x=(i*61)%480,y=108+(i*19)%78;pixel(x,y,2,2,"#c2d2d1");}
   ducks.forEach(drawDuck);
+  explosions.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/.42);pixel(p.x,p.y,2.5,2.5,p.color);ctx.globalAlpha=1;});
   shots.forEach(s=>{pixel(s.x-2,s.y-7,4,12,"#f7d36a");pixel(s.x-1,s.y-5,2,8,"#fff2b0");});
   ctx.fillStyle="#fff6d9";ctx.font="bold 10px monospace";ctx.fillText("NIKE HUNT · BCP",8,13);
  }
  function hud(){
-  scoreEl.textContent=String(score).padStart(4,"0");timeEl.textContent=String(Math.max(0,Math.ceil(time)));
+  scoreEl.textContent=String(score).padStart(4,"0");
   ammoEl.innerHTML=Array.from({length:3},(_,i)=>'<span class="nikehunt-bullet'+(i>=ammo?' is-empty':'')+'" aria-label="'+(i<ammo?"Bala disponible":"Bala gastada")+'"></span>').join("");
   if(livesEl)livesEl.textContent=unlimited?"∞":String(state.livesRemaining??0);
   const escapedEl=modal.querySelector("#duckhunt-escaped");if(escapedEl)escapedEl.textContent="NIKES ESCAPADOS "+escaped+"/10";
  }
- function endGame(reason){
+ function endGame(){
   if(ended)return;ended=true;active=false;cancelAnimationFrame(raf);clearTimeout(reloadTimer);gameAudio.pause();overlay.classList.remove("hidden");
   modal.querySelector("#duckhunt-kicker").textContent="✦ PARTIDA TERMINADA ✦";
-  modal.querySelector("#duckhunt-title").textContent=reason==="time"?"¡TIEMPO!":"¡10 NIKES ESCAPARON!";
-  modal.querySelector("#duckhunt-copy").textContent=reason==="escaped"?"Se escaparon 10 NIKES. Perdiste esta vida. Cazaste "+ducksShot+" NIKES y conseguiste "+score+" puntos. Tu puntuación se guardará en Espíritu.":"Cazaste "+ducksShot+" NIKES y conseguiste "+score+" puntos. Tu puntuación se guardará en Espíritu.";
+  modal.querySelector("#duckhunt-title").textContent="¡10 NIKES ESCAPARON!";
+  modal.querySelector("#duckhunt-copy").textContent="Se escaparon 10 NIKES. Cazaste "+ducksShot+" NIKES y sumaste "+ducksShot+" puntos Espíritu. Tu resultado se guardará en el ranking.";
   modal.querySelector("#duckhunt-start").textContent="JUGAR OTRA PARTIDA";modal.querySelector("#duckhunt-exit").textContent="CERRAR";
-  api("/api/duckhunt/score",{method:"POST",body:JSON.stringify({gameId,score,ducks:ducksShot}),noMemoryCache:true,timeoutMs:8000}).then(result=>{feedback.textContent="¡"+result.awardedPoints+" PUNTOS ESPÍRITU CONSEGUIDOS!";modal.querySelector("#duckhunt-best").textContent=String(result.stats?.best_score||score);loadRanking();}).catch(e=>{feedback.textContent="No se pudo guardar el puntaje: "+(e.message||"intenta de nuevo");});
+  api("/api/duckhunt/score",{method:"POST",body:JSON.stringify({gameId,score:ducksShot,ducks:ducksShot}),noMemoryCache:true,timeoutMs:8000}).then(result=>{feedback.textContent="¡"+result.awardedPoints+" PUNTOS ESPÍRITU CONSEGUIDOS!";modal.querySelector("#duckhunt-best").textContent=String(result.stats?.best_score||ducksShot);loadRanking();}).catch(e=>{feedback.textContent="No se pudo guardar el puntaje: "+(e.message||"intenta de nuevo");});
  }
  function loop(now){
-  if(!active)return;const dt=Math.min(.035,(now-last)/1000||0);last=now;time-=dt;spawn-=dt;
-  const speedMultiplier=Math.min(2.2,Math.pow(1.18,speedTier));
-  if(spawn<=0&&ducks.length<3){
+  if(!active)return;const dt=Math.min(.035,(now-last)/1000||0);last=now;elapsed+=dt;spawn-=dt;
+  const speedMultiplier=Math.pow(2,speedTier);
+  if(spawn<=0&&ducks.length<4){
    const side=Math.random()<.5?-1:1,edge=side<0?-25:505,baseSpeed=rnd(58,76)*speedMultiplier,angle=rnd(-.58,.58);
-   const duck={x:edge,y:rnd(42,225),vx:-side*Math.cos(angle)*baseSpeed,vy:Math.sin(angle)*baseSpeed,wing:0,gold:Math.random()<.12};
-   ducks.push(duck);spawn=rnd(.72,1.22);
+   const duck={x:edge,y:rnd(42,225),vx:-side*Math.cos(angle)*baseSpeed,vy:Math.sin(angle)*baseSpeed,wing:0};
+   ducks.push(duck);spawn=Math.max(.18,rnd(.85,1.3)/Math.pow(1.5,speedTier));
   }
-  ducks.forEach(d=>{
-   d.x+=d.vx*dt;d.y+=d.vy*dt;
-   if(d.y<34){d.y=34;d.vy=Math.abs(d.vy);}
-   if(d.y>235){d.y=235;d.vy=-Math.abs(d.vy);}
-   d.wing=Math.sin(now/65);
-  });
+  ducks.forEach(d=>{d.x+=d.vx*dt;d.y+=d.vy*dt;if(d.y<34){d.y=34;d.vy=Math.abs(d.vy);}if(d.y>235){d.y=235;d.vy=-Math.abs(d.vy);}d.wing=Math.sin(now/65);});
   ducks=ducks.filter(d=>{if(d.x<-35||d.x>515){escaped++;return false;}return true;});
+  explosions.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=35*dt;p.life-=dt;});explosions=explosions.filter(p=>p.life>0);
   shots=shots.filter(s=>now-s.t<150);drawScene();hud();
-  if(time<=0){endGame("time");return;}if(escaped>=10){endGame("escaped");return;}
+  if(escaped>=10){endGame();return;}
+  if(elapsed>=planeNext+7)planeNext=elapsed+rnd(8,15);
   raf=requestAnimationFrame(loop);
  }
  async function start(){
@@ -1543,17 +1539,18 @@ async function openDuckHuntGame(){
    catch(e){feedback.textContent=e.message||"No tienes vidas disponibles.";startButton.disabled=false;return;}
   }
   if(!unlimited&&Number(state.livesRemaining)<=0&&!lifeConsumed){feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 vidas.";startButton.disabled=false;return;}
-  score=0;ducksShot=0;ammo=3;time=60;escaped=0;speedTier=0;ducks=[];shots=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");void gameAudio.play().catch(()=>{});hud();raf=requestAnimationFrame(loop);
+  score=0;ducksShot=0;ammo=3;escaped=0;speedTier=0;elapsed=0;planeNext=rnd(7,12);ducks=[];shots=[];explosions=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");void gameAudio.play().catch(()=>{});hud();raf=requestAnimationFrame(loop);
  }
  canvas.addEventListener("pointerdown",e=>{
-  if(!active||ammo<=0)return;e.preventDefault();const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*canvas.width/r.width,y=(e.clientY-r.top)*canvas.height/r.height;
+  if(!active||ammo<=0)return;e.preventDefault();const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*480/r.width,y=(e.clientY-r.top)*270/r.height;
   ammo--;shots.push({x,y,t:performance.now()});playArcadeSound("shot");
   let hit=-1;for(let i=ducks.length-1;i>=0;i--){const d=ducks[i];if(Math.abs(x-d.x)<25&&Math.abs(y-d.y)<21){hit=i;break;}}
   if(hit>=0){
-   const d=ducks.splice(hit,1)[0],points=d.gold?50:10;score+=points;ducksShot++;playArcadeSound("quack");
+   const d=ducks.splice(hit,1)[0];score++;ducksShot++;playArcadeSound("quack");
+   for(let k=0;k<18;k++){const angle=Math.PI*2*k/18,speed=rnd(25,100);explosions.push({x:d.x,y:d.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:rnd(.22,.48),color:["#ffdf70","#ff8a36","#f7f0d5","#f04d36"][k%4]});}
    const nextTier=Math.floor(ducksShot/10);
-   if(nextTier>speedTier){speedTier=nextTier;feedback.textContent="¡NIKE CAZADO! +"+points+" · VELOCIDAD x"+Math.min(2.2,Math.pow(1.18,speedTier)).toFixed(2);}
-   else feedback.textContent=d.gold?"¡NIKE DORADO! +50":"¡NIKE CAZADO! +10";
+   if(nextTier>speedTier){speedTier=nextTier;feedback.textContent="¡NIVEL "+speedTier+"! VELOCIDAD x"+Math.pow(2,speedTier)+" · SALEN MÁS NIKES";}
+   else feedback.textContent="¡NIKE CAZADO! +1 ESPÍRITU";
   }else feedback.textContent="¡FALLASTE!";
   if(ammo===0){feedback.textContent+=" · RECARGANDO";clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>{if(active){ammo=3;hud();}},650);}hud();
  });
