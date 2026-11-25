@@ -1420,7 +1420,7 @@ async function openRozviGame(){
 
 /* v2.9.2 · DIVORZINHA · penal arcade exclusivo del administrador */
 async function loadDivorzhinhaHomeArt(){const el=document.querySelector(".divorzhinha-announcement");if(!el)return;try{const r=await fetch("/api/divorzhinha/home-background?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const imageUrl=URL.createObjectURL(await r.blob());el.style.backgroundImage="linear-gradient(90deg,rgba(12,37,31,.96),rgba(12,37,31,.78) 62%,rgba(12,37,31,.48)),url('"+imageUrl+"')";el.style.backgroundSize="cover";el.style.backgroundPosition="center";}catch(error){console.warn("No se pudo cargar la imagen de DIVORZINHA",error);}}
-async function loadNikeHuntHomeArt(){const el=document.querySelector(".nikehunt-announcement");if(!el)return;const imageUrl="/api/duckhunt/home-background?v=2.11.27";try{const probe=new Image();probe.onload=()=>{el.style.backgroundImage="linear-gradient(90deg,rgba(5,20,29,.82),rgba(5,20,29,.48)),url('"+imageUrl+"')";el.style.backgroundSize="cover";el.style.backgroundPosition="center";};probe.onerror=()=>console.warn("La portada de NIKE HUNT no está disponible para este participante.");probe.src=imageUrl;}catch(error){console.warn("No se pudo cargar la imagen de NIKE HUNT",error);}}
+async function loadNikeHuntHomeArt(){const el=document.querySelector(".nikehunt-announcement");if(!el)return;const imageUrl="/api/duckhunt/home-background?v=2.11.28";try{const probe=new Image();probe.onload=()=>{el.style.backgroundImage="linear-gradient(90deg,rgba(5,20,29,.82),rgba(5,20,29,.48)),url('"+imageUrl+"')";el.style.backgroundSize="cover";el.style.backgroundPosition="center";};probe.onerror=()=>console.warn("La portada de NIKE HUNT no está disponible para este participante.");probe.src=imageUrl;}catch(error){console.warn("No se pudo cargar la imagen de NIKE HUNT",error);}}
 
 /* NIKE HUNT · 8-bit Christmas Arcade */
 function initDuckHuntGame(){const b=document.getElementById("duckhunt-open-game");if(b&&!b.dataset.ready){b.dataset.ready="1";b.addEventListener("click",openDuckHuntGame);}}
@@ -1597,7 +1597,7 @@ async function openDivorzhinhaGame(){
  document.body.append(modal);openDivorzhinhaGame.loading=false;
  modal.addEventListener("selectstart",e=>e.preventDefault());modal.addEventListener("contextmenu",e=>e.preventDefault());modal.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();});
  const canvas=modal.querySelector("#divorzhinha-canvas"),ctx=canvas.getContext("2d"),gameAudio=new Audio("/api/divorzhinha/music/current?v="+Date.now()),scoreEl=modal.querySelector("#divorzhinha-score"),livesEl=modal.querySelector("#divorzhinha-lives"),bestEl=modal.querySelector("#divorzhinha-best"),pauseBtn=modal.querySelector("#divorzhinha-pause"),overlay=modal.querySelector("#divorzhinha-overlay"),startBtn=modal.querySelector("#divorzhinha-start"),exitBtn=modal.querySelector("#divorzhinha-exit");
- gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540,unlimitedLives=state.unlimitedLives===true;let lives=Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperDirection=1,keeperSpeed=220,keeperTargetX=480,keeperReactAt=0,keeperDive=null,catchFeedback=false,shotSaveTargetX=null,crowdCheerUntil=0,audioCtx=null,gameId=crypto.randomUUID().replace(/-/g,"");
+ gameAudio.loop=true;gameAudio.preload="auto";const W=960,H=540,unlimitedLives=state.unlimitedLives===true;let lives=Math.max(0,Math.min(5,Number(state.livesRemaining??5))),score=0,saves=0,best=Number(state.stats?.best_score||0),gamesPlayed=Number(state.stats?.games_played||0),active=false,paused=false,shooting=false,finished=false,submitted=false,raf=0,last=0,shot=null,aim=null,pointerId=null,message="",messageUntil=0,angryUntil=0,goalParticles=[],keeperX=480,keeperY=0,keeperDirection=1,keeperSpeed=220,keeperTargetX=480,keeperTargetY=0,keeperReactAt=0,keeperDive=null,catchFeedback=false,shotSaveTargetX=null,crowdCheerUntil=0,audioCtx=null,gameId=crypto.randomUUID().replace(/-/g,"");
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  function playCrowdSound(kind){
   try{
@@ -1626,7 +1626,7 @@ async function openDivorzhinhaGame(){
  function keeperRoundedRect(x,y,w,h,r,fill){keeperCtx.beginPath();keeperCtx.roundRect(x,y,w,h,r);keeperCtx.fillStyle=fill;keeperCtx.fill();}
  function drawPixelKeeperFrame(now){
   const t=keeperDive?clamp((now-keeperDive.start)/560,0,1):0,e=t*t*(3-2*t),x=keeperDive?keeperDive.fromX+(keeperDive.toX-keeperDive.fromX)*e:keeperX;
-  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,lean=keeperDive?Math.sin(e*Math.PI)*.32:Math.sin(now/310)*.025,ground=382+Math.sin(now/175)*2+Math.abs(Math.sin(now/260))*2; const step=Math.sin(now/145)*7,saved=catchFeedback&&finished,scored=now<angryUntil;
+  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,lean=keeperDive?Math.sin(e*Math.PI)*.32:Math.sin(now/310)*.025,vertical=keeperDive?keeperDive.fromY+(keeperDive.toY-keeperDive.fromY)*e:keeperY,ground=382+vertical+Math.sin(now/175)*2+Math.abs(Math.sin(now/260))*2; const step=Math.sin(now/145)*7,saved=catchFeedback&&finished,scored=now<angryUntil;
   const armLift=keeperDive?-Math.sin(e*Math.PI)*22:Math.sin(now/280)*5;
   const skin=keeperCtx.createLinearGradient(-55,-220,55,-90);skin.addColorStop(0,"#d99a70");skin.addColorStop(.55,"#b97952");skin.addColorStop(1,"#875139");
   const shirt=keeperCtx.createLinearGradient(-55,-285,55,-105);shirt.addColorStop(0,"#fff06b");shirt.addColorStop(.35,"#f8d52d");shirt.addColorStop(1,"#d79d13");
@@ -1649,7 +1649,7 @@ async function openDivorzhinhaGame(){
   keeperCtx.fillStyle="#fff";keeperCtx.beginPath();keeperCtx.arc(-14,-338,1.5,0,Math.PI*2);keeperCtx.arc(12,-338,1.5,0,Math.PI*2);keeperCtx.fill();
   
   keeperCtx.globalAlpha=.22;keeperCtx.strokeStyle="#fff";keeperCtx.lineWidth=3;keeperCtx.beginPath();keeperCtx.moveTo(-33,-258);keeperCtx.lineTo(-26,-125);keeperCtx.moveTo(33,-258);keeperCtx.lineTo(26,-125);keeperCtx.stroke();keeperCtx.globalAlpha=1;keeperCtx.restore();
-  if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
+  if(keeperDive&&t>=1){keeperX=keeperDive.toX;keeperY=keeperDive.toY;keeperDirection=keeperX>480?-1:1;keeperDive=null;}
  }
  function drawKeeper(now){
   keeperCtx.clearRect(0,0,1920,1280);keeperCtx.save();keeperCtx.setTransform(2,0,0,2,0,0);
@@ -1705,7 +1705,7 @@ async function openDivorzhinhaGame(){
  async function consumeLife(){
   if(!active||shooting)return;shooting=true;saves++;active=false;paused=false;finished=true;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
   catchFeedback=true;message="¡DIVORZINHA LA ATAJÓ!";messageUntil=performance.now()+1500;playCrowdSound("save");
-  keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,260,700)};shotSaveTargetX=null;
+  keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,170,790),fromY:keeperY,toY:keeperY};shotSaveTargetX=null;
   if(!unlimitedLives){try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Math.max(0,Math.min(5,Number(result.livesRemaining??Math.max(0,lives-1))));paintHud();}
   catch(error){lives=Math.max(0,lives-1);paintHud();showOverlay("SIN CONEXIÓN","NO SE PUDO CONFIRMAR LA VIDA",error.message,"",true);startBtn.disabled=true;return;}}
   const saved=await submit(),hasLives=unlimitedLives||lives>0;
@@ -1728,8 +1728,8 @@ async function openDivorzhinhaGame(){
   // expresadas en el canvas final (960x540), con el suelo del arquero en Y≈382.
   // Se amplían los límites por el radio de la pelota para detectar también
   // impactos rasantes en guantes, botas y piernas.
-  function hitsKeeperBody(ballX,ballY,keeperCenterX){
-   const dx=Math.abs(ballX-keeperCenterX),r=21,y=ballY;
+  function hitsKeeperBody(ballX,ballY,keeperCenterX,keeperOffsetY){
+   const dx=Math.abs(ballX-keeperCenterX),r=21,y=ballY-keeperOffsetY;
    const inBand=(top,bottom,halfWidth)=>y>=top-r&&y<=bottom+r&&dx<=halfWidth+r;
    // Cabeza y cuello.
    if(inBand(0,122,49))return true;
@@ -1741,27 +1741,27 @@ async function openDivorzhinhaGame(){
    if(inBand(258,382,68))return true;
    return false;
   }
-  const caught=hitsKeeperBody(current.targetX,current.targetY,keeperX);
-  if(caught){shotSaveTargetX=current.targetX;keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX};keeperX=current.targetX;void consumeLife();}
+  const caught=hitsKeeperBody(current.targetX,current.targetY,keeperX,keeperY);
+  if(caught){shotSaveTargetX=current.targetX;keeperDive={start:performance.now(),fromX:keeperX,toX:current.targetX,fromY:keeperY,toY:keeperY};keeperX=current.targetX;void consumeLife();}
   else{score++;angryUntil=performance.now()+1600;message="¡GOOOOL! +1";messageUntil=performance.now()+1500;playCrowdSound("goal");for(let i=0;i<58;i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*300;goalParticles.push({x:current.targetX,y:current.targetY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-100,life:1,size:3+Math.random()*6,hue:[42,52,145,165,0][i%5]});}paintHud();}
  }
  function shoot(targetX=480,targetY=160){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
   shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
-  shooting=true;aim=null;keeperTargetX=targetX;keeperReactAt=performance.now()+Math.max(85,260-Math.min(score,25)*7);setTimeout(()=>resolveShot(),shot.duration);
+  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.22,-38,38);keeperReactAt=performance.now()+Math.max(105,250-Math.min(score,20)*5);setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
-  const keeperMinX=205,keeperMaxX=755;keeperSpeed=220*Math.pow(2,Math.floor(score/5));
-  if(shooting&&shot&&now>=keeperReactAt){const delta=keeperTargetX-keeperX,step=keeperSpeed*dt;if(Math.abs(delta)<=step)keeperX=keeperTargetX;else keeperX+=Math.sign(delta)*step;}
-  else{keeperX+=keeperDirection*keeperSpeed*.58*dt;if(keeperX>=keeperMaxX){keeperX=keeperMaxX;keeperDirection=-1;}else if(keeperX<=keeperMinX){keeperX=keeperMinX;keeperDirection=1;}}
+  const keeperMinX=170,keeperMaxX=790;keeperSpeed=Math.min(550,220*Math.pow(2,Math.min(2,Math.floor(score/5))));
+  if(shooting&&shot&&now>=keeperReactAt){const dx=keeperTargetX-keeperX,dy=keeperTargetY-keeperY,stepX=keeperSpeed*dt,stepY=keeperSpeed*.62*dt;keeperX=Math.abs(dx)<=stepX?keeperTargetX:keeperX+Math.sign(dx)*stepX;keeperY=Math.abs(dy)<=stepY?keeperTargetY:keeperY+Math.sign(dy)*stepY;}
+  else{keeperX+=keeperDirection*keeperSpeed*.58*dt;if(keeperX>=keeperMaxX){keeperX=keeperMaxX;keeperDirection=-1;}else if(keeperX<=keeperMinX){keeperX=keeperMinX;keeperDirection=1;}keeperY+=(0-keeperY)*Math.min(1,dt*2.4);}
   render(now);raf=requestAnimationFrame(frame);
  }
  function start(){if(active||(!unlimitedLives&&lives<=0)||finished)return;overlay.hidden=true;overlay.style.display="none";gameAudio.play().catch(()=>{});active=true;paused=false;shooting=false;last=performance.now();pauseBtn.disabled=false;raf=requestAnimationFrame(frame);}
  function restartGame(){
   if(!unlimitedLives&&lives<=0){showOverlay("✦ VIDAS AGOTADAS ✦","VUELVE MAÑANA","Has utilizado tus cinco vidas. Se renovarán a las 18:00, hora de Lima.","",false);startBtn.disabled=true;return;}
-  score=0;saves=0;finished=false;submitted=false;shooting=false;catchFeedback=false;shotSaveTargetX=null;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperDirection=1;keeperSpeed=220;keeperTargetX=480;keeperReactAt=0;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
+  score=0;saves=0;finished=false;submitted=false;shooting=false;catchFeedback=false;shotSaveTargetX=null;paused=false;active=false;shot=null;aim=null;pointerId=null;keeperX=480;keeperY=0;keeperDirection=1;keeperSpeed=220;keeperTargetX=480;keeperTargetY=0;keeperReactAt=0;keeperDive=null;angryUntil=0;goalParticles=[];message="";messageUntil=0;gameId=crypto.randomUUID().replace(/-/g,"");paintHud();pauseBtn.textContent="Ⅱ";pauseBtn.disabled=false;start();
  }
  function togglePause(){
   if(!active&&!paused)return;paused=!paused;
