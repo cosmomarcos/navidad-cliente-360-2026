@@ -1626,7 +1626,7 @@ async function openDivorzhinhaGame(){
  function keeperRoundedRect(x,y,w,h,r,fill){keeperCtx.beginPath();keeperCtx.roundRect(x,y,w,h,r);keeperCtx.fillStyle=fill;keeperCtx.fill();}
  function drawPixelKeeperFrame(now){
   const t=keeperDive?clamp((now-keeperDive.start)/560,0,1):0,e=t*t*(3-2*t),x=keeperDive?keeperDive.fromX+(keeperDive.toX-keeperDive.fromX)*e:keeperX;
-  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,pose=keeperDive?.pose||"idle",divePower=keeperDive?Math.sin(e*Math.PI):0,lean=keeperDive?(pose==="left"?.72:pose==="right"?-.72:pose==="high-left"?.52:pose==="high-right"?-.52:0):Math.sin(now/310)*.025,vertical=keeperDive?keeperDive.fromY+(keeperDive.toY-keeperDive.fromY)*e:keeperY,ground=382+vertical+Math.sin(now/175)*2+Math.abs(Math.sin(now/260))*2; const step=Math.sin(now/145)*7,saved=catchFeedback&&finished,scored=now<angryUntil,crouch=pose==="low"||pose==="low-left"||pose==="low-right",stretch=pose==="left"||pose==="right"||pose==="high-left"||pose==="high-right";
+  const idle=Math.sin(now/230),breath=Math.sin(now/390)*2.5,pose=keeperDive?.pose||(shooting&&shot?(shot.targetY<165?(shot.targetX<390?"high-left":shot.targetX>570?"high-right":"high"):shot.targetY>300?(shot.targetX<390?"low-left":shot.targetX>570?"low-right":"low"):shot.targetX<390?"left":shot.targetX>570?"right":"center"):"idle"),divePower=keeperDive?Math.sin(e*Math.PI):0,lean=keeperDive?(pose==="left"?.72:pose==="right"?-.72:pose==="high-left"?.52:pose==="high-right"?-.52:0):Math.sin(now/310)*.025,vertical=keeperDive?keeperDive.fromY+(keeperDive.toY-keeperDive.fromY)*e:keeperY,ground=382+vertical+Math.sin(now/175)*2+Math.abs(Math.sin(now/260))*2; const step=Math.sin(now/145)*7,saved=catchFeedback&&finished,scored=now<angryUntil,crouch=pose==="low"||pose==="low-left"||pose==="low-right",stretch=pose==="left"||pose==="right"||pose==="high-left"||pose==="high-right";
   const armLift=keeperDive?-(pose.startsWith("high")?112:pose==="low"?-24:pose==="low-left"||pose==="low-right"?-8:84)*divePower:Math.sin(now/280)*5;
   const skin=keeperCtx.createLinearGradient(-55,-220,55,-90);skin.addColorStop(0,"#d99a70");skin.addColorStop(.55,"#b97952");skin.addColorStop(1,"#875139");
   const shirt=keeperCtx.createLinearGradient(-55,-285,55,-105);shirt.addColorStop(0,"#fff06b");shirt.addColorStop(.35,"#f8d52d");shirt.addColorStop(1,"#d79d13");
@@ -1705,7 +1705,7 @@ async function openDivorzhinhaGame(){
  async function consumeLife(){
   if(!active||shooting)return;shooting=true;saves++;active=false;paused=false;finished=true;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
   catchFeedback=true;message="¡DIVORZINHA LA ATAJÓ!";messageUntil=performance.now()+1500;playCrowdSound("save");
-  keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,170,790),fromY:keeperY,toY:keeperY,pose:"right"};shotSaveTargetX=null;
+  keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,170,790),fromY:keeperY,toY:keeperY,pose:keeperDive?.pose||"right"};shotSaveTargetX=null;
   if(!unlimitedLives){try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Math.max(0,Math.min(5,Number(result.livesRemaining??Math.max(0,lives-1))));paintHud();}
   catch(error){lives=Math.max(0,lives-1);paintHud();showOverlay("SIN CONEXIÓN","NO SE PUDO CONFIRMAR LA VIDA",error.message,"",true);startBtn.disabled=true;return;}}
   const saved=await submit(),hasLives=unlimitedLives||lives>0;
