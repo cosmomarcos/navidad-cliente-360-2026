@@ -319,10 +319,11 @@ function renderMemberApp(){
  const homeMarkup=isOnboarding?`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · ${esc(currentUser.membership?.year||2026)}</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p id="onboarding-welcome-text">Bienvenido a tu intercambio.</p><div class="member-countdown" id="member-countdown"></div></section><div id="onboarding-home-content"><section class="edition-empty-state"><span>🎁</span><h2>Información del intercambio</h2><p>El organizador está completando los detalles de esta celebración.</p></section></div>`:`<section class="member-welcome"><p class="kicker">NAVIDAD PYME · 2026</p><h1>¡Hola, ${esc(name)}! 🎄</h1><p>Tu espacio para compartir la magia de esta Navidad.</p><div class="member-countdown" id="member-countdown"></div></section><section class="exchange-budget-card" aria-label="Información importante del intercambio"><div class="exchange-budget-icon" aria-hidden="true">🎁</div><div class="exchange-budget-copy"><span class="exchange-budget-kicker">TEN PRESENTE</span><h2>Monto del intercambio</h2><div class="exchange-minimum-list"><div><span>Amigo Secreto</span><strong>Mínimo S/ 100</strong></div><div><span>Dirty Santa</span><strong>Mínimo S/ 20</strong></div></div></div><div class="exchange-location"><div class="exchange-detail-row"><span class="exchange-detail-icon">📅</span><div><b>Fecha: ${esc(exchangeDateLabel)}</b></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">📍</span><div><b>Lugar del intercambio</b><p>Av. Oscar R. Benavides 611, Dpto. 701, Cercado de Lima</p><small>Casa de Marcos</small></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🍖</span><div><b>Cuota para la parrilla</b><p>Por definir</p></div></div><div class="exchange-detail-row"><span class="exchange-detail-icon">🕘</span><div><b>Horario</b><p>Desde las 9:00 a. m.</p></div></div><p class="exchange-breakfast">🥪 Llega temprano para desayunar su respectivo Chicharrón de El Chinito</p><a class="exchange-map-link" href="https://maps.app.goo.gl/rueCMQujUGvwxFoY9" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps ↗</a><div class="exchange-map-preview"><iframe title="Mapa de la ubicación del intercambio en Cercado de Lima" src="https://www.google.com/maps?q=Av.%20Oscar%20R.%20Benavides%20611%2C%20Cercado%20de%20Lima&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><a class="exchange-whatsapp-share" href="https://wa.me/?text=${encodeURIComponent(exchangeShareText)}" target="_blank" rel="noopener noreferrer" aria-label="Compartir información del intercambio por WhatsApp"><span aria-hidden="true">◉</span> Compartir información por WhatsApp</a></div></section><figure class="home-team-photo-wrap"><img class="home-team-photo" src="/images/equipo-navidad-2026.webp" alt="Equipo Cliente 360 reunido para celebrar la Navidad" loading="eager" fetchpriority="high"></figure>`
  const rozviAnnouncement=currentUser.membership?.team_name==="Cliente 360"?'<section class="rozvi-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE</span><h2>¡VAMOS ROZVI!</h2><p>JUEGA AHORA Y GANA PUNTOS ESPÍRITU.</p><button type="button" id="rozvi-open-game" class="rozvi-play-button">Jugar ahora <span>→</span></button></div></section>':"";
  const divorzhinhaAnnouncement=currentUser.membership?.team_name==="Cliente 360"?'<section class="rozvi-announcement divorzhinha-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-copy divorzhinha-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE</span><h2>DIVORZINHA</h2><p>¡PATEA AL ARQUERO Y SUMA PUNTOS ESPÍRITU!</p><button type="button" id="divorzhinha-open-game" class="rozvi-play-button divorzhinha-play-button">Jugar ahora <span>→</span></button></div></section>':"";
+ const duckHuntAnnouncement=currentUser.membership?.team_name==="Cliente 360"?'<section class="rozvi-announcement duckhunt-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE · 8-BIT ARCADE</span><h2>🦆 DUCK HUNT</h2><p>¡APUNTA CON TU DEDO, CAZA PATOS Y SUMA ESPÍRITU!</p><button type="button" id="duckhunt-open-game" class="rozvi-play-button">Jugar ahora <span>→</span></button></div></section>':"";
 
- app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}${divorzhinhaAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
+ app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}${divorzhinhaAnnouncement}${duckHuntAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
  if(currentUser.membership?.team_name==="Cliente 360") initRozviGame();
- if(currentUser.membership?.team_name==="Cliente 360"){initDivorzhinhaGame();loadDivorzhinhaHomeArt();}
+ if(currentUser.membership?.team_name==="Cliente 360"){initDivorzhinhaGame();loadDivorzhinhaHomeArt();initDuckHuntGame();}
  if(isOnboarding)loadOnboardingHome();else loadClient360HomePhoto();
  startActivityHeartbeat();
  updateMemberCountdown(currentUser.membership?.event_date);
@@ -1411,6 +1412,88 @@ async function openRozviGame(){
 
 /* v2.9.2 · DIVORZINHA · penal arcade exclusivo del administrador */
 async function loadDivorzhinhaHomeArt(){const el=document.querySelector(".divorzhinha-announcement");if(!el)return;try{const r=await fetch("/api/divorzhinha/home-background?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const imageUrl=URL.createObjectURL(await r.blob());el.style.backgroundImage="linear-gradient(90deg,rgba(12,37,31,.96),rgba(12,37,31,.78) 62%,rgba(12,37,31,.48)),url('"+imageUrl+"')";el.style.backgroundSize="cover";el.style.backgroundPosition="center";}catch(error){console.warn("No se pudo cargar la imagen de DIVORZINHA",error);}}
+
+/* Duck Hunt · 8-bit Christmas Arcade */
+function initDuckHuntGame(){const b=document.getElementById("duckhunt-open-game");if(b&&!b.dataset.ready){b.dataset.ready="1";b.addEventListener("click",openDuckHuntGame);}}
+async function openDuckHuntGame(){
+ if(currentUser?.membership?.team_name!=="Cliente 360"||document.getElementById("duckhunt-modal")||openDuckHuntGame.loading)return;
+ openDuckHuntGame.loading=true;const launch=document.getElementById("duckhunt-open-game");
+ if(launch){launch.disabled=true;launch.dataset.label=launch.innerHTML;launch.innerHTML="CARGANDO…";}
+ let state;
+ try{state=await api("/api/duckhunt/state",{noMemoryCache:true,timeoutMs:8000});}
+ catch(e){openDuckHuntGame.loading=false;if(launch){launch.disabled=false;launch.innerHTML=launch.dataset.label||"Jugar ahora";}alert(e.message||"No se pudo cargar Duck Hunt.");return;}
+ const modal=document.createElement("section");modal.id="duckhunt-modal";modal.className="duckhunt-modal";
+ modal.innerHTML='<div class="duckhunt-shell" role="dialog" aria-modal="true" aria-label="Duck Hunt"><header class="duckhunt-head"><div><small>NAVIDAD PYME ARCADE · 8-BIT</small><h2>DUCK HUNT <span>🦆</span></h2></div><button type="button" class="duckhunt-close" aria-label="Cerrar">×</button></header><div class="duckhunt-hud"><div><small>PUNTOS</small><b id="duckhunt-score">0000</b></div><div><small>TIEMPO</small><b id="duckhunt-time">60</b></div><div><small>MUNICIÓN</small><b id="duckhunt-ammo">🔴🔴🔴</b></div><div><small>RÉCORD</small><b id="duckhunt-best">0</b></div></div><div class="duckhunt-screen"><canvas id="duckhunt-canvas" width="480" height="270" aria-label="Toca los patos que vuelan para cazarlos"></canvas><div class="duckhunt-overlay" id="duckhunt-overlay"><div><small id="duckhunt-kicker">✦ TEMPORADA DE CAZA NAVIDEÑA ✦</small><h3 id="duckhunt-title">¡CAZA LOS PATOS!</h3><p id="duckhunt-copy">Toca directamente a los patos para disparar. Tienes 3 disparos por recarga y 60 segundos. Cada pato normal vale 10 puntos; el dorado vale 50.</p><button id="duckhunt-start" type="button">▶ COMENZAR</button><button id="duckhunt-exit" type="button">SALIR</button></div></div></div><div class="duckhunt-foot"><span>🦆 NORMAL +10</span><span>✨ DORADO +50</span><span>❄️ 5 PARTIDAS DIARIAS</span></div><p class="duckhunt-feedback" id="duckhunt-feedback">TOCA UN PATO PARA DISPARAR</p><section class="duckhunt-ranking"><b>🏆 TOP 5 · CAZADORES</b><ol id="duckhunt-ranking-list"><li>Cargando…</li></ol></section></div>';
+ const best=Number(state.stats?.best_score||0),unlimited=state.unlimitedLives===true;
+ modal.querySelector("#duckhunt-best").textContent=String(best);
+ modal.querySelector("#duckhunt-copy").textContent=unlimited?"Toca directamente a los patos. Tienes 3 disparos por recarga y 60 segundos. Como administrador tienes partidas ilimitadas.":"Toca directamente a los patos para disparar. Tienes 3 disparos por recarga y 60 segundos. Cada pato normal vale 10 puntos; el dorado vale 50. Te quedan "+state.livesRemaining+" partidas hoy.";
+ document.body.append(modal);openDuckHuntGame.loading=false;
+ const canvas=modal.querySelector("#duckhunt-canvas"),ctx=canvas.getContext("2d"),overlay=modal.querySelector("#duckhunt-overlay"),scoreEl=modal.querySelector("#duckhunt-score"),timeEl=modal.querySelector("#duckhunt-time"),ammoEl=modal.querySelector("#duckhunt-ammo"),feedback=modal.querySelector("#duckhunt-feedback");
+ let score=0,ducksShot=0,ammo=3,time=60,active=false,ended=false,raf=0,last=0,spawn=0,ducks=[],shots=[],escaped=0,gameId=crypto.randomUUID().replace(/-/g,""),lifeConsumed=false;
+ const rnd=(a,b)=>a+Math.random()*(b-a);
+ function pixel(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
+ function drawDuck(d){
+  const x=Math.round(d.x),y=Math.round(d.y),dir=d.dir;
+  ctx.save();ctx.translate(x,y);ctx.scale(dir,1);
+  pixel(-16,-3,25,13,"#a34e2e");pixel(-10,-8,14,8,"#d17a38");pixel(5,-10,10,9,"#26754a");pixel(11,-13,8,8,"#3a9a59");pixel(18,-11,4,3,"#f1d35d");pixel(21,-10,3,2,"#202a25");
+  pixel(-3,1,9,5,"#f0cf62");pixel(-13,4,7,3,"#e9e4ce");
+  if(d.wing>0)pixel(-7,d.wing>0.5?-13:4,15,8,"#e4b34e");else pixel(-7,-1,15,7,"#e4b34e");
+  if(d.gold){pixel(-14,-16,5,5,"#ffe46a");pixel(-8,-20,4,4,"#fff0a0");pixel(1,-17,4,4,"#ffe46a");}
+  ctx.restore();
+ }
+ function drawScene(){
+  ctx.imageSmoothingEnabled=false;pixel(0,0,480,270,"#74b7d5");pixel(0,18,480,78,"#91c9df");
+  for(let i=0;i<24;i++){const x=(i*71)%480,y=18+(i*29)%70;pixel(x,y,2,2,"#e9f4e8");}
+  pixel(0,120,480,28,"#8fc5d0");pixel(0,148,480,40,"#4d9a50");pixel(0,188,480,82,"#286a3b");
+  for(let i=0;i<18;i++){const x=i*29;pixel(x,139,20,13,"#246b43");pixel(x+5,131,13,14,"#317d49");pixel(x+10,124,5,12,"#438d4c");}
+  pixel(0,218,480,5,"#e8f0d7");pixel(12,18,4,4,"#fff5cb");pixel(452,28,4,4,"#fff5cb");
+  ducks.forEach(drawDuck);
+  shots.forEach(s=>{pixel(s.x-2,s.y-5,4,8,"#fff5a8");pixel(s.x-1,s.y-3,2,4,"#ffb84a");});
+  ctx.fillStyle="#fff6d9";ctx.font="10px monospace";ctx.fillText("NORTH POLE HUNT",8,13);
+ }
+ function hud(){scoreEl.textContent=String(score).padStart(4,"0");timeEl.textContent=String(Math.ceil(time));ammoEl.textContent="🔴".repeat(ammo)+"⚫".repeat(3-ammo);}
+ function endGame(reason){
+  if(ended)return;ended=true;active=false;cancelAnimationFrame(raf);overlay.classList.remove("hidden");
+  modal.querySelector("#duckhunt-kicker").textContent="✦ PARTIDA TERMINADA ✦";
+  modal.querySelector("#duckhunt-title").textContent=reason==="time"?"¡TIEMPO!":"¡SE ESCAPARON DEMASIADOS!";
+  modal.querySelector("#duckhunt-copy").textContent="Cazaste "+Math.floor(score/10)+" patos equivalentes y conseguiste "+score+" puntos. Tu puntuación se guardará en Espíritu.";
+  modal.querySelector("#duckhunt-start").textContent="JUGAR OTRA PARTIDA";
+  modal.querySelector("#duckhunt-exit").textContent="CERRAR";
+  api("/api/duckhunt/score",{method:"POST",body:JSON.stringify({gameId,score,ducks:ducksShot}) ,noMemoryCache:true,timeoutMs:8000}).then(result=>{feedback.textContent="¡"+result.awardedPoints+" PUNTOS ESPÍRITU CONSEGUIDOS!";modal.querySelector("#duckhunt-best").textContent=String(result.stats?.best_score||score);loadRanking();}).catch(e=>{feedback.textContent="No se pudo guardar el puntaje: "+(e.message||"intenta de nuevo");});
+ }
+ function loop(now){
+  if(!active)return;const dt=Math.min(.04,(now-last)/1000||0);last=now;time-=dt;spawn-=dt;
+  if(spawn<=0&&ducks.length<3){const gold=Math.random()<.12;ducks.push({x:Math.random()<.5?-24:504,y:rnd(45,135),dir:Math.random()<.5?1:-1,speed:rnd(90,150)+(60-time)*.7,wing:0,gold});if(ducks[ducks.length-1].dir<0)ducks[ducks.length-1].x=504;spawn=rnd(.65,1.25);}
+  ducks.forEach(d=>{d.x+=d.dir*d.speed*dt;d.y+=Math.sin(now/170+d.x/45)*22*dt;d.wing=Math.sin(now/65);});
+  ducks=ducks.filter(d=>{if(d.x<-35||d.x>515){escaped++;return false;}return true;});
+  shots=shots.filter(s=>now-s.t<150);
+  drawScene();hud();
+  if(time<=0){endGame("time");return;}if(escaped>=5){endGame("escaped");return;}
+  raf=requestAnimationFrame(loop);
+ }
+ async function start(){
+  if(active)return;const startButton=modal.querySelector("#duckhunt-start");startButton.disabled=true;
+  if(!unlimited&&!lifeConsumed){try{const res=await api("/api/duckhunt/lives",{method:"POST",body:JSON.stringify({action:"consume-life"}),noMemoryCache:true});lifeConsumed=true;state.livesRemaining=res.livesRemaining;feedback.textContent="PARTIDAS RESTANTES HOY: "+res.livesRemaining;}catch(e){feedback.textContent=e.message||"No tienes partidas disponibles.";startButton.disabled=false;return;}}
+  if(!unlimited&&Number(state.livesRemaining)<=0&&!lifeConsumed){feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 partidas.";return;}
+  score=0;ducksShot=0;ammo=3;time=60;escaped=0;ducks=[];shots=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");hud();raf=requestAnimationFrame(loop);
+ }
+ canvas.addEventListener("pointerdown",e=>{
+  if(!active||ammo<=0)return;e.preventDefault();const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*canvas.width/r.width,y=(e.clientY-r.top)*canvas.height/r.height;
+  ammo--;shots.push({x,y,t:performance.now()});let hit=-1;
+  for(let i=ducks.length-1;i>=0;i--){const d=ducks[i];if(Math.abs(x-d.x)<25&&Math.abs(y-d.y)<21){hit=i;break;}}
+  if(hit>=0){const d=ducks.splice(hit,1)[0],points=d.gold?50:10;score+=points;ducksShot++;feedback.textContent=d.gold?"¡PATO DORADO! +50":"¡PATO CAZADO! +10";}
+  else feedback.textContent="¡FALLASTE!";
+  if(ammo===0){feedback.textContent+=" · RECARGANDO";setTimeout(()=>{if(active){ammo=3;hud();}},650);}hud();
+ });
+ modal.querySelector("#duckhunt-start").addEventListener("click",()=>{if(ended){lifeConsumed=false;gameId=crypto.randomUUID().replace(/-/g,"");}void start();});
+ modal.querySelector("#duckhunt-exit").addEventListener("click",()=>close());
+ modal.querySelector(".duckhunt-close").addEventListener("click",()=>close());
+ function close(){active=false;cancelAnimationFrame(raf);modal.remove();}
+ async function loadRanking(){try{const r=await api("/api/duckhunt/leaderboard",{noMemoryCache:true});modal.querySelector("#duckhunt-ranking-list").innerHTML=(r.ranking||[]).map((p,i)=>"<li><span>"+(i+1)+". "+esc(p.display_name)+"</span><b>"+Number(p.best_score||0)+"</b></li>").join("")||"<li>Aún no hay puntajes</li>";}catch{}}
+ loadRanking();drawScene();hud();
+ if(!unlimited&&Number(state.livesRemaining)<=0){modal.querySelector("#duckhunt-start").disabled=true;feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 partidas.";}
+}
+
 function initDivorzhinhaGame(){
  const button=document.getElementById("divorzhinha-open-game");
  if(button&&!button.dataset.ready){button.dataset.ready="1";button.addEventListener("click",openDivorzhinhaGame);}
