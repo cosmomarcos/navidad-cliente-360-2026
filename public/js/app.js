@@ -1472,10 +1472,10 @@ async function openDuckHuntGame(){
   raf=requestAnimationFrame(loop);
  }
  async function start(){
-  if(active)return;
-  if(!unlimited&&!lifeConsumed){try{const res=await api("/api/duckhunt/lives",{method:"POST",body:JSON.stringify({action:"consume-life"}),noMemoryCache:true});lifeConsumed=true;state.livesRemaining=res.livesRemaining;feedback.textContent="PARTIDAS RESTANTES HOY: "+res.livesRemaining;}catch(e){feedback.textContent=e.message||"No tienes partidas disponibles.";return;}}
+  if(active)return;const startButton=modal.querySelector("#duckhunt-start");startButton.disabled=true;
+  if(!unlimited&&!lifeConsumed){try{const res=await api("/api/duckhunt/lives",{method:"POST",body:JSON.stringify({action:"consume-life"}),noMemoryCache:true});lifeConsumed=true;state.livesRemaining=res.livesRemaining;feedback.textContent="PARTIDAS RESTANTES HOY: "+res.livesRemaining;}catch(e){feedback.textContent=e.message||"No tienes partidas disponibles.";startButton.disabled=false;return;}}
   if(!unlimited&&Number(state.livesRemaining)<=0&&!lifeConsumed){feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 partidas.";return;}
-  score=0;ducksShot=0;ammo=3;time=60;escaped=0;ducks=[];shots=[];spawn=.2;ended=false;active=true;last=performance.now();overlay.classList.add("hidden");hud();raf=requestAnimationFrame(loop);
+  score=0;ducksShot=0;ammo=3;time=60;escaped=0;ducks=[];shots=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");hud();raf=requestAnimationFrame(loop);
  }
  canvas.addEventListener("pointerdown",e=>{
   if(!active||ammo<=0)return;e.preventDefault();const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*canvas.width/r.width,y=(e.clientY-r.top)*canvas.height/r.height;
