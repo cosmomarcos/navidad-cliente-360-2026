@@ -1357,7 +1357,13 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .duckhunt-foot{display:flex;justify-content:space-around;gap:8px;flex-wrap:wrap;padding:12px 0 6px;font-size:9px;color:#f0d98b}.duckhunt-feedback{text-align:center;font-size:10px;min-height:15px;color:#bfe6c7}.duckhunt-ranking{border-top:2px solid #58786e;padding-top:10px;font-size:10px}.duckhunt-ranking ol{padding-left:22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.duckhunt-ranking li{padding:5px;background:#0d202c;display:flex;justify-content:space-between;gap:8px}.duckhunt-ranking li b{color:#ffdf77}
 @media(max-width:560px){.duckhunt-modal{padding:4px}.duckhunt-shell{width:100%;max-height:calc(100dvh - 8px);padding:8px;border-radius:11px}.duckhunt-head h2{font-size:clamp(20px,5vw,28px)}.duckhunt-hud{gap:4px;margin:8px 0}.duckhunt-hud div{padding:6px 2px}.duckhunt-hud small{font-size:7px}.duckhunt-hud b{font-size:11px}.duckhunt-overlay{padding:8px}.duckhunt-overlay p{font-size:10px;line-height:1.4}.duckhunt-foot{font-size:8px;padding:8px 0 3px}.duckhunt-feedback{margin:5px 0}.duckhunt-ranking{padding-top:7px}.duckhunt-ranking ol{grid-template-columns:1fr;gap:4px}.duckhunt-ranking li{padding:5px 7px}}
 
-/* NIKE HUNT · tarjeta de inicio minimalista */
-.nikehunt-announcement{margin:18px 0;min-height:150px;display:grid;place-items:center;overflow:hidden;border:2px solid #d9bd68;border-radius:16px;background:linear-gradient(135deg,#183d55,#102c36);box-shadow:0 8px 24px #0003}
-.nikehunt-launch{width:100%;min-height:150px;padding:24px 16px;display:grid;place-content:center;gap:8px;text-align:center;border:0;background:transparent;color:#fff0c7;font-family:monospace;cursor:pointer;text-shadow:0 2px 8px #000}
-.nikehunt-launch span{font-size:clamp(10px,2.4vw,14px);letter-spacing:2px;font-weight:800}.nikehunt-launch strong{font-size:clamp(26px,7vw,42px);letter-spacing:3px}.nikehunt-launch:focus-visible{outline:3px solid #ffe58b;outline-offset:-6px}
+/* NIKE HUNT · tarjeta con la misma estructura visual de DIVORZINHA */
+.nikehunt-announcement{display:block;box-sizing:border-box;width:100%;min-height:205px;margin:20px 0;padding:18px 15px;border:1px solid #d6b66b;border-radius:18px;background-size:cover;background-position:center;align-content:center}
+.nikehunt-announcement .nikehunt-copy{max-width:82%}
+.nikehunt-announcement .nikehunt-copy h2{margin:12px 0;color:#fff2c7;font-size:clamp(27px,6vw,40px)}
+.nikehunt-announcement .nikehunt-copy p{margin:9px 0 13px;color:#fff8e9;font-size:13px}
+.nikehunt-announcement .nikehunt-play-button{min-height:44px;padding:12px 18px;border:2px solid #f6e1a7;border-radius:7px;background:linear-gradient(#f6df9d,#d9b969);color:#183b2e;font-size:11px;font-weight:1000;box-shadow:0 4px 0 #886c37}
+.nikehunt-bullet{display:inline-block;width:7px;height:19px;margin:0 3px;border:1px solid #9c7b36;border-radius:2px;background:linear-gradient(90deg,#f7e2a0 0 35%,#c69a48 35% 100%);box-shadow:0 1px 2px #0006;transform:rotate(90deg);vertical-align:middle}
+.nikehunt-bullet.is-empty{border-color:#61717a;background:linear-gradient(90deg,#52636d 0 35%,#273a45 35% 100%);opacity:.5}
+#duckhunt-ammo{display:flex;align-items:center;justify-content:center;min-height:20px}
+@media(max-width:560px){.nikehunt-announcement{min-height:205px;margin:20px 0;padding:18px 15px}.nikehunt-announcement .nikehunt-copy{max-width:95%}.nikehunt-announcement .nikehunt-copy h2{font-size:27px}.nikehunt-announcement .nikehunt-copy p{font-size:11px;max-width:260px}.nikehunt-bullet{width:6px;height:16px;margin:0 2px}}
