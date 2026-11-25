@@ -1730,26 +1730,23 @@ async function openDivorzhinhaGame(){
   if(!shot)return;const current=shot;shot=null;shooting=false;
   const inside=current.targetX>=170&&current.targetX<=790&&current.targetY>=78&&current.targetY<=390;
   if(!inside){finishOutsideShot();return;}
-  // Colisión con la silueta completa del arquero. Las coordenadas están
-  // expresadas en el canvas final (960x540), con el suelo del arquero en Y≈382.
-  // Se amplían los límites por el radio de la pelota para detectar también
-  // impactos rasantes en guantes, botas y piernas.
+  // Colisión con el cuerpo y la posición REAL de los dos guantes.
+  // No se proyecta el guante mágicamente sobre el balón: debe llegar físicamente.
   function hitsKeeperBody(ballX,ballY,keeperCenterX,keeperOffsetY){
    const dx=Math.abs(ballX-keeperCenterX),r=21,y=ballY-keeperOffsetY;
    const inBand=(top,bottom,halfWidth)=>y>=top-r&&y<=bottom+r&&dx<=halfWidth+r;
-   // Cabeza y cuello.
-   if(inBand(0,122,49))return true;
-   // Torso, hombros y camiseta.
-   if(inBand(105,278,65))return true;
-   // Brazos, antebrazos y guantes: zona amplia de atajada.
-   if(inBand(72,285,148))return true;
-   // Guantes dirigidos hacia la trayectoria del balón (extensión de ambos brazos).
+   if(inBand(0,122,36))return true;       // cabeza y cuello
+   if(inBand(105,278,43))return true;     // torso y hombros
+   if(inBand(258,382,47))return true;     // piernas y botas
+   const reachX=clamp(ballX-keeperCenterX,-155,155);
    const shoulderY=382+keeperOffsetY-251;
-   const gloveCenterX=keeperCenterX+clamp(ballX-keeperCenterX,-155,155);
-   const gloveCenterY=shoulderY+clamp(ballY-shoulderY,-120,150);
-   if(Math.hypot(ballX-gloveCenterX,ballY-gloveCenterY)<66)return true;
-   // Pantalones cortos, muslos, pantorrillas y botas.
-   if(inBand(258,382,68))return true;
+   const reachY=clamp(ballY-shoulderY,-120,150);
+   // Coincide con los dos guantes dibujados (incluye su tamaño, no todo el brazo).
+   for(const side of [-1,1]){
+    const gloveX=keeperCenterX+side*43+reachX+side*17+2;
+    const gloveY=shoulderY+reachY+side*10;
+    if(Math.hypot(ballX-gloveX,ballY-gloveY)<=30)return true;
+   }
    return false;
   }
   const caught=hitsKeeperBody(current.targetX,current.targetY,keeperX,keeperY);
@@ -1760,11 +1757,11 @@ async function openDivorzhinhaGame(){
   if(!active||paused||shooting||finished)return;
   targetX=clamp(targetX,35,925);targetY=clamp(targetY,18,505);
   shot={x:480,y:475,targetX,targetY,started:performance.now(),radiusStart:46,radiusEnd:20,duration:Math.max(360,Math.min(620,390+(475-targetY)*.55))};
-  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.62,-95,110);keeperReactAt=performance.now()+Math.max(55,180/(1+Math.floor(score/10)*.25));setTimeout(()=>resolveShot(),shot.duration);
+  shooting=true;aim=null;keeperTargetX=clamp(targetX,170,790);keeperTargetY=clamp((targetY-220)*.62,-95,110);keeperReactAt=performance.now()+Math.max(90,250-Math.floor(score/10)*12);setTimeout(()=>resolveShot(),shot.duration);
  }
  function frame(now){
   if(!active||paused)return;const dt=Math.min(.04,(now-last)/1000||.016);last=now;
-  const reactionTier=Math.floor(score/10);keeperSpeed=360*(1+reactionTier*.15);
+  const reactionTier=Math.floor(score/10);keeperSpeed=190*(1+reactionTier*.12);
   if(shooting&&shot&&now>=keeperReactAt){const dx=keeperTargetX-keeperX,dy=keeperTargetY-keeperY,stepX=keeperSpeed*dt,stepY=keeperSpeed*.9*dt;keeperX=Math.abs(dx)<=stepX?keeperTargetX:keeperX+Math.sign(dx)*stepX;keeperY=Math.abs(dy)<=stepY?keeperTargetY:keeperY+Math.sign(dy)*stepY;}
   else if(!shooting&&!keeperDive){keeperX+=(480-keeperX)*Math.min(1,dt*5);keeperY+=(0-keeperY)*Math.min(1,dt*5);}
   render(now);raf=requestAnimationFrame(frame);
