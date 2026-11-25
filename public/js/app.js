@@ -1705,7 +1705,7 @@ async function openDivorzhinhaGame(){
  async function consumeLife(){
   if(!active||shooting)return;shooting=true;saves++;active=false;paused=false;finished=true;gameAudio.pause();cancelAnimationFrame(raf);pauseBtn.disabled=true;
   catchFeedback=true;message="¡DIVORZINHA LA ATAJÓ!";messageUntil=performance.now()+1500;playCrowdSound("save");
-  keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,260,700)};shotSaveTargetX=null;
+  keeperDive={start:performance.now(),fromX:keeperX,toX:clamp(shotSaveTargetX??keeperX,170,790),fromY:keeperY,toY:keeperY};shotSaveTargetX=null;
   if(!unlimitedLives){try{const result=await api("/api/divorzhinha/lives",{method:"POST",body:JSON.stringify({action:"lose-life"}),noMemoryCache:true});lives=Math.max(0,Math.min(5,Number(result.livesRemaining??Math.max(0,lives-1))));paintHud();}
   catch(error){lives=Math.max(0,lives-1);paintHud();showOverlay("SIN CONEXIÓN","NO SE PUDO CONFIRMAR LA VIDA",error.message,"",true);startBtn.disabled=true;return;}}
   const saved=await submit(),hasLives=unlimitedLives||lives>0;
