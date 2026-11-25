@@ -1638,8 +1638,8 @@ async function openDivorzhinhaGame(){
   keeperRoundedRect(-53,-279,106,168,25,shirt);keeperRoundedRect(-42,-265,84,12,6,"#fff4a1");keeperCtx.save();keeperCtx.fillStyle="#101010";keeperCtx.font="1000 72px Arial,sans-serif";keeperCtx.textAlign="center";keeperCtx.textBaseline="middle";keeperCtx.fillText("1",0,-194);keeperCtx.restore();
   const side=keeperCtx.createLinearGradient(-53,0,53,0);side.addColorStop(0,"#d49a12");side.addColorStop(.5,"#ffed69");side.addColorStop(1,"#d49a12");keeperCtx.fillStyle=side;keeperCtx.fillRect(-53,-171,106,9);
   keeperCtx.fillStyle="#fff7b4";keeperCtx.beginPath();keeperCtx.moveTo(-17,-278);keeperCtx.lineTo(0,-260);keeperCtx.lineTo(17,-278);keeperCtx.lineTo(10,-286);keeperCtx.lineTo(-10,-286);keeperCtx.closePath();keeperCtx.fill();
-  const actionActive=shooting&&shot&&now>=keeperReactAt,reachT=actionActive?clamp((now-keeperReactAt)/190,0,1):keeperDive?divePower:0,reachEase=reachT*reachT*(3-2*reachT);
-  const aimDX=actionActive?clamp((shot.targetX-480)/310,-1,1):0,aimDY=actionActive?clamp((shot.targetY-220)/170,-1,1):0;
+  const armActionActive=shooting&&shot&&now>=keeperReactAt,reachT=armActionActive?clamp((now-keeperReactAt)/190,0,1):keeperDive?divePower:0,reachEase=reachT*reachT*(3-2*reachT);
+  const aimDX=armActionActive?clamp((shot.targetX-480)/310,-1,1):0,aimDY=armActionActive?clamp((shot.targetY-220)/170,-1,1):0;
   const reachX=aimDX*108*reachEase,reachY=(-62+aimDY*112)*reachEase;
   function drawReachArm(side){
    const sx=side*43,spread=side*17,ex=sx+reachX+spread,ey=-251+reachY+side*10;
