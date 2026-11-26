@@ -665,10 +665,6 @@ async function handleApi(request, env, url) {
    await ensureDivorzhinhaSchema(env);await ensureSpiritSchema(env);
    const inserted=await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_game_scores(id,game_id,edition_id,user_id,goals,saves) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,goals,saves).run();
    let awardedPoints=0;
-   if(Number(inserted.meta?.changes||0)>0&&goals>0){
-    const award=await env.DB.prepare("INSERT OR IGNORE INTO spirit_points(id,edition_id,user_id,source_type,source_id,points,description) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"divorzhinha_game",gameId,goals,"DIVORZINHA · "+goals+" goles").run();
-    awardedPoints=Number(award.meta?.changes||0)>0?goals:0;
-   }
    const stats=await env.DB.prepare("SELECT COALESCE(MAX(goals),0) AS best_score,COUNT(*) AS games_played,COALESCE(SUM(goals),0) AS total_goals FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
    const history=await env.DB.prepare("SELECT goals,saves,created_at FROM divorzhinha_game_scores WHERE edition_id=? AND user_id=? ORDER BY created_at DESC LIMIT 8").bind(member.edition_id,user.id).all();
    return json({ok:true,awardedPoints,stats:stats||{},history:history.results||[]});
