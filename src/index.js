@@ -34,6 +34,7 @@ async function ensureDuckHuntSchema(env){
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS duckhunt_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS duckhunt_game_scores (id TEXT PRIMARY KEY,game_id TEXT NOT NULL UNIQUE,edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,score INTEGER NOT NULL DEFAULT 0,ducks INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_duckhunt_scores ON duckhunt_game_scores(edition_id,score DESC,created_at)").run();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS duckhunt_game_sessions (game_id TEXT PRIMARY KEY,edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,started_at INTEGER NOT NULL,completed_at INTEGER,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  });
 }
 async function ensureMichiScoresSchema(env){return ensureSchemaOnce("michi-scores",async()=>{await env.DB.prepare("CREATE TABLE IF NOT EXISTS michi_game_scores (id TEXT PRIMARY KEY,game_id TEXT NOT NULL UNIQUE,edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,score INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_michi_scores_edition ON michi_game_scores(edition_id,score DESC,created_at)").run();});}
@@ -692,7 +693,8 @@ async function handleApi(request, env, url) {
    await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
    if(!admin){const changed=await env.DB.prepare("UPDATE duckhunt_daily_lives SET lives_remaining=lives_remaining-1,updated_at=datetime('now') WHERE edition_id=? AND user_id=? AND game_date=? AND lives_remaining>0").bind(member.edition_id,user.id,gameDate).run();if(Number(changed.meta?.changes||0)===0)return json({error:"Ya utilizaste tus 5 partidas de hoy. ¡Vuelve mañana!"},409);}
    const row=await env.DB.prepare("SELECT lives_remaining FROM duckhunt_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
-   return json({ok:true,livesRemaining:admin?5:Number(row?.lives_remaining??0),unlimitedLives:admin});
+   const gameId=crypto.randomUUID();await env.DB.prepare("INSERT INTO duckhunt_game_sessions(game_id,edition_id,user_id,started_at) VALUES(?,?,?,?)").bind(gameId,member.edition_id,user.id,Date.now()).run();
+   return json({ok:true,livesRemaining:admin?5:Number(row?.lives_remaining??0),unlimitedLives:admin,gameId});
   }
   if(url.pathname==="/api/duckhunt/score"&&request.method==="POST"){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
@@ -701,7 +703,13 @@ async function handleApi(request, env, url) {
    if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
    const score=Math.max(0,Math.min(10000,Math.floor(Number(body.score)||0))),ducks=Math.max(0,Math.min(1000,Math.floor(Number(body.ducks)||0)));
    if(score!==ducks)return json({error:"Puntuación no válida."},400);
-   await ensureDuckHuntSchema(env);await ensureSpiritSchema(env);const inserted=await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_game_scores(id,game_id,edition_id,user_id,score,ducks) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,score,ducks).run();
+   await ensureDuckHuntSchema(env);const session=await env.DB.prepare("SELECT started_at,completed_at FROM duckhunt_game_sessions WHERE game_id=? AND edition_id=? AND user_id=?").bind(gameId,member.edition_id,user.id).first();
+   if(!session||session.completed_at)return json({error:"Partida no válida, ya cerrada o no iniciada desde el servidor."},409);
+   const durationSeconds=Math.max(0,(Date.now()-Number(session.started_at))/1000),maxAllowed=Math.min(60,Math.floor(durationSeconds*1.25));
+   if(durationSeconds<8||ducks>maxAllowed)return json({error:"Resultado rechazado por velocidad o cantidad imposible de aciertos."},422);
+   const closed=await env.DB.prepare("UPDATE duckhunt_game_sessions SET completed_at=? WHERE game_id=? AND completed_at IS NULL").bind(Date.now(),gameId).run();
+   if(Number(closed.meta?.changes||0)!==1)return json({error:"Esta partida ya fue procesada."},409);
+   await ensureSpiritSchema(env);const inserted=await env.DB.prepare("INSERT OR IGNORE INTO duckhunt_game_scores(id,game_id,edition_id,user_id,score,ducks) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,ducks,ducks).run();
    let awardedPoints=0;if(Number(inserted.meta?.changes||0)>0&&ducks>0){awardedPoints=ducks;await env.DB.prepare("INSERT OR IGNORE INTO spirit_points(id,edition_id,user_id,source_type,source_id,points,description) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"duckhunt_game",gameId,awardedPoints,"NIKE HUNT · "+ducks+" NIKES cazados").run();}
    const stats=await env.DB.prepare("SELECT COALESCE(MAX(score),0) AS best_score,COUNT(*) AS games_played FROM duckhunt_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
    return json({ok:true,awardedPoints,stats:stats||{}});
