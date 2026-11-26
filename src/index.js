@@ -491,7 +491,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.38" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.39" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -529,7 +529,11 @@ async function handleApi(request, env, url) {
   if((url.pathname==="/api/michi/score"&&request.method==="POST")||(url.pathname==="/api/michi/leaderboard"&&request.method==="GET")){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    if(!(await isPrimaryAdmin(user,env)))return json({error:"MICHI VS DOG está disponible únicamente para el administrador principal."},403);
-   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Selecciona una edición confirmada de Cliente 360."},403);
+   const requestedEditionId=url.searchParams.get("editionId");
+   const member=requestedEditionId
+    ? await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed' AND w.name='Cliente 360'").bind(user.id,requestedEditionId).first()
+    : await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' AND w.name='Cliente 360' ORDER BY e.year DESC,em.joined_at DESC LIMIT 1").bind(user.id).first();
+   if(!member)return json({error:"No se encontró una edición confirmada de Cliente 360 para cargar el ranking."},403);
    await ensureMichiScoresSchema(env);await ensureParticipantProfilesSchema(env);
    if(request.method==="POST"){
     const body=await request.json().catch(()=>({})),gameId=String(body.gameId||"").slice(0,80);
