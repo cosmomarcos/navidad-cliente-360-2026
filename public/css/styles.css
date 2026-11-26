@@ -1399,3 +1399,53 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
 .michi-overlay{position:absolute;inset:0;display:grid;place-items:center;background:#081c2bd9;padding:14px;text-align:center}.michi-overlay.hidden{display:none}.michi-overlay>div{max-width:440px}.michi-overlay small{color:#f2d77f;font-size:9px}.michi-overlay h3{font-size:clamp(17px,4vw,25px);margin:10px 0;color:#fff0b8}.michi-overlay p{font-size:11px;line-height:1.7;color:#d8e4d8}.michi-overlay button{font-family:monospace;font-weight:bold;padding:11px 14px;margin:5px;border:2px solid #f1d67b;background:#a83e36;color:#fff3d0;cursor:pointer}
 .michi-controls{display:flex;justify-content:space-around;gap:8px;flex-wrap:wrap;padding:12px 0 6px;font-size:9px;color:#f0d98b}.michi-feedback{text-align:center;font-size:10px;min-height:18px;color:#bfe6c7}.michi-touch{display:none;justify-content:center;gap:8px;padding:9px}.michi-touch button{min-width:48px;min-height:44px;border:1px solid #b64c7c;border-radius:10px;background:#382044;color:white;font-size:20px;touch-action:none}
 @media(max-width:560px){.michi-game-modal{padding:4px}.michi-shell{width:100%;max-height:calc(100dvh - 8px);padding:8px;border-radius:11px}.michi-head h2{font-size:clamp(20px,5vw,28px)}.michi-hud{grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin:8px 0}.michi-hud div{padding:6px 2px}.michi-hud small{font-size:7px}.michi-hud b{font-size:12px}.michi-controls{font-size:8px}.michi-touch{display:flex}.michi-touch button{flex:1;min-width:0;min-height:40px}.michi-overlay p{font-size:10px}}
+
+/* MICHI VS DOG 2.11.38 · controles accesibles, selección desactivada y ranking */
+#michi-game-modal,#michi-game-modal *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent}
+#michi-game-modal{-webkit-user-drag:none;touch-action:pan-y}
+#michi-game-modal button,#michi-game-modal canvas{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important}
+.michi-shell{width:min(940px,100%);max-height:calc(100dvh - 16px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.michi-stage{width:100%;aspect-ratio:16/9;overflow:hidden;touch-action:none}
+.michi-stage canvas{width:100%;height:100%;aspect-ratio:16/9;display:block;object-fit:fill;image-rendering:auto;touch-action:none;pointer-events:none}
+.michi-hud{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.michi-hud>div{min-width:0}
+.michi-hud small{display:block;font-size:clamp(7px,1.2vw,10px);white-space:nowrap}
+.michi-hud b{display:block;font-size:clamp(12px,2vw,17px);white-space:nowrap}
+.michi-controls{display:flex;justify-content:space-around;gap:8px;flex-wrap:wrap;padding:9px 0 4px;font-size:9px;color:#f0d98b}
+.michi-touch{display:none;align-items:center;justify-content:space-between;gap:18px;padding:8px 4px}
+.michi-dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,40px);gap:5px;justify-items:center;align-items:center}
+.michi-dpad [data-key="up"]{grid-column:2;grid-row:1}
+.michi-dpad [data-key="left"]{grid-column:1;grid-row:2}
+.michi-dpad [data-key="down"]{grid-column:2;grid-row:2}
+.michi-dpad [data-key="right"]{grid-column:3;grid-row:2}
+.michi-touch button{display:flex;align-items:center;justify-content:center;min-width:42px;min-height:40px;padding:5px;border:1px solid #bd6590;border-radius:11px;background:linear-gradient(145deg,#48264d,#291d3d);color:#fff1dc;font-size:19px;box-shadow:0 3px 0 #171323;touch-action:none}
+.michi-touch button:active{transform:translateY(2px);box-shadow:0 1px 0 #171323;background:#6b315c}
+.michi-touch .michi-jump{width:82px;height:78px;flex-direction:column;gap:2px;border-radius:18px;background:linear-gradient(145deg,#e6538b,#8f2e77);font-size:27px}
+.michi-jump small{font-size:8px;font-weight:900;letter-spacing:1px}
+.michi-ranking{margin-top:8px;padding:10px 12px;border-top:2px solid #688b82;background:#0d202c;color:#f8edce;text-align:left}
+.michi-ranking h3{margin:0 0 8px;color:#f1d98a;font-size:11px;letter-spacing:.6px}
+.michi-ranking ol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}
+.michi-ranking li{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;padding:7px 9px;background:#152d3b;border:1px solid #395b66;color:#e9ead8;font-size:10px}
+.michi-ranking li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.michi-ranking li b{color:#ffdf77;white-space:nowrap}
+.michi-overlay{z-index:2}
+@media(max-width:560px){
+ .michi-game-modal{padding:4px}
+ .michi-shell{width:100%;max-height:calc(100dvh - 8px);padding:8px;border-radius:11px}
+ .michi-hud{gap:3px;margin:8px 0}
+ .michi-hud>div{padding:6px 2px}
+ .michi-hud small{font-size:7px}
+ .michi-hud b{font-size:12px}
+ .michi-stage{width:100%;aspect-ratio:16/9}
+ .michi-controls{font-size:8px;gap:4px;padding:7px 0 2px}
+ .michi-touch{display:flex;min-height:98px}
+ .michi-dpad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(2,36px);gap:4px}
+ .michi-touch button{min-width:40px;min-height:36px}
+ .michi-touch .michi-jump{width:76px;height:72px}
+ .michi-ranking{padding:8px 7px}
+ .michi-ranking ol{grid-template-columns:1fr;gap:4px}
+ .michi-ranking li{padding:5px 7px;font-size:9px}
+ .michi-ranking h3{font-size:10px}
+ .michi-feedback{font-size:9px;line-height:1.35}
+}
+@media(hover:none),(pointer:coarse){#michi-game-modal .michi-touch{display:flex}}
