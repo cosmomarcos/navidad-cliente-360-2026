@@ -1486,3 +1486,9 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
  #michi-game-modal .michi-ranking li{font-size:9px;padding:6px 8px}
  #michi-game-modal .michi-feedback{font-size:9px;line-height:1.4}
 }
+
+/* MICHI VS DOG 2.11.40 · formulario de audio del ladrido */
+#michi-admin-settings #michi-bark-form{display:grid;gap:10px;margin-top:12px;padding:14px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:rgba(255,255,255,.035)}
+#michi-admin-settings #michi-bark-form label{display:grid;gap:8px;color:#fff3e8}
+#michi-admin-settings #michi-bark-file{display:block;max-width:100%;color:#fff;font-size:13px}
+#michi-admin-settings #michi-bark-status{color:#d5c4d3;font-size:12px}
