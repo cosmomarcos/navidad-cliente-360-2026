@@ -36,6 +36,7 @@ async function ensureDuckHuntSchema(env){
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_duckhunt_scores ON duckhunt_game_scores(edition_id,score DESC,created_at)").run();
  });
 }
+async function ensureMichiScoresSchema(env){return ensureSchemaOnce("michi-scores",async()=>{await env.DB.prepare("CREATE TABLE IF NOT EXISTS michi_game_scores (id TEXT PRIMARY KEY,game_id TEXT NOT NULL UNIQUE,edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,score INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_michi_scores_edition ON michi_game_scores(edition_id,score DESC,created_at)").run();});}
 async function ensureDivorzhinhaSchema(env){
  return ensureSchemaOnce("divorzhinha-game",async()=>{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS divorzhinha_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
@@ -490,7 +491,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.37" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.38" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -524,6 +525,22 @@ async function handleApi(request, env, url) {
    }
    const row=await env.DB.prepare("SELECT lives_remaining FROM michi_daily_lives WHERE edition_id=? AND user_id=? AND game_date=?").bind(member.edition_id,user.id,gameDate).first();
    return json({livesRemaining:adminInfiniteLives?-1:Number(row?.lives_remaining??5),maxLives:adminInfiniteLives?null:5,infiniteLives:adminInfiniteLives,gameDate});
+  }
+  if((url.pathname==="/api/michi/score"&&request.method==="POST")||(url.pathname==="/api/michi/leaderboard"&&request.method==="GET")){
+   const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
+   if(!(await isPrimaryAdmin(user,env)))return json({error:"MICHI VS DOG está disponible únicamente para el administrador principal."},403);
+   const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"Selecciona una edición confirmada de Cliente 360."},403);
+   await ensureMichiScoresSchema(env);await ensureParticipantProfilesSchema(env);
+   if(request.method==="POST"){
+    const body=await request.json().catch(()=>({})),gameId=String(body.gameId||"").slice(0,80);
+    if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
+    const score=Math.max(0,Math.min(100000,Math.floor(Number(body.score)||0)));
+    const inserted=await env.DB.prepare("INSERT OR IGNORE INTO michi_game_scores(id,game_id,edition_id,user_id,score) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,score).run();
+    const stats=await env.DB.prepare("SELECT COALESCE(MAX(score),0) AS best_score,COUNT(*) AS games_played FROM michi_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
+    return json({ok:true,saved:Number(inserted.meta?.changes||0)>0,stats:stats||{}});
+   }
+   const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ms.score) AS best_score,COUNT(ms.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN michi_game_scores ms ON ms.edition_id=em.edition_id AND ms.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
+   return json({ranking:rows.results||[]});
   }
   if(url.pathname==="/api/michi/home-background"&&request.method==="GET"){
    if(!(await currentUser(request,env)))return json({error:"Inicia sesión primero."},401);
