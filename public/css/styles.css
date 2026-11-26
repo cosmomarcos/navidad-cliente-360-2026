@@ -1449,3 +1449,40 @@ body:has(#join-card:not(.hidden)) #join-card{margin-bottom:18px}
  .michi-feedback{font-size:9px;line-height:1.35}
 }
 @media(hover:none),(pointer:coarse){#michi-game-modal .michi-touch{display:flex}}
+
+/* MICHI VS DOG 2.11.39 · joystick y escenario vertical tipo NIKE HUNT */
+#michi-game-modal .michi-shell{width:min(100%,940px);max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain}
+#michi-game-modal .michi-stage{width:100%;aspect-ratio:5/6;max-height:none;overflow:hidden;flex:none}
+#michi-game-modal .michi-stage canvas{display:block;width:100%;height:100%;aspect-ratio:5/6;object-fit:fill;image-rendering:auto;touch-action:none}
+#michi-game-modal .michi-overlay{overflow:auto;padding:clamp(12px,3vw,28px)}
+#michi-game-modal .michi-overlay>div{width:min(100%,560px);max-height:100%;margin:auto}
+#michi-game-modal .michi-overlay h3{font-size:clamp(19px,4.5vw,30px);line-height:1.2}
+#michi-game-modal .michi-overlay p{font-size:clamp(12px,2.1vw,16px);line-height:1.55}
+#michi-game-modal .michi-overlay button{min-height:48px;padding:12px 20px;font-size:clamp(12px,2vw,16px)}
+#michi-game-modal .michi-touch{display:flex;align-items:center;justify-content:center;gap:clamp(32px,12vw,100px);min-height:130px;padding:12px 8px}
+#michi-game-modal .michi-joystick{display:flex;flex-direction:column;align-items:center;gap:5px;touch-action:none;user-select:none}
+#michi-game-modal .michi-joystick-ring{position:relative;width:clamp(104px,25vw,142px);height:clamp(104px,25vw,142px);border:3px solid #b86a99;border-radius:50%;background:radial-gradient(circle at 50% 45%,#44284f,#211b36 75%);box-shadow:inset 0 0 0 8px #ffffff0b,0 5px 0 #131426;touch-action:none}
+#michi-game-modal .michi-joystick-knob{position:absolute;left:50%;top:50%;width:43%;height:43%;border:2px solid #f5c5dc;border-radius:50%;background:linear-gradient(145deg,#ed8cbb,#a53b83);box-shadow:0 4px 10px #0008;transform:translate(-50%,-50%);pointer-events:none}
+#michi-game-modal .michi-joystick>small{font:800 10px monospace;letter-spacing:1.5px;color:#f4d7a0}
+#michi-game-modal .michi-control-hint{display:flex;align-items:center;gap:10px;color:#f1d58e}
+#michi-game-modal .michi-control-hint>span{font-size:35px}
+#michi-game-modal .michi-control-hint small{font:800 10px/1.4 monospace}
+#michi-game-modal .michi-ranking{margin-top:8px}
+@media(max-width:650px){
+ #michi-game-modal.michi-game-modal{padding:4px;align-items:flex-start}
+ #michi-game-modal .michi-shell{width:100%;max-height:calc(100dvh - 8px);padding:8px;border-radius:11px}
+ #michi-game-modal .michi-head{padding:10px 12px}
+ #michi-game-modal .michi-head h2{font-size:clamp(19px,5vw,27px)}
+ #michi-game-modal .michi-head small{font-size:8px;letter-spacing:1.3px}
+ #michi-game-modal .michi-hud{grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+ #michi-game-modal .michi-hud>div{padding:6px 2px;min-width:0}
+ #michi-game-modal .michi-hud small{font-size:clamp(6px,1.8vw,8px)}
+ #michi-game-modal .michi-hud b{font-size:clamp(10px,3vw,13px)}
+ #michi-game-modal .michi-stage{aspect-ratio:5/6}
+ #michi-game-modal .michi-controls{justify-content:center;gap:7px 15px;font-size:8px;padding:7px 0}
+ #michi-game-modal .michi-touch{min-height:122px;gap:38px;padding:9px 4px}
+ #michi-game-modal .michi-joystick-ring{width:108px;height:108px}
+ #michi-game-modal .michi-ranking ol{grid-template-columns:1fr}
+ #michi-game-modal .michi-ranking li{font-size:9px;padding:6px 8px}
+ #michi-game-modal .michi-feedback{font-size:9px;line-height:1.4}
+}
