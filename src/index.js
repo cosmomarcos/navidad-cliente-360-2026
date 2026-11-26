@@ -508,12 +508,8 @@ async function handleApi(request, env, url) {
 
   if(url.pathname==="/api/michi/state"&&(request.method==="GET"||request.method==="POST")){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"MICHI VS DOG está disponible únicamente para el administrador principal."},403);
-   const requestedEditionId=url.searchParams.get("editionId");
-   const member=requestedEditionId
-    ? await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed' AND w.name='Cliente 360'").bind(user.id,requestedEditionId).first()
-    : await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' AND w.name='Cliente 360' ORDER BY e.year DESC,em.joined_at DESC LIMIT 1").bind(user.id).first();
-   if(!member)return json({error:"No se encontró tu participación confirmada en Cliente 360. Verifica que el intercambio esté seleccionado."},403);
+   const member=await getParticipantEdition(env,user,url);
+   if(!member||member.team_name!=="Cliente 360")return json({error:"MICHI VS DOG está disponible únicamente para participantes confirmados de Cliente 360."},403);
    const adminInfiniteLives=true;
    await env.DB.prepare("CREATE TABLE IF NOT EXISTS michi_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
    const gameDate=getRozviGameDate();
@@ -528,20 +524,23 @@ async function handleApi(request, env, url) {
   }
   if((url.pathname==="/api/michi/score"&&request.method==="POST")||(url.pathname==="/api/michi/leaderboard"&&request.method==="GET")){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   if(!(await isPrimaryAdmin(user,env)))return json({error:"MICHI VS DOG está disponible únicamente para el administrador principal."},403);
-   const requestedEditionId=url.searchParams.get("editionId");
-   const member=requestedEditionId
-    ? await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed' AND w.name='Cliente 360'").bind(user.id,requestedEditionId).first()
-    : await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' AND w.name='Cliente 360' ORDER BY e.year DESC,em.joined_at DESC LIMIT 1").bind(user.id).first();
-   if(!member)return json({error:"No se encontró una edición confirmada de Cliente 360 para cargar el ranking."},403);
+   const member=await getParticipantEdition(env,user,url);
+   if(!member||member.team_name!=="Cliente 360")return json({error:"MICHI VS DOG está disponible únicamente para participantes confirmados de Cliente 360."},403);
    await ensureMichiScoresSchema(env);await ensureParticipantProfilesSchema(env);
    if(request.method==="POST"){
     const body=await request.json().catch(()=>({})),gameId=String(body.gameId||"").slice(0,80);
     if(!/^[A-Za-z0-9_-]{12,80}$/.test(gameId))return json({error:"Identificador de partida no válido."},400);
     const score=Math.max(0,Math.min(100000,Math.floor(Number(body.score)||0)));
     const inserted=await env.DB.prepare("INSERT OR IGNORE INTO michi_game_scores(id,game_id,edition_id,user_id,score) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),gameId,member.edition_id,user.id,score).run();
+    const saved=Number(inserted.meta?.changes||0)>0;
+    let awardedPoints=0;
+    if(saved&&score>0){
+     await ensureSpiritSchema(env);
+     awardedPoints=score;
+     await env.DB.prepare("INSERT OR IGNORE INTO spirit_points(id,edition_id,user_id,source_type,source_id,points,description) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),member.edition_id,user.id,"michi_vs_dog",gameId,awardedPoints,"MICHI VS DOG · "+score+" Yapecréditos recolectados").run();
+    }
     const stats=await env.DB.prepare("SELECT COALESCE(MAX(score),0) AS best_score,COUNT(*) AS games_played FROM michi_game_scores WHERE edition_id=? AND user_id=?").bind(member.edition_id,user.id).first();
-    return json({ok:true,saved:Number(inserted.meta?.changes||0)>0,stats:stats||{}});
+    return json({ok:true,saved,awardedPoints,stats:stats||{}});
    }
    const rows=await env.DB.prepare("SELECT u.id AS user_id,COALESCE(NULLIF(TRIM(COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')),''),u.display_name) AS display_name,MAX(ms.score) AS best_score,COUNT(ms.id) AS games_played FROM edition_members em JOIN users u ON u.id=em.user_id LEFT JOIN participant_profiles p ON p.user_id=u.id LEFT JOIN michi_game_scores ms ON ms.edition_id=em.edition_id AND ms.user_id=em.user_id WHERE em.edition_id=? AND em.status='confirmed' GROUP BY u.id ORDER BY best_score DESC,display_name COLLATE NOCASE LIMIT 5").bind(member.edition_id).all();
    return json({ranking:rows.results||[]});
