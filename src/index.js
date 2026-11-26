@@ -491,7 +491,7 @@ async function getParticipantEdition(env,user,url){
 }
 
 async function handleApi(request, env, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.39" });
+  if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.40" });
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -551,6 +551,11 @@ async function handleApi(request, env, url) {
    const object=await env.MEDIA?.get("michi-game/home-background");if(!object)return json({error:"Imagen no configurada."},404);
    return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"image/webp","cache-control":"public, max-age=300","etag":object.httpEtag||"michi-art","x-content-type-options":"nosniff"}});
   }
+  if(url.pathname==="/api/michi/bark/current"&&(request.method==="GET"||request.method==="HEAD")){
+   if(!(await currentUser(request,env)))return json({error:"Inicia sesión primero."},401);
+   const object=await env.MEDIA?.get("michi-game/bark");if(!object)return json({error:"No hay ladrido personalizado."},404);
+   return new Response(request.method==="HEAD"?null:object.body,{headers:{"content-type":object.httpMetadata?.contentType||"audio/mpeg","cache-control":"no-store","accept-ranges":"bytes","etag":object.httpEtag||"michi-bark","content-length":String(object.size),"x-content-type-options":"nosniff"}});
+  }
   if(url.pathname==="/api/michi/music/current"&&(request.method==="GET"||request.method==="HEAD")){
    if(!(await currentUser(request,env)))return json({error:"Inicia sesión primero."},401);
    const object=await env.MEDIA?.get("michi-game/music");if(!object)return json({error:"No hay canción configurada."},404);
@@ -560,14 +565,14 @@ async function handleApi(request, env, url) {
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
    if(!(await isPrimaryAdmin(user,env)))return json({error:"Solo el administrador principal puede configurar MICHI VS DOG."},403);
    if(!env.MEDIA)return json({error:"El bucket R2 no está vinculado."},503);
-   const kind=url.pathname.endsWith("/art")?"art":url.pathname.endsWith("/music")?"music":null;
+   const kind=url.pathname.endsWith("/art")?"art":url.pathname.endsWith("/music")?"music":url.pathname.endsWith("/bark")?"bark":null;
    if(!kind)return json({error:"Recurso no válido."},404);
-   const key=kind==="art"?"michi-game/home-background":"michi-game/music";
+   const key=kind==="art"?"michi-game/home-background":kind==="music"?"michi-game/music":"michi-game/bark";
    if(request.method==="GET"){const o=await env.MEDIA.head(key);return json({configured:!!o,fileName:o?.customMetadata?.fileName||null,size:o?.size||0});}
-   if(request.method==="DELETE"&&kind==="art"){await env.MEDIA.delete(key);return json({ok:true});}
+   if(request.method==="DELETE"&&(kind==="art"||kind==="bark")){await env.MEDIA.delete(key);return json({ok:true});}
    if(request.method==="POST"){
     const form=await request.formData(),file=form.get("file");if(!file||typeof file.arrayBuffer!=="function"||!file.size)return json({error:"Selecciona un archivo."},400);
-    const max=kind==="art"?5*1024*1024:15*1024*1024;if(file.size>max)return json({error:kind==="art"?"La imagen supera 5 MB.":"El audio supera 15 MB."},413);
+    const max=kind==="art"?5*1024*1024:kind==="bark"?5*1024*1024:15*1024*1024;if(file.size>max)return json({error:kind==="art"?"La imagen supera 5 MB.":kind==="bark"?"El ladrido supera 5 MB.":"El audio supera 15 MB."},413);
     const allowed=kind==="art"?new Set(["image/jpeg","image/png","image/webp"]):new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/wav","audio/x-wav","audio/webm"]);
     if(!allowed.has(String(file.type).toLowerCase()))return json({error:kind==="art"?"Usa JPG, PNG o WEBP.":"Usa MP3, M4A, AAC, OGG, WAV o WEBM."},400);
     const fileName=String(file.name||"michi-"+kind).replace(/[\\r\\n"]/g,"").slice(0,120);
