@@ -1555,10 +1555,8 @@ async function openDuckHuntGame(){
  }
  async function start(){
   if(active)return;const startButton=modal.querySelector("#duckhunt-start");startButton.disabled=true;
-  if(!unlimited&&!lifeConsumed){
-   try{const res=await api("/api/duckhunt/lives",{method:"POST",body:JSON.stringify({action:"consume-life"}),noMemoryCache:true});lifeConsumed=true;state.livesRemaining=res.livesRemaining;hud();feedback.textContent="VIDAS RESTANTES HOY: "+res.livesRemaining;}
-   catch(e){feedback.textContent=e.message||"No tienes vidas disponibles.";startButton.disabled=false;return;}
-  }
+  try{const res=await api("/api/duckhunt/lives",{method:"POST",body:JSON.stringify({action:"consume-life"}),noMemoryCache:true});lifeConsumed=true;state.livesRemaining=res.livesRemaining;gameId=res.gameId;hud();feedback.textContent=unlimited?"MODO ADMINISTRADOR · VIDAS INFINITAS":"VIDAS RESTANTES HOY: "+res.livesRemaining;}
+  catch(e){feedback.textContent=e.message||"No tienes vidas disponibles.";startButton.disabled=false;return;}
   if(!unlimited&&Number(state.livesRemaining)<=0&&!lifeConsumed){feedback.textContent="¡Vuelve mañana! Ya usaste tus 5 vidas.";startButton.disabled=false;return;}
   score=0;ducksShot=0;ammo=3;escaped=0;speedTier=0;elapsed=0;planeNext=rnd(7,12);carNext=rnd(10,18);ducks=[];shots=[];explosions=[];spawn=.2;ended=false;active=true;startButton.disabled=false;last=performance.now();overlay.classList.add("hidden");void gameAudio.play().catch(()=>{});hud();raf=requestAnimationFrame(loop);
  }
