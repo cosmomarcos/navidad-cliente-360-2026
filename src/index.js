@@ -508,9 +508,12 @@ async function handleApi(request, env, url) {
 
   if(url.pathname==="/api/michi/state"&&(request.method==="GET"||request.method==="POST")){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   const member=await getParticipantEdition(env,user,url);
-   if(!member||member.team_name!=="Cliente 360")return json({error:"MICHI VS DOG está disponible únicamente para participantes confirmados de Cliente 360."},403);
-   const adminInfiniteLives=true;
+   const requestedEditionId=url.searchParams.get("editionId");
+   const member=requestedEditionId
+    ? await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed' AND w.name='Cliente 360'").bind(user.id,requestedEditionId).first()
+    : await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' AND w.name='Cliente 360' ORDER BY e.year DESC,em.joined_at DESC LIMIT 1").bind(user.id).first();
+   if(!member)return json({error:"No se encontró tu participación confirmada en Cliente 360."},403);
+   const adminInfiniteLives=await isPrimaryAdmin(user,env);
    await env.DB.prepare("CREATE TABLE IF NOT EXISTS michi_daily_lives (edition_id TEXT NOT NULL REFERENCES editions(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,game_date TEXT NOT NULL,lives_remaining INTEGER NOT NULL DEFAULT 5,updated_at TEXT NOT NULL DEFAULT (datetime('now')),PRIMARY KEY(edition_id,user_id,game_date))").run();
    const gameDate=getRozviGameDate();
    await env.DB.prepare("INSERT OR IGNORE INTO michi_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
@@ -524,8 +527,11 @@ async function handleApi(request, env, url) {
   }
   if((url.pathname==="/api/michi/score"&&request.method==="POST")||(url.pathname==="/api/michi/leaderboard"&&request.method==="GET")){
    const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
-   const member=await getParticipantEdition(env,user,url);
-   if(!member||member.team_name!=="Cliente 360")return json({error:"MICHI VS DOG está disponible únicamente para participantes confirmados de Cliente 360."},403);
+   const requestedEditionId=url.searchParams.get("editionId");
+   const member=requestedEditionId
+    ? await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.edition_id=? AND em.status='confirmed' AND w.name='Cliente 360'").bind(user.id,requestedEditionId).first()
+    : await env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' AND w.name='Cliente 360' ORDER BY e.year DESC,em.joined_at DESC LIMIT 1").bind(user.id).first();
+   if(!member)return json({error:"No se encontró tu participación confirmada en Cliente 360."},403);
    await ensureMichiScoresSchema(env);await ensureParticipantProfilesSchema(env);
    if(request.method==="POST"){
     const body=await request.json().catch(()=>({})),gameId=String(body.gameId||"").slice(0,80);
