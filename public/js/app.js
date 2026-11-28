@@ -757,6 +757,20 @@ async function loadAdminPointsAnalysis(){
   if(!people.length)select.innerHTML='<option value="">No hay participantes en esta edición</option>';
  }catch(error){select.innerHTML='<option value="">No se pudieron cargar los participantes</option>';result.innerHTML='<p class="status error">'+esc(error.message)+'</p>';return;}
  result.addEventListener("click",async event=>{
+  const resetButton=event.target.closest("[data-reset-participant-points]");
+  if(resetButton){
+   const userId=select.value,participantName=result.querySelector(".admin-points-audit-summary b")?.textContent||"este participante";
+   const currentTotal=result.querySelector(".admin-points-audit-summary strong")?.textContent?.trim()||"";
+   if(!userId||!window.confirm("Vas a dejar en cero los puntos de "+participantName+" (actualmente "+currentTotal+"). Sus publicaciones, comentarios, deseos y demás contenido se conservarán. ¿Deseas continuar?"))return;
+   resetButton.disabled=true;resetButton.textContent="Reiniciando puntos…";
+   try{
+    const reset=await api("/api/admin/spirit/reset-participant-points",{method:"POST",body:JSON.stringify({userId})});
+    await form.requestSubmit();
+    const notice=document.createElement("p");notice.className="spirit-success";notice.textContent="Puntaje reiniciado correctamente. Se eliminaron "+Number(reset.deleted||0)+" movimientos.";
+    result.prepend(notice);
+   }catch(error){resetButton.disabled=false;resetButton.textContent="↺ Poner puntaje en cero";window.alert(error.message||"No se pudo reiniciar el puntaje.");}
+   return;
+  }
   const button=event.target.closest("[data-delete-point]");if(!button)return;
   const pointId=button.dataset.deletePoint,userId=select.value;
   if(!pointId||!userId)return;
@@ -776,7 +790,7 @@ async function loadAdminPointsAnalysis(){
    for(const entry of entries){const key=entry.source_type+"|"+entry.description;const group=groups.get(key)||{sourceType:entry.source_type,description:entry.description,points:0,count:0};group.points+=Number(entry.points||0);group.count++;groups.set(key,group);}
    const items=[...groups.values()].sort((x,y)=>y.points-x.points);
    const typeLabel={like:"Me gusta recibidos",submission:"Participación",achievement:"Logros",daily_action:"Acciones diarias",daily_winner:"Reto diario ganador",bonus_approved:"Bonus aprobado",community_bonus:"Bonus de comunidad",admin_adjustment:"Ajuste manual"};
-   result.innerHTML='<section class="admin-points-audit-summary"><div><span>PARTICIPANTE</span><b>'+esc(data.participant.displayName)+'</b></div><div><span>PUNTAJE TOTAL</span><strong>'+Number(data.totalPoints||0)+' <small>pts</small></strong></div></section>'+(items.length?'<div class="admin-points-audit-list"><h4>Desglose de puntos</h4>'+items.map(item=>'<article class="admin-points-audit-row"><div><b>'+esc(item.description||typeLabel[item.sourceType]||item.sourceType)+'</b><small>'+esc(typeLabel[item.sourceType]||item.sourceType)+(item.count>1?' · '+item.count+' registros':'')+'</small></div><strong>'+(item.points>0?'+':'')+item.points+' pts</strong></article>').join("")+'</div><details class="admin-points-audit-history" open><summary>Historial individual ('+entries.length+')</summary>'+entries.map(entry=>'<div class="admin-points-history-row"><span>'+esc(entry.description||typeLabel[entry.source_type]||entry.source_type)+'<small>'+esc(typeLabel[entry.source_type]||entry.source_type)+' · '+esc(entry.created_at||"")+'</small></span><div class="admin-points-history-actions"><b>'+(Number(entry.points)>0?'+':'')+Number(entry.points)+' pts</b><button type="button" class="admin-points-history-delete" data-delete-point="'+esc(entry.id)+'">Eliminar</button></div></div>').join("")+'</details>':'<p class="muted">Este participante todavía no tiene movimientos de puntaje registrados.</p>');
+   result.innerHTML='<section class="admin-points-audit-summary"><div><span>PARTICIPANTE</span><b>'+esc(data.participant.displayName)+'</b></div><div><span>PUNTAJE TOTAL</span><strong>'+Number(data.totalPoints||0)+' <small>pts</small></strong></div></section><button type="button" class="admin-action" data-reset-participant-points>↺ Poner puntaje en cero</button>'+(items.length?'<div class="admin-points-audit-list"><h4>Desglose de puntos</h4>'+items.map(item=>'<article class="admin-points-audit-row"><div><b>'+esc(item.description||typeLabel[item.sourceType]||item.sourceType)+'</b><small>'+esc(typeLabel[item.sourceType]||item.sourceType)+(item.count>1?' · '+item.count+' registros':'')+'</small></div><strong>'+(item.points>0?'+':'')+item.points+' pts</strong></article>').join("")+'</div><details class="admin-points-audit-history" open><summary>Historial individual ('+entries.length+')</summary>'+entries.map(entry=>'<div class="admin-points-history-row"><span>'+esc(entry.description||typeLabel[entry.source_type]||entry.source_type)+'<small>'+esc(typeLabel[entry.source_type]||entry.source_type)+' · '+esc(entry.created_at||"")+'</small></span><div class="admin-points-history-actions"><b>'+(Number(entry.points)>0?'+':'')+Number(entry.points)+' pts</b><button type="button" class="admin-points-history-delete" data-delete-point="'+esc(entry.id)+'">Eliminar</button></div></div>').join("")+'</details>':'<p class="muted">Este participante todavía no tiene movimientos de puntaje registrados.</p>');
   }catch(error){result.innerHTML='<p class="status error">'+esc(error.message||"No se pudo analizar el puntaje.")+'</p>';}
   finally{button.disabled=false;button.textContent="Analizar puntaje";}
  });
