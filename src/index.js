@@ -608,7 +608,7 @@ async function handleApi(request, env, url) {
     const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"DIVORZINHA está disponible únicamente para participantes confirmados de Cliente 360."},403);
     const admin=await isPrimaryAdmin(user,env);
-    const homeOnly=await isHomeOnlyAccount(env,user);if(!admin)return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
+    if(!admin)return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
     await ensureDivorzhinhaSchema(env);
     const gameDate=getRozviGameDate();
     await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
@@ -817,6 +817,7 @@ if(url.pathname==="/api/duckhunt/home-background"&&request.method==="GET"){
     if (!user) return json({ authenticated: false });
     await ensureParticipantProfilesSchema(env);
     const admin=await isPrimaryAdmin(user,env);
+    const homeOnly=await isHomeOnlyAccount(env,user);
     const requestedId=url.searchParams.get("editionId");
     if(admin){
       const targetEdition=requestedId
