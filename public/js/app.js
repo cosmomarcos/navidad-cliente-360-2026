@@ -765,8 +765,10 @@ async function loadAdminPointsAnalysis(){
    resetButton.disabled=true;resetButton.textContent="Reiniciando puntos…";
    try{
     const reset=await api("/api/admin/spirit/reset-participant-points",{method:"POST",body:JSON.stringify({userId})});
-    await form.requestSubmit();
-    const notice=document.createElement("p");notice.className="spirit-success";notice.textContent="Puntaje reiniciado correctamente. Se eliminaron "+Number(reset.deleted||0)+" movimientos.";
+    const total=result.querySelector(".admin-points-audit-summary strong");if(total)total.innerHTML='0 <small>pts</small>';
+    result.querySelector(".admin-points-audit-list")?.remove();result.querySelector(".admin-points-audit-history")?.remove();
+    resetButton.textContent="Puntaje en cero ✓";
+    const notice=document.createElement("p");notice.className="spirit-success";notice.textContent="Puntaje reiniciado correctamente. Se eliminaron "+Number(reset.deleted||0)+" movimientos. El contenido del participante se conservó.";
     result.prepend(notice);
    }catch(error){resetButton.disabled=false;resetButton.textContent="↺ Poner puntaje en cero";window.alert(error.message||"No se pudo reiniciar el puntaje.");}
    return;
