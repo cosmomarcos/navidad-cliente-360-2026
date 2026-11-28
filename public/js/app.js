@@ -310,6 +310,7 @@ function renderMemberApp(){
  let app=$("#member-app");app.classList.remove("hidden");
  const name=currentUser.participantProfile?.first_name||currentUser.user.display_name||"Participante";
  const isOnboarding=currentUser.membership?.team_name==="Onboarding Digital";
+ const homeOnly=!!currentUser.homeOnly;
  if(currentUser.membership?.edition_id&&selectedEditionId!==currentUser.membership.edition_id){selectedEditionId=currentUser.membership.edition_id;try{localStorage.setItem("navidad_selected_edition",selectedEditionId);}catch{}apiMemoryCache.clear();}
  const budgetAmount=currentUser.membership?.budget_amount;
  const budgetCurrency=currentUser.membership?.currency||"PEN";
@@ -322,20 +323,19 @@ function renderMemberApp(){
  const michiAnnouncement=currentUser.membership?.team_name==="Cliente 360"?'<section class="rozvi-announcement michi-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-copy michi-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE</span><h2>MICHI VS DOG</h2><p>¡ATRAPA LOS YAPECREDITOS Y SUPERA TU MARCA!</p><button type="button" id="michi-open-game" class="rozvi-play-button michi-play-button">JUGAR AHORA <span>→</span></button></div></section>':"";
  const duckHuntAnnouncement=currentUser.membership?.team_name==="Cliente 360"?'<section class="rozvi-announcement nikehunt-announcement" aria-label="Nuevo juego disponible"><div class="rozvi-announcement-copy nikehunt-copy"><span class="rozvi-kicker">NUEVO JUEGO DISPONIBLE</span><h2>NIKE HUNT</h2><p>¡CAZA LOS PATOS Y SUPERA TU MARCA!</p><button type="button" id="duckhunt-open-game" class="rozvi-play-button nikehunt-play-button">Jugar ahora <span>→</span></button></div></section>':"";
 
- app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}${divorzhinhaAnnouncement}${duckHuntAnnouncement}${michiAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button><button data-tab="secret"><span>🎁</span>Mi secreto <span class="nav-unread-badge" id="secret-unread-badge" hidden></span></button><button data-tab="community" aria-label="Mensajes"><span>✉️</span>Mensajes</button><button data-tab="wishes"><span>💝</span>Deseos <span class="nav-unread-badge" id="wishes-unread-badge" hidden></span></button><button data-tab="spirit"><span>🎄</span>Espíritu <span class="nav-unread-badge" id="spirit-unread-badge" hidden></span></button><button data-tab="achievements"><span>🏆</span>Logros</button><button data-tab="profile"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab="admin-settings"><span>⚙️</span>Ajustes</button>':""}</nav>`;
- if(currentUser.membership?.team_name==="Cliente 360") initRozviGame();
- if(currentUser.membership?.team_name==="Cliente 360"){initDivorzhinhaGame();loadDivorzhinhaHomeArt();initDuckHuntGame();loadNikeHuntHomeArt();}
- if(currentUser.membership?.team_name==="Cliente 360"){import("./michi.js?v=2.11.43").then(m=>m.initMichiGame()).catch(e=>console.error("MICHI VS DOG init:",e));}
+ app.innerHTML=`<section class="member-home" id="member-tab-content">${homeMarkup}${rozviAnnouncement}${divorzhinhaAnnouncement}${duckHuntAnnouncement}${michiAnnouncement}</section><nav class="bottom-nav" aria-label="Menú principal"><button class="active" data-tab="home"><span>⌂</span>Inicio</button>${homeOnly?"":"<button data-tab=\"secret\"><span>🎁</span>Mi secreto <span class=\"nav-unread-badge\" id=\"secret-unread-badge\" hidden></span></button><button data-tab=\"community\" aria-label=\"Mensajes\"><span>✉️</span>Mensajes</button><button data-tab=\"wishes\"><span>💝</span>Deseos <span class=\"nav-unread-badge\" id=\"wishes-unread-badge\" hidden></span></button><button data-tab=\"spirit\"><span>🎄</span>Espíritu <span class=\"nav-unread-badge\" id=\"spirit-unread-badge\" hidden></span></button><button data-tab=\"achievements\"><span>🏆</span>Logros</button><button data-tab=\"profile\"><span>👥</span>Mi equipo</button>${currentUser.isPrimaryAdmin?'<button data-tab=\"admin-settings\"><span>⚙️</span>Ajustes</button>':\"\"}"}</nav>`;
+ if(!homeOnly&&currentUser.membership?.team_name==="Cliente 360") initRozviGame();
+ if(!homeOnly&&currentUser.membership?.team_name==="Cliente 360"){initDivorzhinhaGame();loadDivorzhinhaHomeArt();initDuckHuntGame();loadNikeHuntHomeArt();}
+ if(!homeOnly&&currentUser.membership?.team_name==="Cliente 360"){import("./michi.js?v=2.11.43").then(m=>m.initMichiGame()).catch(e=>console.error("MICHI VS DOG init:",e));}
  if(isOnboarding)loadOnboardingHome();else loadClient360HomePhoto();
- startActivityHeartbeat();
+ if(!homeOnly)startActivityHeartbeat();
  updateMemberCountdown(currentUser.membership?.event_date);
 
  prefetchMemberTabs();
  if(communityPollTimer)clearInterval(communityPollTimer);
- updateTabUnreadBadges();
- communityPollTimer=setInterval(updateTabUnreadBadges,90000);
+ if(!homeOnly){updateTabUnreadBadges();communityPollTimer=setInterval(updateTabUnreadBadges,90000);}
  app.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{setClass("#join-card","hidden",true);setClass("#member-tab-content","hidden",false);setSnowfall(btn.dataset.tab==="home");app.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.tab==="profile"){showProfileSettings();return;}if(btn.dataset.tab==="admin-settings"){showAdminSettings();return;}if(btn.dataset.tab==="secret"){renderSecretTab();return;}if(btn.dataset.tab==="wishes"){renderWishesTab();return;}if(btn.dataset.tab==="community"){renderCommunityTab();return;}if(btn.dataset.tab==="spirit"){renderSpiritTab();return;}if(btn.dataset.tab==="achievements"){renderAchievementsTab();return;}const labels={home:"Inicio",secret:"Mi amigo secreto",community:"Mensajes",wishes:"Lista de deseos"};if(btn.dataset.tab!=="home"){const section=app.querySelector(".member-home");section.innerHTML=`<div class="member-section-heading"><p class="kicker">NAVIDAD PYME · 2026</p><h2>${labels[btn.dataset.tab]}</h2></div><article class="member-feature"><span>${btn.dataset.tab==="secret"?"🎁":btn.dataset.tab==="community"?"💬":"💝"}</span><div><b>${labels[btn.dataset.tab]}</b><p>Esta funcionalidad se habilitará en su fase correspondiente del proyecto.</p></div><small>Próximamente</small></article>`;}else{renderMemberApp();}}));
- const requestedTab=new URLSearchParams(location.search).get("tab");
+ const requestedTab=homeOnly?"home":new URLSearchParams(location.search).get("tab");
  if(requestedTab==="community"||requestedTab==="achievements"){
   const cleanUrl=new URL(location.href);
   cleanUrl.searchParams.delete("tab");
