@@ -1339,6 +1339,36 @@ if(url.pathname==="/api/duckhunt/home-background"&&request.method==="GET"){
       return json({participant:{userId:member.user_id,displayName:member.display_name,status:member.status},totalPoints:entries.reduce((sum,row)=>sum+Number(row.points||0),0),entries});
     }
 
+    if(request.method==="POST"&&url.pathname==="/api/admin/spirit/reset-participant-points"){
+      const edition=await getAdminEdition(env,url);
+      if(!edition)return json({error:"No hay una edición configurada."},404);
+      const body=await request.json().catch(()=>({}));
+      const targetUserId=String(body.userId||"").trim();
+      if(!targetUserId)return json({error:"Selecciona un participante."},400);
+      const member=await env.DB.prepare("SELECT user_id FROM edition_members WHERE edition_id=? AND user_id=? AND status IN ('confirmed','inactive')").bind(edition.id,targetUserId).first();
+      if(!member)return json({error:"El participante no pertenece a esta edición."},404);
+      await ensureSpiritSchema(env);
+      const metrics=await getSpiritAchievementMetrics(env,edition.id,targetUserId);
+      const baselines={
+        first_post:metrics.submissions,wishes_full:metrics.wishCount,son_webadas:0,
+        three_posts:metrics.submissions,five_posts:metrics.submissions,community_star:metrics.likes,
+        frequent:metrics.activeDays,multimedia:Math.min(metrics.voiceCount,metrics.photoCount),
+        kind_companion:metrics.likesGiven,star_commenter:metrics.commentsGiven,early_bird:metrics.earlyDays,
+        unstoppable_days:metrics.activeDays,challenge_marathon:metrics.maxChallengeStreak,
+        spirit_unstoppable:metrics.distinctChallenges,good_neighbor:metrics.commentsGiven,
+        kindness_giver:metrics.likesGiven,official_motivator:metrics.peopleMotivated,
+        christmas_voice:metrics.voiceCount,sopranos:metrics.voiceCount,
+        multitalented_artist:Math.min(Math.floor(metrics.photoCount/3),Math.floor(metrics.voiceCount/3)),
+        icebreaker:metrics.icebreaker,christmas_legend:0
+      };
+      const resetStatements=Object.entries(baselines).map(([achievementId,baseline])=>
+        env.DB.prepare("INSERT INTO spirit_achievement_progress_resets (edition_id,user_id,achievement_id,baseline_progress,created_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(edition_id,user_id,achievement_id) DO UPDATE SET baseline_progress=excluded.baseline_progress,created_at=datetime('now')").bind(edition.id,targetUserId,achievementId,baseline)
+      );
+      const deleted=await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=?").bind(edition.id,targetUserId).run();
+      await env.DB.batch(resetStatements);
+      return json({ok:true,deleted:deleted.meta?.changes||0,totalPoints:0});
+    }
+
     const adminPointDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/points\/([A-Za-z0-9-]+)$/);
     if(request.method==="DELETE"&&adminPointDeleteMatch){
       const edition=await getAdminEdition(env,url);
