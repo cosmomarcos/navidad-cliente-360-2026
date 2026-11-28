@@ -496,8 +496,23 @@ async function getParticipantEdition(env,user,url){
  return env.DB.prepare("SELECT em.id,em.edition_id,em.status,e.title,e.year,e.event_date,e.budget_amount,e.currency,w.name AS team_name,e.status AS edition_status FROM edition_members em JOIN editions e ON e.id=em.edition_id JOIN workspace w ON w.id=e.workspace_id WHERE em.user_id=? AND em.status='confirmed' ORDER BY em.joined_at DESC LIMIT 1").bind(user.id).first();
 }
 
+async function isHomeOnlyAccount(env,user) {
+  if(!user?.id)return false;
+  const row=await env.DB.prepare("SELECT u.display_name, p.first_name, p.last_name FROM users u LEFT JOIN participant_profiles p ON p.user_id=u.id WHERE u.id=?").bind(user.id).first();
+  const names=[row?.display_name,[row?.first_name,row?.last_name].filter(Boolean).join(" ")].map(x=>String(x||"").trim().toLocaleLowerCase("es-PE"));
+  return names.some(name=>["david sánchez","david sanchez","juan josé soto","juan jose soto"].includes(name));
+}
+
 async function handleApi(request, env, url) {
   if (request.method === "GET" && url.pathname === "/api/health") return json({ ok: true, app: env.APP_NAME, version: "2.11.43" });
+  // Acceso mínimo de solo lectura: David Sánchez y Juan José Soto únicamente pueden consultar Inicio.
+  const routeIsAuth = url.pathname === "/api/auth/google" || url.pathname === "/api/auth/logout" || url.pathname === "/api/me";
+  if (!routeIsAuth) {
+    const sessionUser = await currentUser(request, env);
+    if (sessionUser && await isHomeOnlyAccount(env, sessionUser) && !(request.method === "GET" && url.pathname === "/api/edition/home")) {
+      return json({ error: "Tu cuenta tiene acceso limitado exclusivamente a la pestaña Inicio." }, 403);
+    }
+  }
   if (request.method === "GET" && url.pathname === "/api/edition/home") {
     const user=await currentUser(request,env); if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url); if(!member)return json({error:"No tienes una edición activa."},403);
@@ -592,7 +607,8 @@ async function handleApi(request, env, url) {
    try{
     const user=await currentUser(request,env);if(!user)return json({error:"Inicia sesión primero."},401);
     const member=await getParticipantEdition(env,user,url);if(!member||member.team_name!=="Cliente 360")return json({error:"DIVORZINHA está disponible únicamente para participantes confirmados de Cliente 360."},403);
-    const admin=await isPrimaryAdmin(user,env);if(!admin)return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
+    const admin=await isPrimaryAdmin(user,env);
+    const homeOnly=await isHomeOnlyAccount(env,user);if(!admin)return json({error:"DIVORZINHA está deshabilitado para los participantes."},403);
     await ensureDivorzhinhaSchema(env);
     const gameDate=getRozviGameDate();
     await env.DB.prepare("INSERT OR IGNORE INTO divorzhinha_daily_lives(edition_id,user_id,game_date,lives_remaining) VALUES(?,?,?,5)").bind(member.edition_id,user.id,gameDate).run();
@@ -819,7 +835,7 @@ if(url.pathname==="/api/duckhunt/home-background"&&request.method==="GET"){
     const memberships=membershipsResult.results||[];
     const membership=requestedId?memberships.find(x=>x.edition_id===requestedId)||null:memberships[memberships.length-1]||null;
     const profile = await env.DB.prepare("SELECT first_name, last_name FROM participant_profiles WHERE user_id=?").bind(user.id).first();
-    return json({ authenticated:true,user,isPrimaryAdmin:admin,membership,memberships,participantProfile:profile||null }, 200, { "set-cookie": cookie(await createSession(user, env.SESSION_SECRET)) });
+    return json({ authenticated:true,user,isPrimaryAdmin:admin,homeOnly,membership,memberships,participantProfile:profile||null }, 200, { "set-cookie": cookie(await createSession(user, env.SESSION_SECRET)) });
   }
   if (request.method === "GET" && url.pathname === "/api/participants") {
     const user = await currentUser(request, env);
