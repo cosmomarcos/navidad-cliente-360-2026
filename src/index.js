@@ -1364,9 +1364,12 @@ if(url.pathname==="/api/duckhunt/home-background"&&request.method==="GET"){
       const resetStatements=Object.entries(baselines).map(([achievementId,baseline])=>
         env.DB.prepare("INSERT INTO spirit_achievement_progress_resets (edition_id,user_id,achievement_id,baseline_progress,created_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(edition_id,user_id,achievement_id) DO UPDATE SET baseline_progress=excluded.baseline_progress,created_at=datetime('now')").bind(edition.id,targetUserId,achievementId,baseline)
       );
-      const deleted=await env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=?").bind(edition.id,targetUserId).run();
-      await env.DB.batch(resetStatements);
-      return json({ok:true,deleted:deleted.meta?.changes||0,totalPoints:0});
+      const batchResults=await env.DB.batch([
+        ...resetStatements,
+        env.DB.prepare("DELETE FROM spirit_points WHERE edition_id=? AND user_id=?").bind(edition.id,targetUserId)
+      ]);
+      const deleted=batchResults?.[batchResults.length-1]?.meta?.changes||0;
+      return json({ok:true,deleted,totalPoints:0});
     }
 
     const adminPointDeleteMatch=url.pathname.match(/^\/api\/admin\/spirit\/points\/([A-Za-z0-9-]+)$/);
